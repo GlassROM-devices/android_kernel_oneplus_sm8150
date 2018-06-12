@@ -1536,3 +1536,5 @@ endif
 
 source "lib/Kconfig"
 source "coretech/Kconfig"
+
+source "techpack/Kconfig"
