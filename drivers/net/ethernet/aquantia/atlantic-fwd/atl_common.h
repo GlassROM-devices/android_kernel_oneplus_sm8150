@@ -71,24 +71,31 @@ struct atl_global_stats {
 enum {
 	ATL_RXF_VLAN_BASE = 0,
 	ATL_RXF_VLAN_MAX = 8,
-	ATL_RXF_NTUPLE_BASE = ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX,
+	ATL_RXF_ETYPE_BASE = ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX,
+	ATL_RXF_ETYPE_MAX = 16,
+	ATL_RXF_NTUPLE_BASE = ATL_RXF_ETYPE_BASE + ATL_RXF_ETYPE_MAX,
 	ATL_RXF_NTUPLE_MAX = 8,
 };
 
+enum atl_rxf_common_cmd {
+	ATL_RXF_EN = BIT(31),
+	ATL_RXF_RXQ_MSK = BIT(5) - 1,
+};
+
 enum atl_ntuple_cmd {
-	ATL_NTC_EN = BIT(31),	/* Filter enabled */
+	ATL_NTC_EN = ATL_RXF_EN, /* Filter enabled */
 	ATL_NTC_V6 = BIT(30),	/* IPv6 mode -- only valid in filters
 				 * 0 and 4 */
 	ATL_NTC_SA = BIT(29),	/* Match source address */
 	ATL_NTC_DA = BIT(28),	/* Match destination address */
 	ATL_NTC_SP = BIT(27),	/* Match source port */
 	ATL_NTC_DP = BIT(26),	/* Match destination port */
-	ATL_NTC_PROTO = BIT(25),	/* Match L4 proto */
+	ATL_NTC_PROTO = BIT(25), /* Match L4 proto */
 	ATL_NTC_ARP = BIT(24),
 	ATL_NTC_RXQ = BIT(23),	/* Assign Rx queue */
 	ATL_NTC_ACT_SHIFT = 16,
 	ATL_NTC_RXQ_SHIFT = 8,
-	ATL_NTC_RXQ_MASK = (BIT(5) - 1) << ATL_NTC_RXQ_SHIFT,
+	ATL_NTC_RXQ_MASK = ATL_RXF_RXQ_MSK << ATL_NTC_RXQ_SHIFT,
 	ATL_NTC_L4_MASK = BIT(3) - 1,
 	ATL_NTC_L4_TCP = 0,
 	ATL_NTC_L4_UDP = 1,
@@ -114,16 +121,30 @@ struct atl_rxf_ntuple {
 };
 
 enum atl_vlan_cmd {
-	ATL_VLAN_EN = BIT(31),
+	ATL_VLAN_EN = ATL_RXF_EN,
 	ATL_VLAN_RXQ = BIT(28),
 	ATL_VLAN_RXQ_SHIFT = 20,
-	ATL_VLAN_RXQ_MASK = (BIT(5) - 1) << ATL_VLAN_RXQ_SHIFT,
+	ATL_VLAN_RXQ_MASK = ATL_RXF_RXQ_MSK << ATL_VLAN_RXQ_SHIFT,
 	ATL_VLAN_ACT_SHIFT = 16,
 	ATL_VLAN_VID_MASK = BIT(12) - 1,
 };
 
 struct atl_rxf_vlan {
 	uint32_t cmd[ATL_RXF_VLAN_MAX];
+	int count;
+};
+
+enum atl_etype_cmd {
+	ATL_ETYPE_EN = ATL_RXF_EN,
+	ATL_ETYPE_RXQ = BIT(29),
+	ATL_ETYPE_RXQ_SHIFT = 20,
+	ATL_ETYPE_RXQ_MASK = ATL_RXF_RXQ_MSK << ATL_ETYPE_RXQ_SHIFT,
+	ATL_ETYPE_ACT_SHIFT = 16,
+	ATL_ETYPE_VAL_MASK = BIT(16) - 1,
+};
+
+struct atl_rxf_etype {
+	uint32_t cmd[ATL_RXF_ETYPE_MAX];
 	int count;
 };
 
@@ -149,6 +170,7 @@ struct atl_nic {
 	spinlock_t stats_lock;
 	struct atl_rxf_ntuple rxf_ntuple;
 	struct atl_rxf_vlan rxf_vlan;
+	struct atl_rxf_etype rxf_etype;
 };
 
 enum atl_nic_flags {

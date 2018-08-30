@@ -766,27 +766,66 @@ static int atl_set_coalesce(struct net_device *ndev,
 	return 0;
 }
 
-static int atl_get_vlan(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+struct atl_rxf_flt_desc {
+	int base;
+	int count;
+	uint32_t rxq_bit;
+	int rxq_shift;
+	size_t cmd_offt;
+	size_t count_offt;
+	int (*get_rxf)(const struct atl_rxf_flt_desc *desc,
+		struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp);
+	int (*set_rxf)(const struct atl_rxf_flt_desc *desc,
+		struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp);
+	void (*update_rxf)(struct atl_nic *nic, int idx);
+};
+
+static inline int atl_rxf_idx(const struct atl_rxf_flt_desc *desc,
+	struct ethtool_rx_flow_spec *fsp)
+{
+	return fsp->location - desc->base;
+}
+
+static inline uint64_t atl_ring_cookie(const struct atl_rxf_flt_desc *desc,
+	uint32_t cmd)
+{
+	return (cmd & desc->rxq_bit) ?
+		(cmd >> desc->rxq_shift) & ATL_RXF_RXQ_MSK :
+		RX_CLS_FLOW_DISC;
+}
+
+static int atl_rxf_get_vlan(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 {
 	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
-	uint32_t idx = fsp->location - ATL_RXF_VLAN_BASE;
+	int idx = atl_rxf_idx(desc, fsp);
 	uint32_t cmd = vlan->cmd[idx];
 
-	if (!(cmd & ATL_VLAN_EN))
+	if (!(cmd & ATL_RXF_EN))
 		return -EINVAL;
-
-	memset(&fsp->h_u, 0, sizeof(fsp->h_u));
-	memset(&fsp->m_u, 0, sizeof(fsp->m_u));
-	memset(&fsp->h_ext, 0, sizeof(fsp->h_ext));
-	memset(&fsp->m_ext, 0, sizeof(fsp->m_ext));
 
 	fsp->flow_type = ETHER_FLOW | FLOW_EXT;
 	fsp->h_ext.vlan_tci = htons(cmd & ATL_VLAN_VID_MASK);
 	fsp->m_ext.vlan_tci = htons(BIT(12) - 1);
+	fsp->ring_cookie = atl_ring_cookie(desc, cmd);
 
-	fsp->ring_cookie = (cmd & ATL_VLAN_RXQ) ?
-		(cmd & ATL_NTC_RXQ_MASK) >> ATL_NTC_RXQ_SHIFT :
-		RX_CLS_FLOW_DISC;
+	return 0;
+}
+
+static int atl_rxf_get_etype(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+{
+	struct atl_rxf_etype *etype = &nic->rxf_etype;
+	int idx = atl_rxf_idx(desc, fsp);
+	uint32_t cmd = etype->cmd[idx];
+
+	if (!(cmd & ATL_RXF_EN))
+		return -EINVAL;
+
+	fsp->flow_type = ETHER_FLOW;
+	fsp->m_u.ether_spec.h_proto = 0xffff;
+	fsp->h_u.ether_spec.h_proto = htons(cmd & ATL_ETYPE_VAL_MASK);
+	fsp->ring_cookie = atl_ring_cookie(desc, cmd);
 
 	return 0;
 }
@@ -799,13 +838,14 @@ static inline void atl_ntuple_swap_v6(__be32 dst[4], __be32 src[4])
 		dst[i] = src[3 - i];
 }
 
-static int atl_get_ntuple(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+static int atl_rxf_get_ntuple(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 {
 	struct atl_rxf_ntuple *ntuples = &nic->rxf_ntuple;
-	uint32_t idx = fsp->location - ATL_RXF_NTUPLE_BASE;
+	uint32_t idx = atl_rxf_idx(desc, fsp);
 	uint32_t cmd = ntuples->cmd[idx];
 
-	if (!(cmd & ATL_NTC_EN))
+	if (!(cmd & ATL_RXF_EN))
 		return -EINVAL;
 
 	if (cmd & ATL_NTC_PROTO) {
@@ -832,14 +872,10 @@ static int atl_get_ntuple(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 #ifdef ATL_HAVE_IPV6_NTUPLE
 		if (cmd & ATL_NTC_V6) {
 			fsp->flow_type = IPV6_USER_FLOW;
-			fsp->h_u.usr_ip6_spec.l4_proto = 0;
-			fsp->m_u.usr_ip6_spec.l4_proto = 0;
 		} else
 #endif
 		{
 			fsp->flow_type = IPV4_USER_FLOW;
-			fsp->h_u.usr_ip4_spec.proto = 0;
-			fsp->m_u.usr_ip4_spec.proto = 0;
 		}
 	}
 
@@ -852,34 +888,22 @@ static int atl_get_ntuple(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 			atl_ntuple_swap_v6(rule->ip6src,
 				ntuples->src_ip6[idx / 4]);
 			memset(mask->ip6src, 0xff, sizeof(mask->ip6src));
-		} else {
-			memset(rule->ip6src, 0, sizeof(rule->ip6src));
-			memset(mask->ip6src, 0, sizeof(mask->ip6src));
 		}
 
 		if (cmd & ATL_NTC_DA) {
 			atl_ntuple_swap_v6(rule->ip6dst,
 				ntuples->dst_ip6[idx / 4]);
 			memset(mask->ip6dst, 0xff, sizeof(mask->ip6dst));
-		} else {
-			memset(rule->ip6dst, 0, sizeof(rule->ip6dst));
-			memset(mask->ip6dst, 0, sizeof(mask->ip6dst));
 		}
 
 		if (cmd & ATL_NTC_SP) {
 			rule->psrc = ntuples->src_port[idx];
 			mask->psrc = -1;
-		} else {
-			rule->psrc = 0;
-			mask->psrc = 0;
 		}
 
 		if (cmd & ATL_NTC_DP) {
 			rule->pdst = ntuples->dst_port[idx];
 			mask->pdst = -1;
-		} else {
-			rule->pdst = 0;
-			mask->pdst = 0;
 		}
 	} else
 #endif
@@ -890,41 +914,25 @@ static int atl_get_ntuple(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 		if (cmd & ATL_NTC_SA) {
 			rule->ip4src = ntuples->src_ip4[idx];
 			mask->ip4src = -1;
-		} else {
-			rule->ip4src = 0;
-			mask->ip4src = 0;
 		}
 
 		if (cmd & ATL_NTC_DA) {
 			rule->ip4dst = ntuples->dst_ip4[idx];
 			mask->ip4dst = -1;
-		} else {
-			rule->ip4dst = 0;
-			mask->ip4dst = 0;
 		}
 
 		if (cmd & ATL_NTC_SP) {
 			rule->psrc = ntuples->src_port[idx];
 			mask->psrc = -1;
-		} else {
-			rule->psrc = 0;
-			mask->psrc = 0;
 		}
 
 		if (cmd & ATL_NTC_DP) {
 			rule->pdst = ntuples->dst_port[idx];
 			mask->pdst = -1;
-		} else {
-			rule->pdst = 0;
-			mask->pdst = 0;
 		}
 	}
 
-	if (cmd & ATL_NTC_RXQ)
-		fsp->ring_cookie =
-			(cmd & ATL_NTC_RXQ_MASK) >> ATL_NTC_RXQ_SHIFT;
-	else
-		fsp->ring_cookie = RX_CLS_FLOW_DISC;
+	fsp->ring_cookie = atl_ring_cookie(desc, cmd);
 
 	return 0;
 }
@@ -934,59 +942,27 @@ static int atl_get_rxf_locs(struct atl_nic *nic, struct ethtool_rxnfc *rxnfc,
 {
 	struct atl_rxf_ntuple *ntuple = &nic->rxf_ntuple;
 	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
-	int count = ntuple->count + vlan->count;
+	struct atl_rxf_etype *etype = &nic->rxf_etype;
+	int count = ntuple->count + vlan->count + etype->count;
 	int i;
 
 	if (rxnfc->rule_cnt < count)
 		return -EMSGSIZE;
 
 	for (i = 0; i < ATL_RXF_VLAN_MAX; i++)
-		if (vlan->cmd[i] & ATL_VLAN_EN)
+		if (vlan->cmd[i] & ATL_RXF_EN)
 			*rule_locs++ = i + ATL_RXF_VLAN_BASE;
 
+	for (i = 0; i < ATL_RXF_ETYPE_MAX; i++)
+		if (etype->cmd[i] & ATL_RXF_EN)
+			*rule_locs++ = i + ATL_RXF_ETYPE_BASE;
+
 	for (i = 0; i < ATL_RXF_NTUPLE_MAX; i++)
-		if (ntuple->cmd[i] & ATL_NTC_EN)
+		if (ntuple->cmd[i] & ATL_RXF_EN)
 			*rule_locs++ = i + ATL_RXF_NTUPLE_BASE;
 
 	rxnfc->rule_cnt = count;
 	return 0;
-}
-
-static int atl_get_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *rxnfc,
-	uint32_t *rule_locs)
-{
-	struct atl_nic *nic = netdev_priv(ndev);
-	struct ethtool_rx_flow_spec *fsp = &rxnfc->fs;
-	uint32_t loc = fsp->location;
-	int ret = -ENOTSUPP;
-
-	switch (rxnfc->cmd) {
-	case ETHTOOL_GRXRINGS:
-		rxnfc->data = nic->nvecs;
-		return 0;
-
-	case ETHTOOL_GRXCLSRLCNT:
-		rxnfc->rule_cnt = nic->rxf_ntuple.count + nic->rxf_vlan.count;
-		return 0;
-
-	case ETHTOOL_GRXCLSRULE:
-		if (loc < ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX)
-			ret = atl_get_vlan(nic, fsp);
-		else if (loc < ATL_RXF_NTUPLE_BASE + ATL_RXF_NTUPLE_MAX)
-			ret = atl_get_ntuple(nic, fsp);
-		else
-			return -EINVAL;
-		break;
-
-	case ETHTOOL_GRXCLSRLALL:
-		ret = atl_get_rxf_locs(nic, rxnfc, rule_locs);
-		break;
-
-	default:
-		break;
-	}
-
-	return ret;
 }
 
 static int atl_check_mask(uint8_t *mask, int len, uint32_t *cmd, uint32_t flag)
@@ -994,8 +970,11 @@ static int atl_check_mask(uint8_t *mask, int len, uint32_t *cmd, uint32_t flag)
 	uint8_t first = mask[0];
 	uint8_t *p;
 
+	if (first != 0 && first != 0xff)
+		return -EINVAL;
+
 	for (p = mask; p < &mask[len]; p++)
-		if (*p != first || (*p != 0 && *p != 0xff))
+		if (*p != first)
 			return -EINVAL;
 
 	if (first == 0xff) {
@@ -1008,58 +987,37 @@ static int atl_check_mask(uint8_t *mask, int len, uint32_t *cmd, uint32_t flag)
 	return 0;
 }
 
-static int atl_parse_ring(struct atl_nic *nic, uint64_t ring_cookie)
+static int atl_rxf_set_ring(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp, uint32_t *cmd)
 {
-	int ring = INT_MAX;
+	uint64_t ring_cookie = fsp->ring_cookie;
+	uint32_t ring;
 
-	if (ring_cookie != RX_CLS_FLOW_DISC) {
-		ring = ethtool_get_flow_spec_ring(ring_cookie);
-		if (ring >= nic->nvecs) {
-			atl_nic_err("Invalid Rx filter queue %d\n", ring);
-			return -EINVAL;
-		}
+	if (ring_cookie == RX_CLS_FLOW_DISC)
+		return 0;
 
-		if (ethtool_get_flow_spec_ring_vf(ring_cookie)) {
-			atl_nic_err("Rx filter queue VF must be zero");
-			return -EINVAL;
-		}
-	}
-
-	return ring;
-}
-
-static int atl_add_vlan(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
-{
-	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
-	uint32_t idx = fsp->location - ATL_RXF_VLAN_BASE;
-	uint32_t cmd = ATL_VLAN_EN;
-	int ret, delta = 1, ring;
-	uint16_t vid, mask;
-
-	if (vlan->cmd[idx] & ATL_VLAN_EN)
-		delta = 0;
-
-	ring = atl_parse_ring(nic, fsp->ring_cookie);
-	if (ring < 0)
-		return ring;
-
-	if (fsp->flow_type != (ETHER_FLOW | FLOW_EXT)) {
-		atl_nic_err("Only ether flow-type supported for VLAN filters\n");
+	ring = ethtool_get_flow_spec_ring(ring_cookie);
+	if (ring >= nic->nvecs) {
+		atl_nic_err("Invalid Rx filter queue %d\n", ring);
 		return -EINVAL;
 	}
 
-	ret = atl_check_mask((uint8_t *)&fsp->m_u.ether_spec.h_dest,
-		sizeof(fsp->m_u.ether_spec.h_dest), NULL, 0);
-	if (ret)
-		return ret;
+	if (ethtool_get_flow_spec_ring_vf(ring_cookie)) {
+		atl_nic_err("Rx filter queue VF must be zero");
+		return -EINVAL;
+	}
+
+	*cmd |= ring << desc->rxq_shift | desc->rxq_bit;
+
+	return 0;
+}
+
+static int atl_check_vlan_etype_common(struct ethtool_rx_flow_spec *fsp)
+{
+	int ret;
 
 	ret = atl_check_mask((uint8_t *)&fsp->m_u.ether_spec.h_source,
 		sizeof(fsp->m_u.ether_spec.h_source), NULL, 0);
-	if (ret)
-		return ret;
-
-	ret = atl_check_mask((uint8_t *)&fsp->m_u.ether_spec.h_proto,
-		sizeof(fsp->m_u.ether_spec.h_proto), NULL, 0);
 	if (ret)
 		return ret;
 
@@ -1070,8 +1028,30 @@ static int atl_add_vlan(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 
 	ret = atl_check_mask((uint8_t *)&fsp->m_ext.vlan_etype,
 		sizeof(fsp->m_ext.vlan_etype), NULL, 0);
+
+	return ret;
+}
+
+static int atl_rxf_set_vlan(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+{
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	int idx = atl_rxf_idx(desc, fsp);
+	int ret;
+	uint32_t cmd = ATL_RXF_EN;
+	uint16_t vid, mask;
+
+	if (fsp->flow_type != (ETHER_FLOW | FLOW_EXT)) {
+		atl_nic_err("Only ether flow-type supported for VLAN filters\n");
+		return -EINVAL;
+	}
+
+	ret = atl_check_vlan_etype_common(fsp);
 	if (ret)
 		return ret;
+
+	if (fsp->m_u.ether_spec.h_proto)
+		return -EINVAL;
 
 	vid = ntohs(fsp->h_ext.vlan_tci);
 	mask = ntohs(fsp->m_ext.vlan_tci);
@@ -1079,33 +1059,66 @@ static int atl_add_vlan(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 	if (mask & 0xf000 && vid & 0xf000 & mask)
 		return -EINVAL;
 
+	if ((mask & 0xfff) != 0xfff)
+		return -EINVAL;
+
 	cmd |= vid & 0xfff;
-	if (ring != INT_MAX)
-		cmd |= ATL_VLAN_RXQ | ring << ATL_VLAN_RXQ_SHIFT |
-			1 << ATL_VLAN_ACT_SHIFT;
+
+	ret = atl_rxf_set_ring(desc, nic, fsp, &cmd);
+	if (ret)
+		return ret;
 
 	vlan->cmd[idx] = cmd;
-	vlan->count += delta;
-
-	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), cmd);
 
 	return 0;
 }
 
-static int atl_add_ntuple(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+static int atl_rxf_set_etype(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+{
+	struct atl_rxf_etype *etype = &nic->rxf_etype;
+	int idx = atl_rxf_idx(desc, fsp);
+	int ret;
+	uint32_t cmd = ATL_RXF_EN;
+
+	if (fsp->flow_type != (ETHER_FLOW)) {
+		atl_nic_err("Only ether flow-type supported for ethertype filters\n");
+		return -EINVAL;
+	}
+
+	ret = atl_check_vlan_etype_common(fsp);
+	if (ret)
+		return ret;
+
+	if (fsp->m_ext.vlan_tci)
+		return -EINVAL;
+
+	if (fsp->m_u.ether_spec.h_proto != 0xffff)
+		return -EINVAL;
+
+	cmd |= ntohs(fsp->h_u.ether_spec.h_proto);
+
+	ret = atl_rxf_set_ring(desc, nic, fsp, &cmd);
+	if (ret)
+		return ret;
+
+	etype->cmd[idx] = cmd;
+
+	return 0;
+}
+
+static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 {
 	struct atl_rxf_ntuple *ntuple = &nic->rxf_ntuple;
-	uint32_t idx = fsp->location - ATL_RXF_NTUPLE_BASE;
+	int idx = atl_rxf_idx(desc, fsp);
 	uint32_t cmd = ATL_NTC_EN;
-	int ret, delta = 1, ring;
+	int ret;
 	__be16 sport, dport;
 
-	if (ntuple->cmd[idx] & ATL_NTC_EN)
-		delta = 0;
-
-	ring = atl_parse_ring(nic, fsp->ring_cookie);
-	if (ring < 0)
-		return ring;
+	ret = atl_rxf_set_ring(desc, nic, fsp, &cmd);
+	if (ret)
+		return ret;
 
 	switch (fsp->flow_type) {
 #ifdef ATL_HAVE_IPV6_NTUPLE
@@ -1256,74 +1269,156 @@ static int atl_add_ntuple(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 	if (cmd & ATL_NTC_DP)
 		ntuple->dst_port[idx] = dport;
 
-	if (ring != INT_MAX)
-		cmd |= ATL_NTC_RXQ | ring << ATL_NTC_RXQ_SHIFT |
-			1 << ATL_NTC_ACT_SHIFT;
-
 	ntuple->cmd[idx] = cmd;
-	ntuple->count += delta;
-
-	atl_update_ntuple_flt(nic, idx);
 
 	return 0;
 }
 
-static int atl_del_vlan(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 {
-	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
-	uint32_t idx = fsp->location - ATL_RXF_VLAN_BASE;
+	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), nic->rxf_vlan.cmd[idx]);
+}
 
-	if (!(vlan->cmd[idx] & ATL_VLAN_EN))
+static void atl_rxf_update_etype(struct atl_nic *nic, int idx)
+{
+	atl_write(&nic->hw, ATL_RX_ETYPE_FLT(idx), nic->rxf_etype.cmd[idx]);
+}
+
+static const struct atl_rxf_flt_desc atl_rxf_descs[] = {
+	{
+		.base = ATL_RXF_VLAN_BASE,
+		.count = ATL_RXF_VLAN_MAX,
+		.rxq_bit = ATL_VLAN_RXQ,
+		.rxq_shift = ATL_VLAN_RXQ_SHIFT,
+		.cmd_offt = offsetof(struct atl_nic, rxf_vlan.cmd),
+		.count_offt = offsetof(struct atl_nic, rxf_vlan.count),
+		.get_rxf = atl_rxf_get_vlan,
+		.set_rxf = atl_rxf_set_vlan,
+		.update_rxf = atl_rxf_update_vlan,
+	},
+	{
+		.base = ATL_RXF_ETYPE_BASE,
+		.count = ATL_RXF_ETYPE_MAX,
+		.rxq_bit = ATL_ETYPE_RXQ,
+		.rxq_shift = ATL_ETYPE_RXQ_SHIFT,
+		.cmd_offt = offsetof(struct atl_nic, rxf_etype.cmd),
+		.count_offt = offsetof(struct atl_nic, rxf_etype.count),
+		.get_rxf = atl_rxf_get_etype,
+		.set_rxf = atl_rxf_set_etype,
+		.update_rxf = atl_rxf_update_etype,
+	},
+	{
+		.base = ATL_RXF_NTUPLE_BASE,
+		.count = ATL_RXF_NTUPLE_MAX,
+		.rxq_bit = ATL_NTC_RXQ,
+		.rxq_shift = ATL_NTC_RXQ_SHIFT,
+		.cmd_offt = offsetof(struct atl_nic, rxf_ntuple.cmd),
+		.count_offt = offsetof(struct atl_nic, rxf_ntuple.count),
+		.get_rxf = atl_rxf_get_ntuple,
+		.set_rxf = atl_rxf_set_ntuple,
+		.update_rxf = atl_update_ntuple_flt,
+	},
+};
+
+static uint32_t *atl_rxf_cmd(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic)
+{
+	return (uint32_t *)((char *)nic + desc->cmd_offt);
+}
+
+static int *atl_rxf_count(const struct atl_rxf_flt_desc *desc, struct atl_nic *nic)
+{
+	return (int *)((char *)nic + desc->count_offt);
+}
+
+static const struct atl_rxf_flt_desc *atl_rxf_desc(struct ethtool_rx_flow_spec *fsp)
+{
+	uint32_t loc = fsp->location;
+	const struct atl_rxf_flt_desc *desc = atl_rxf_descs;
+
+	while (desc < atl_rxf_descs + ARRAY_SIZE(atl_rxf_descs)) {
+		if (loc < desc->base)
+			return NULL;
+
+		if (loc < desc->base + desc->count)
+			return desc;
+
+		desc++;
+	}
+
+	return NULL;
+}
+
+static int atl_set_rxf(struct atl_nic *nic,
+	struct ethtool_rx_flow_spec *fsp, bool delete)
+{
+	const struct atl_rxf_flt_desc *desc;
+	uint32_t *cmd;
+	int *count, ret, idx;
+	bool present;
+
+	desc = atl_rxf_desc(fsp);
+	if (!desc)
 		return -EINVAL;
 
-	vlan->cmd[idx] = 0;
-	vlan->count--;
+	idx = atl_rxf_idx(desc, fsp);
+	cmd = &atl_rxf_cmd(desc, nic)[idx];
+	count = atl_rxf_count(desc, nic);
+	present = !!(*cmd & ATL_RXF_EN);
 
-	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), 0);
+	if (!delete) {
+		ret = desc->set_rxf(desc, nic, fsp);
+		if (ret)
+			return ret;
 
-	return 0;
-}
-
-static int atl_del_ntuple(struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
-{
-	struct atl_rxf_ntuple *ntuple = &nic->rxf_ntuple;
-	uint32_t idx = fsp->location - ATL_RXF_NTUPLE_BASE;
-
-	if (!(ntuple->cmd[idx] & ATL_NTC_EN))
+		if (!present)
+			(*count)++;
+	} else if (!present)
+		/* Attempting to delete non-existent filter */
 		return -EINVAL;
+	else {
+		*cmd = 0;
+		(*count)--;
+	}
 
-	ntuple->cmd[idx] = 0;
-	ntuple->count--;
-
-	atl_update_ntuple_flt(nic, idx);
+	desc->update_rxf(nic, idx);
 
 	return 0;
 }
 
-static int atl_set_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *rxnfc)
+static int atl_get_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *rxnfc,
+	uint32_t *rule_locs)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
-	int ret = -ENOTSUPP;
 	struct ethtool_rx_flow_spec *fsp = &rxnfc->fs;
-	uint32_t loc = fsp->location;
+	int ret = -ENOTSUPP;
+	const struct atl_rxf_flt_desc *desc;
 
 	switch (rxnfc->cmd) {
-	case ETHTOOL_SRXCLSRLINS:
-		if (loc < ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX)
-			ret = atl_add_vlan(nic, fsp);
-		else if (loc < ATL_RXF_NTUPLE_BASE + ATL_RXF_NTUPLE_MAX)
-			ret = atl_add_ntuple(nic, fsp);
-		else
+	case ETHTOOL_GRXRINGS:
+		rxnfc->data = nic->nvecs;
+		return 0;
+
+	case ETHTOOL_GRXCLSRLCNT:
+		rxnfc->rule_cnt = nic->rxf_ntuple.count + nic->rxf_vlan.count +
+			nic->rxf_etype.count;
+		return 0;
+
+	case ETHTOOL_GRXCLSRULE:
+		desc = atl_rxf_desc(fsp);
+		if (!desc)
 			return -EINVAL;
+
+		memset(&fsp->h_u, 0, sizeof(fsp->h_u));
+		memset(&fsp->m_u, 0, sizeof(fsp->m_u));
+		memset(&fsp->h_ext, 0, sizeof(fsp->h_ext));
+		memset(&fsp->m_ext, 0, sizeof(fsp->m_ext));
+
+		ret = desc->get_rxf(desc, nic, fsp);
 		break;
 
-	case ETHTOOL_SRXCLSRLDEL:
-		if (loc < ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX)
-			ret = atl_del_vlan(nic, fsp);
-		else if (loc < ATL_RXF_NTUPLE_BASE + ATL_RXF_NTUPLE_MAX)
-			ret = atl_del_ntuple(nic, fsp);
-		else
-			return -EINVAL;
+	case ETHTOOL_GRXCLSRLALL:
+		ret = atl_get_rxf_locs(nic, rxnfc, rule_locs);
 		break;
 
 	default:
@@ -1331,6 +1426,22 @@ static int atl_set_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *rxnfc)
 	}
 
 	return ret;
+}
+
+static int atl_set_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *rxnfc)
+{
+	struct atl_nic *nic = netdev_priv(ndev);
+	struct ethtool_rx_flow_spec *fsp = &rxnfc->fs;
+
+	switch (rxnfc->cmd) {
+	case ETHTOOL_SRXCLSRLINS:
+		return atl_set_rxf(nic, fsp, false);
+
+	case ETHTOOL_SRXCLSRLDEL:
+		return atl_set_rxf(nic, fsp, true);
+	}
+
+	return -ENOTSUPP;
 }
 
 const struct ethtool_ops atl_ethtool_ops = {
