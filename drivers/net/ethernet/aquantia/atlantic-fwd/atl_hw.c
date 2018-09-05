@@ -527,7 +527,7 @@ static void atl_restore_vlan_filters(struct atl_hw *hw)
 		return;
 
 	for (i = ATL_RXF_VLAN_MAX; i < num + ATL_RXF_VLAN_MAX; i++) {
-		vid = find_next_bit(hw->vlan_map, ATL_VID_MAP_LEN, vid + 1);
+		vid = find_next_bit(hw->vlan_map, BIT(12), vid + 1);
 		atl_write(hw, ATL_RX_VLAN_FLT(i),
 			atl_vlan_flt_val(vid));
 	}
