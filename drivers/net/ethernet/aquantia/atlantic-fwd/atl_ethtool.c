@@ -286,7 +286,6 @@ static int atl_ethtool_set_ksettings(struct net_device *ndev,
 #undef atl_add_link_bit
 #undef atl_test_link_bit
 
-#ifdef ATL_HAVE_ETHTOOL_RXHASH
 static uint32_t atl_rss_tbl_size(struct net_device *ndev)
 {
 	return ATL_RSS_TBL_SIZE;
@@ -297,21 +296,14 @@ static uint32_t atl_rss_key_size(struct net_device *ndev)
 	return ATL_RSS_KEY_SIZE;
 }
 
-#ifdef ATL_HAVE_RXHASH_TYPE
 static int atl_rss_get_rxfh(struct net_device *ndev, uint32_t *tbl,
 	uint8_t *key, uint8_t *htype)
-#else
-static int atl_rss_get_rxfh(struct net_device *ndev, uint32_t *tbl,
-	uint8_t *key)
-#endif
 {
 	struct atl_hw *hw = &((struct atl_nic *)netdev_priv(ndev))->hw;
 	int i;
 
-#ifdef ATL_HAVE_RXHASH_TYPE
 	if (htype)
 		*htype = ETH_RSS_HASH_TOP;
-#endif
 
 	if (key)
 		memcpy(key, hw->rss_key, atl_rss_key_size(ndev));
@@ -323,23 +315,16 @@ static int atl_rss_get_rxfh(struct net_device *ndev, uint32_t *tbl,
 	return 0;
 }
 
-#ifdef ATL_HAVE_RXHASH_TYPE
 static int atl_rss_set_rxfh(struct net_device *ndev, const uint32_t *tbl,
 	const uint8_t *key, const uint8_t htype)
-#else
-static int atl_rss_set_rxfh(struct net_device *ndev, const uint32_t *tbl,
-	const uint8_t *key)
-#endif
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_hw *hw = &nic->hw;
 	int i;
 	uint32_t tbl_size = atl_rss_tbl_size(ndev);
 
-#ifdef ATL_HAVE_RXHASH_TYPE
 	if (htype && htype != ETH_RSS_HASH_TOP)
 		return -EINVAL;
-#endif
 
 	if (tbl) {
 		for (i = 0; i < tbl_size; i++)
@@ -360,8 +345,6 @@ static int atl_rss_set_rxfh(struct net_device *ndev, const uint32_t *tbl,
 
 	return 0;
 }
-
-#endif	/* ATL_HAVE_ETHTOOL_RXHASH */
 
 static void atl_get_channels(struct net_device *ndev,
 	struct ethtool_channels *chan)
@@ -1360,12 +1343,10 @@ const struct ethtool_ops atl_ethtool_ops = {
 	.set_link_ksettings = atl_ethtool_set_ksettings,
 #endif
 
-#ifdef ATL_HAVE_ETHTOOL_RXHASH
 	.get_rxfh_indir_size = atl_rss_tbl_size,
 	.get_rxfh_key_size = atl_rss_key_size,
 	.get_rxfh = atl_rss_get_rxfh,
 	.set_rxfh = atl_rss_set_rxfh,
-#endif
 	.get_channels = atl_get_channels,
 	.set_channels = atl_set_channels,
 	.get_rxnfc = atl_get_rxnfc,

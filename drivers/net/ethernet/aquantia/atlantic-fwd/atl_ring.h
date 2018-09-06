@@ -131,6 +131,9 @@ struct atl_queue_vec {
 	struct atl_nic *nic;
 	unsigned idx;
 	char name[IFNAMSIZ + 10];
+#ifdef ATL_COMPAT_PCI_ALLOC_IRQ_VECTORS_AFFINITY
+	cpumask_t affinity_hint;
+#endif
 };
 
 #define atl_for_each_qvec(nic, qvec)				\

@@ -137,7 +137,11 @@ static const struct net_device_ops atl_ndev_ops = {
 #endif
 	.ndo_set_features = atl_set_features,
 	.ndo_set_mac_address = atl_set_mac_address,
+#ifdef ATL_COMPAT_CAST_NDO_GET_STATS64
+	.ndo_get_stats64 = (void *)atl_get_stats64,
+#else
 	.ndo_get_stats64 = atl_get_stats64,
+#endif
 };
 
 /* RTNL lock must be held */

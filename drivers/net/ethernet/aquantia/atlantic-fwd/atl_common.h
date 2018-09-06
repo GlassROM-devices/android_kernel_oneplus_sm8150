@@ -22,6 +22,7 @@
 
 struct atl_nic;
 
+#include "atl_compat.h"
 #include "atl_hw.h"
 
 struct atl_rx_ring_stats {

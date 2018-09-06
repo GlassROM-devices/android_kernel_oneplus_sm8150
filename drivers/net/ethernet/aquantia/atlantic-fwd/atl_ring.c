@@ -1133,6 +1133,8 @@ int atl_init_ring_interrupts(struct atl_nic *nic)
 			goto free_irqs;
 		}
 
+		atl_compat_set_affinity(vector, qvec);
+
 		/* Map ring interrups into corresponding cause bit*/
 		atl_set_intr_bits(hw, i, i + ATL_NUM_NON_RING_IRQS,
 			i + ATL_NUM_NON_RING_IRQS);
@@ -1159,6 +1161,7 @@ free_irqs:
 		int vector = pci_irq_vector(hw->pdev,
 			ATL_NUM_NON_RING_IRQS + i);
 
+		atl_compat_set_affinity(vector, NULL);
 		free_irq(vector, &nic->qvecs[i].napi);
 	}
 
@@ -1173,6 +1176,7 @@ void atl_release_ring_interrupts(struct atl_nic *nic)
 		int vector = pci_irq_vector(nic->hw.pdev,
 			ATL_NUM_NON_RING_IRQS + i);
 
+		atl_compat_set_affinity(vector, NULL);
 		free_irq(vector, &nic->qvecs[i].napi);
 	}
 }
@@ -1189,6 +1193,14 @@ void atl_clear_datapath(struct atl_nic *nic)
 	 */
 	if (!test_and_clear_bit(ATL_ST_CONFIGURED, &nic->state))
 		return;
+
+#ifdef ATL_COMPAT_PCI_ALLOC_IRQ_VECTORS_AFFINITY
+	for (i = 0; i < nic->nvecs; i++) {
+		int vector = pci_irq_vector(nic->hw.pdev,
+			i + ATL_NUM_NON_RING_IRQS);
+		irq_set_affinity_hint(vector, NULL);
+	}
+#endif
 
 	pci_free_irq_vectors(nic->hw.pdev);
 
@@ -1236,6 +1248,8 @@ int atl_setup_datapath(struct atl_nic *nic)
 
 		netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
 	}
+
+	atl_compat_calc_affinities(nic);
 
 	nic->max_mtu = atl_rx_linear ? ATL_MAX_RX_LINEAR_MTU : ATL_MAX_MTU;
 
