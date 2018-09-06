@@ -876,6 +876,7 @@ static int atl_rxf_get_ntuple(const struct atl_rxf_flt_desc *desc,
 #endif
 		{
 			fsp->flow_type = IPV4_USER_FLOW;
+			fsp->h_u.usr_ip4_spec.ip_ver = ETH_RX_NFC_IP4;
 		}
 	}
 
