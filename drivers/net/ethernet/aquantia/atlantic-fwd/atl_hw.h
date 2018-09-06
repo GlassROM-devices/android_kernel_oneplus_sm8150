@@ -35,6 +35,7 @@ enum atl_board {
 	ATL_AQC107,
 	ATL_AQC108,
 	ATL_AQC109,
+	ATL_AQC100,
 };
 
 #define ATL_VID_MAP_LEN BITS_TO_LONGS(BIT(12))

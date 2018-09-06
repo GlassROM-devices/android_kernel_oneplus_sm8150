@@ -32,6 +32,9 @@ static struct atl_board_info atl_boards[] = {
 	[ATL_AQC109] = {
 		.link_mask = 7,
 	},
+	[ATL_AQC100] = {
+		.link_mask = 0x1f,
+	},
 };
 
 static void atl_unplugged(struct atl_hw *hw)
