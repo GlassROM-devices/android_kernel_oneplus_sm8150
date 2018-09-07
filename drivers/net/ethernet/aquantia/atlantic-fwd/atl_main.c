@@ -385,9 +385,17 @@ static struct pci_driver atl_pci_ops = {
 	.remove = atl_remove,
 };
 
+static int __init atl_module_init(void)
+{
+	return pci_register_driver(&atl_pci_ops);
+}
+module_init(atl_module_init);
 
-
-module_pci_driver(atl_pci_ops);
+static void __exit atl_module_exit(void)
+{
+	pci_unregister_driver(&atl_pci_ops);
+}
+module_exit(atl_module_exit);
 
 MODULE_DEVICE_TABLE(pci, atl_pci_tbl);
 MODULE_LICENSE("GPL v2");
