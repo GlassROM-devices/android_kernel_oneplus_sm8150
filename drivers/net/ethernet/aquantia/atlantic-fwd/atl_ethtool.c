@@ -610,6 +610,7 @@ static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(TX_LPI_MAC, LPI_TX_MAC),
 	ATL_PRIV_FLAG(RX_LPI_PHY, LPI_RX_PHY),
 	ATL_PRIV_FLAG(TX_LPI_PHY, LPI_TX_PHY),
+	ATL_PRIV_FLAG(ResetStatistics, STATS_RESET),
 };
 
 static int atl_get_sset_count(struct net_device *ndev, int sset)
@@ -767,6 +768,26 @@ done:
 	return ret;
 }
 
+void atl_reset_stats(struct atl_nic *nic)
+{
+	struct atl_queue_vec *qvec;
+
+	/* Fetch current MSM stats */
+	atl_update_eth_stats(nic);
+
+	spin_lock(&nic->stats_lock);
+	/* Adding current relative values to base makes it equal to
+	 * current absolute values, thus zeroing the relative values. */
+	atl_adjust_eth_stats(&nic->stats.eth_base, &nic->stats.eth, true);
+
+	atl_for_each_qvec(nic, qvec) {
+		memset(&qvec->rx.stats, 0, sizeof(qvec->rx.stats));
+		memset(&qvec->tx.stats, 0, sizeof(qvec->tx.stats));
+	}
+
+	spin_unlock(&nic->stats_lock);
+}
+
 static uint32_t atl_get_priv_flags(struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
@@ -778,11 +799,18 @@ static uint32_t atl_get_priv_flags(struct net_device *ndev)
 static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
-	uint32_t diff = (flags ^ nic->priv_flags) & ATL_PF_RW_MASK;
+	uint32_t diff = flags ^ nic->priv_flags;
 	uint32_t curr = nic->priv_flags & ATL_PF_LPB_MASK;
 
-	if (diff & ~ATL_PF_LPB_MASK)
+	if (diff & ATL_PF_RO_MASK)
+		return -EINVAL;
+
+	if (diff & ~ATL_PF_RW_MASK)
 		return -EOPNOTSUPP;
+
+	if (flags & ATL_PF_BIT(STATS_RESET))
+		atl_reset_stats(nic);
+	flags &= ~ATL_PF_BIT(STATS_RESET);
 
 	flags &= ATL_PF_LPB_MASK;
 	if (hweight32(flags) > 1) {

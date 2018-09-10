@@ -903,6 +903,17 @@ int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 	if (RET)							\
 		goto label;
 
+void atl_adjust_eth_stats(struct atl_ether_stats *stats,
+	struct atl_ether_stats *base, bool add)
+{
+	int i;
+	uint64_t *_stats = (uint64_t *)stats;
+	uint64_t *_base = (uint64_t *)base;
+
+	for (i = 0; i < sizeof(*stats) / sizeof(uint64_t); i++)
+		_stats[i] += add ? _base[i] : - _base[i];
+}
+
 int atl_update_eth_stats(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
@@ -951,7 +962,13 @@ int atl_update_eth_stats(struct atl_nic *nic)
 	reg2 = atl_read(hw, ATL_RX_RPF_LOST_CNT_HI);
 	stats.rx_filter_lost = ((uint64_t)reg2 << 32) | reg;
 
+	spin_lock(&nic->stats_lock);
+
+	atl_adjust_eth_stats(&stats, &nic->stats.eth_base, false);
 	nic->stats.eth = stats;
+
+	spin_unlock(&nic->stats_lock);
+
 	ret = 0;
 
 hwsem_put:

@@ -77,7 +77,12 @@ struct atl_ether_stats {
 struct atl_global_stats {
 	struct atl_rx_ring_stats rx;
 	struct atl_tx_ring_stats tx;
+
+	/* MSM counters can't be reset without full HW reset, so
+	 * store them in relative form:
+	 * eth[i] == HW_counter - eth_base[i] */
 	struct atl_ether_stats eth;
+	struct atl_ether_stats eth_base;
 };
 
 enum {
@@ -242,6 +247,7 @@ enum atl_priv_flags {
 	ATL_PF_LPI_TX_MAC,
 	ATL_PF_LPI_RX_PHY,
 	ATL_PF_LPI_TX_PHY,
+	ATL_PF_STATS_RESET,
 };
 
 enum atl_priv_flag_bits {
@@ -251,13 +257,18 @@ enum atl_priv_flag_bits {
 
 	ATL_PF_LPB_MASK = ATL_PF_BIT(LPB_SYS_DMA) | ATL_PF_BIT(LPB_SYS_PB)
 		/* | ATL_PF_BIT(LPB_NET_DMA) */,
+
 	ATL_DEF_PF_BIT(LPI_RX_MAC),
 	ATL_DEF_PF_BIT(LPI_TX_MAC),
 	ATL_DEF_PF_BIT(LPI_RX_PHY),
 	ATL_DEF_PF_BIT(LPI_TX_PHY),
 	ATL_PF_LPI_MASK = ATL_PF_BIT(LPI_RX_MAC) | ATL_PF_BIT(LPI_TX_MAC) |
 		ATL_PF_BIT(LPI_RX_PHY) | ATL_PF_BIT(LPI_TX_PHY),
-	ATL_PF_RW_MASK = ATL_PF_LPB_MASK,
+
+	ATL_DEF_PF_BIT(STATS_RESET),
+
+	ATL_PF_RW_MASK = ATL_PF_LPB_MASK | ATL_PF_BIT(STATS_RESET),
+	ATL_PF_RO_MASK = ATL_PF_LPI_MASK,
 };
 
 #define ATL_MAX_MTU (16352 - ETH_FCS_LEN - ETH_HLEN)
@@ -318,6 +329,7 @@ void atl_intr_release(struct atl_nic *nic);
 int atl_hw_reset(struct atl_hw *hw);
 int atl_fw_init(struct atl_hw *hw);
 int atl_reconfigure(struct atl_nic *nic);
+void atl_reset_stats(struct atl_nic *nic);
 void atl_update_global_stats(struct atl_nic *nic);
 void atl_set_loopback(struct atl_nic *nic, int idx, bool on);
 void atl_set_intr_mod(struct atl_nic *nic);
@@ -329,6 +341,8 @@ int atl_msm_read(struct atl_hw *hw, uint32_t addr, uint32_t *val);
 int __atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val);
 int atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val);
 int atl_update_eth_stats(struct atl_nic *nic);
+void atl_adjust_eth_stats(struct atl_ether_stats *stats,
+	struct atl_ether_stats *base, bool add);
 void atl_fwd_release_rings(struct atl_nic *nic);
 int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay);
 int atl_mdio_hwsem_get(struct atl_hw *hw);
@@ -342,6 +356,5 @@ int __atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 	uint16_t addr, uint16_t val);
 void atl_refresh_rxfs(struct atl_nic *nic);
-
 
 #endif

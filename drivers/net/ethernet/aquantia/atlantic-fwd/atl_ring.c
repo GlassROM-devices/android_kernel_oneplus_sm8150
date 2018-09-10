@@ -1640,11 +1640,13 @@ void atl_update_global_stats(struct atl_nic *nic)
 	struct atl_ring_stats stats;
 
 	memset(&stats, 0, sizeof(stats));
-	memset(&nic->stats, 0, sizeof(nic->stats));
+	atl_update_eth_stats(nic);
 
 	spin_lock(&nic->stats_lock);
 
-	atl_update_eth_stats(nic);
+	memset(&nic->stats.rx, 0, sizeof(nic->stats.rx));
+	memset(&nic->stats.tx, 0, sizeof(nic->stats.tx));
+
 
 	for (i = 0; i < nic->nvecs; i++) {
 		atl_get_ring_stats(&nic->qvecs[i].rx, &stats);
