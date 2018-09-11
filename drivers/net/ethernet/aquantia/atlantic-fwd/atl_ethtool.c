@@ -432,8 +432,8 @@ static int atl_get_eee(struct net_device *ndev, struct ethtool_eee *eee)
 	atl_link_to_kernel(lstate->lp_advertized >> ATL_EEE_BIT_OFFT,
 		(unsigned long *)&eee->lp_advertised, true);
 
-	eee->eee_enabled = lstate->eee_enabled;
-	eee->eee_active = eee->tx_lpi_enabled = lstate->eee;
+	eee->eee_enabled = eee->tx_lpi_enabled = lstate->eee_enabled;
+	eee->eee_active = lstate->eee;
 	eee->tx_lpi_timer = 0;
 	return 0;
 }
@@ -450,9 +450,6 @@ static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
 
 	if (eee->tx_lpi_timer != 0)
 		return -EOPNOTSUPP;
-
-	if (!!eee->eee_enabled != !!eee->tx_lpi_enabled)
-		return -EINVAL;
 
 	lstate->eee_enabled = eee->eee_enabled;
 
