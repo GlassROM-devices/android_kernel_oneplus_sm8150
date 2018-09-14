@@ -862,3 +862,18 @@ hwsem_put:
 	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);
 	return ret;
 }
+
+int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay)
+{
+	struct atl_hw *hw = &nic->hw;
+	uint32_t lpi;
+	int ret = 0;
+
+
+	ret = atl_msm_read(hw, ATL_MSM_TX_LPI_DELAY, &lpi);
+	if (ret)
+		return ret;
+	*lpi_delay = ATL_HW_CLOCK_TO_US(lpi);
+
+	return ret;
+}

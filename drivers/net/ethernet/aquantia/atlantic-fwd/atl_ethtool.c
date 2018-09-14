@@ -419,6 +419,7 @@ static int atl_get_eee(struct net_device *ndev, struct ethtool_eee *eee)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_link_state *lstate = &nic->hw.link_state;
+	int ret = 0;
 
 	eee->supported = eee->advertised = eee->lp_advertised = 0;
 
@@ -434,8 +435,10 @@ static int atl_get_eee(struct net_device *ndev, struct ethtool_eee *eee)
 
 	eee->eee_enabled = eee->tx_lpi_enabled = lstate->eee_enabled;
 	eee->eee_active = lstate->eee;
-	eee->tx_lpi_timer = 0;
-	return 0;
+
+	ret = atl_get_lpi_timer(nic, &eee->tx_lpi_timer);
+
+	return ret;
 }
 
 static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
@@ -448,7 +451,8 @@ static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
 	if (atl_fw_major(hw) < 2)
 		return -EOPNOTSUPP;
 
-	if (eee->tx_lpi_timer != 0)
+	atl_get_lpi_timer(nic, &tmp);
+	if (eee->tx_lpi_timer != tmp)
 		return -EOPNOTSUPP;
 
 	lstate->eee_enabled = eee->eee_enabled;
@@ -459,8 +463,14 @@ static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
 		if (eee->advertised & ~tmp)
 			return -EINVAL;
 
-		tmp = atl_kernel_to_link((unsigned long *)&eee->advertised,
-			true);
+		/* advertize the requested link or all supported */
+		if (eee->advertised)
+			tmp = atl_kernel_to_link(
+					(unsigned long *)&eee->advertised,
+					true);
+		else
+			tmp = atl_kernel_to_link(
+					(unsigned long *)&tmp, true);
 	}
 
 	lstate->advertized &= ~ATL_EEE_MASK;

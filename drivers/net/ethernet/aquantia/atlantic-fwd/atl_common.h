@@ -290,6 +290,7 @@ int __atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val);
 int atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val);
 int atl_update_msm_stats(struct atl_nic *nic);
 void atl_fwd_release_rings(struct atl_nic *nic);
+int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay);
 
 
 #endif

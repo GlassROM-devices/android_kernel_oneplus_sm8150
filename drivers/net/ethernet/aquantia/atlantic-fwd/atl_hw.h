@@ -17,6 +17,9 @@
 
 #define PCI_VENDOR_ID_AQUANTIA 0x1d6a
 
+/* clock is 3.2 ns*/
+#define ATL_HW_CLOCK_TO_US(clk)  (clk * 32 / 10000)
+
 #define busy_wait(tries, wait, lvalue, fetch, cond)	\
 ({							\
 	uint32_t _dummy = 0;				\
