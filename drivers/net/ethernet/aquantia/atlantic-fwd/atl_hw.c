@@ -459,9 +459,10 @@ int atl_start_hw(struct atl_nic *nic)
 	if (ret)
 		return ret;
 
-	/* Enable RPF2, TPO2 */
+	/* Enable TPO2 */
 	atl_write(hw, 0x7040, 0x10000);
-	atl_write(hw, 0x5040, 0xf0000);
+	/* Enable RPF2, filter logic 3 */
+	atl_write(hw, 0x5040, BIT(16) | (3 << 17));
 
 	/* Alloc TPB */
 	/* TC1: space for offload engine iface */
@@ -842,7 +843,7 @@ int atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val)
 	if (RET)							\
 		goto label;
 
-int atl_update_msm_stats(struct atl_nic *nic)
+int atl_update_eth_stats(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
 	struct atl_ether_stats stats = {0};
@@ -878,6 +879,17 @@ int atl_update_msm_stats(struct atl_nic *nic)
 	stats.rx_ether_crc_align_errs = reg + reg2;
 
 	stats.rx_ether_drops = atl_read(hw, ATL_RX_DMA_STATS_CNT7);
+
+	/* capture debug counters*/
+	atl_write_bit(hw, ATL_RX_RPF_DBG_CNT_CTRL, 0x1f, 1);
+
+	reg = atl_read(hw, ATL_RX_RPF_HOST_CNT_LO);
+	reg2 = atl_read(hw, ATL_RX_RPF_HOST_CNT_HI);
+	stats.rx_filter_host = ((uint64_t)reg2 << 32) | reg;
+
+	reg = atl_read(hw, ATL_RX_RPF_LOST_CNT_LO);
+	reg2 = atl_read(hw, ATL_RX_RPF_LOST_CNT_HI);
+	stats.rx_filter_lost = ((uint64_t)reg2 << 32) | reg;
 
 	nic->stats.eth = stats;
 	ret = 0;

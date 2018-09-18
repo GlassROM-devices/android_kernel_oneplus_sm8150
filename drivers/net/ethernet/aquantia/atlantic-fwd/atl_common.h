@@ -70,6 +70,8 @@ struct atl_ether_stats {
 	uint64_t rx_ether_broacasts;
 	uint64_t rx_ether_multicasts;
 	uint64_t rx_ether_crc_align_errs;
+	uint64_t rx_filter_host;
+	uint64_t rx_filter_lost;
 };
 
 struct atl_global_stats {

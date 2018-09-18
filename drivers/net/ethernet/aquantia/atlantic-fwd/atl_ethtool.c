@@ -595,6 +595,8 @@ static const struct atl_stat_desc eth_stat_descs[] = {
 	ATL_ETH_STAT(rx_ether_broacasts, rx_ether_broacasts),
 	ATL_ETH_STAT(rx_ether_multicasts, rx_ether_multicasts),
 	ATL_ETH_STAT(rx_ether_crc_align_errs, rx_ether_crc_align_errs),
+	ATL_ETH_STAT(rx_filter_host, rx_filter_host),
+	ATL_ETH_STAT(rx_filter_lost, rx_filter_lost),
 };
 
 #define ATL_PRIV_FLAG(_name, _bit)		\
