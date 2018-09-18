@@ -837,31 +837,56 @@ int atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val)
 	return ret;
 }
 
+#define __READ_MSM_OR_GOTO(RET, HW, REGISTER, PVARIABLE, label) \
+	RET = __atl_msm_read(HW, REGISTER, PVARIABLE); \
+	if (RET)							\
+		goto label;
+
 int atl_update_msm_stats(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
-	struct atl_msm_stats stats = {0};
+	struct atl_ether_stats stats = {0};
+	uint32_t reg = 0, reg2 = 0;
 	int ret;
 
 	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
 	if (ret)
 		return ret;
 
-	ret = __atl_msm_read(hw, ATL_MSM_CTR_TX_PAUSE, &stats.tx_pause);
-	if (ret)
-		goto hwsem_put;
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_TX_PAUSE, &reg, hwsem_put);
+	stats.tx_pause = reg;
 
-	ret = __atl_msm_read(hw, ATL_MSM_CTR_RX_PAUSE, &stats.rx_pause);
-	if (ret)
-		goto hwsem_put;
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_PAUSE, &reg, hwsem_put);
+	stats.rx_pause = reg;
 
-	nic->stats.msm = stats;
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_OCTETS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_OCTETS_HI, &reg2, hwsem_put);
+	stats.rx_ether_octets = ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_PKTS_GOOD, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_ERRS, &reg2, hwsem_put);
+	stats.rx_ether_pkts = reg + reg2;;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_BROADCAST, &reg, hwsem_put);
+	stats.rx_ether_broacasts = reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_MULTICAST, &reg, hwsem_put);
+	stats.rx_ether_multicasts = reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_FCS_ERRS, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_ALIGN_ERRS, &reg2, hwsem_put);
+	stats.rx_ether_crc_align_errs = reg + reg2;
+
+	stats.rx_ether_drops = atl_read(hw, ATL_RX_DMA_STATS_CNT7);
+
+	nic->stats.eth = stats;
 	ret = 0;
 
 hwsem_put:
 	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);
 	return ret;
 }
+#undef __READ_MSM_OR_GOTO
 
 int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay)
 {

@@ -554,11 +554,11 @@ struct atl_stat_desc {
 		sizeof(uint64_t),				\
 }
 
-#define ATL_MSM_STAT(_name, _field)				\
+#define ATL_ETH_STAT(_name, _field)				\
 {								\
 	.stat_name = #_name,					\
-	.idx = offsetof(struct atl_msm_stats, _field) /		\
-		sizeof(uint32_t),				\
+	.idx = offsetof(struct atl_ether_stats, _field) /	\
+		sizeof(uint64_t),				\
 }
 
 static const struct atl_stat_desc tx_stat_descs[] = {
@@ -586,9 +586,15 @@ static const struct atl_stat_desc rx_stat_descs[] = {
 	ATL_RX_STAT(rx_checksum_err, csum_err),
 };
 
-static const struct atl_stat_desc msm_stat_descs[] = {
-	ATL_MSM_STAT(tx_pause, tx_pause),
-	ATL_MSM_STAT(rx_pause, rx_pause),
+static const struct atl_stat_desc eth_stat_descs[] = {
+	ATL_ETH_STAT(tx_pause, tx_pause),
+	ATL_ETH_STAT(rx_pause, rx_pause),
+	ATL_ETH_STAT(rx_ether_drops, rx_ether_drops),
+	ATL_ETH_STAT(rx_ether_octets, rx_ether_octets),
+	ATL_ETH_STAT(rx_ether_pkts, rx_ether_pkts),
+	ATL_ETH_STAT(rx_ether_broacasts, rx_ether_broacasts),
+	ATL_ETH_STAT(rx_ether_multicasts, rx_ether_multicasts),
+	ATL_ETH_STAT(rx_ether_crc_align_errs, rx_ether_crc_align_errs),
 };
 
 #define ATL_PRIV_FLAG(_name, _bit)		\
@@ -608,7 +614,7 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 	case ETH_SS_STATS:
 		return ARRAY_SIZE(tx_stat_descs) * (nic->nvecs + 1) +
 			ARRAY_SIZE(rx_stat_descs) * (nic->nvecs + 1) +
-			ARRAY_SIZE(msm_stat_descs);
+			ARRAY_SIZE(eth_stat_descs);
 
 	case ETH_SS_PRIV_FLAGS:
 		return ARRAY_SIZE(atl_priv_flags);
@@ -650,8 +656,8 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 	case ETH_SS_STATS:
 		atl_copy_stats_string_set(&p, "");
 
-		atl_copy_stats_strings(&p, "", msm_stat_descs,
-			ARRAY_SIZE(msm_stat_descs));
+		atl_copy_stats_strings(&p, "", eth_stat_descs,
+			ARRAY_SIZE(eth_stat_descs));
 
 		for (i = 0; i < nic->nvecs; i++) {
 			snprintf(prefix, sizeof(prefix), "ring_%d_", i);
@@ -686,7 +692,7 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	atl_write_stats(&nic->stats.tx, tx_stat_descs, data, uint64_t);
 	atl_write_stats(&nic->stats.rx, rx_stat_descs, data, uint64_t);
 
-	atl_write_stats(&nic->stats.msm, msm_stat_descs, data, uint32_t);
+	atl_write_stats(&nic->stats.eth, eth_stat_descs, data, uint64_t);
 
 	for (i = 0; i < nic->nvecs; i++) {
 		struct atl_queue_vec *qvec = &nic->qvecs[i];

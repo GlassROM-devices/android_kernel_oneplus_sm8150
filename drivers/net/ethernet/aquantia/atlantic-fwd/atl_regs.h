@@ -122,6 +122,7 @@ enum mcp_scratchpad {
 #define ATL_RX_RING_BUF_SIZE(ring) ATL_RING_OFFT(ring, 0x18)
 #define ATL_RX_RING_THRESH(ring) ATL_RING_OFFT(ring, 0x1c)
 
+#define ATL_RX_DMA_STATS_CNT7 0x6818
 
 /* TX @ 0x7000 */
 #define ATL_TX_CTRL1 0x7000
@@ -149,8 +150,16 @@ enum mcp_scratchpad {
 
 /* MSM */
 #define ATL_MSM_TX_LPI_DELAY 0x78
+#define ATL_MSM_CTR_RX_PKTS_GOOD 0x88
+#define ATL_MSM_CTR_RX_FCS_ERRS 0x90
+#define ATL_MSM_CTR_RX_ALIGN_ERRS 0x98
 #define ATL_MSM_CTR_TX_PAUSE 0xa0
 #define ATL_MSM_CTR_RX_PAUSE 0xa8
+#define ATL_MSM_CTR_RX_OCTETS_LO 0xd8
+#define ATL_MSM_CTR_RX_OCTETS_HI 0xdc
+#define ATL_MSM_CTR_RX_MULTICAST 0xE8
+#define ATL_MSM_CTR_RX_BROADCAST 0xF0
+#define ATL_MSM_CTR_RX_ERRS 0x120
 
 
 #endif

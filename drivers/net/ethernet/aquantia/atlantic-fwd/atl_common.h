@@ -61,15 +61,21 @@ struct atl_ring_stats {
 	};
 };
 
-struct atl_msm_stats {
-	uint32_t rx_pause;
-	uint32_t tx_pause;
+struct atl_ether_stats {
+	uint64_t rx_pause;
+	uint64_t tx_pause;
+	uint64_t rx_ether_drops;
+	uint64_t rx_ether_octets;
+	uint64_t rx_ether_pkts;
+	uint64_t rx_ether_broacasts;
+	uint64_t rx_ether_multicasts;
+	uint64_t rx_ether_crc_align_errs;
 };
 
 struct atl_global_stats {
 	struct atl_rx_ring_stats rx;
 	struct atl_tx_ring_stats tx;
-	struct atl_msm_stats msm;
+	struct atl_ether_stats eth;
 };
 
 enum {
