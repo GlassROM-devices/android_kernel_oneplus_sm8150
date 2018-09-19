@@ -269,6 +269,13 @@ int atl_hwinit(struct atl_nic *nic, enum atl_board brd_id)
 	return hw->mcp.ops->get_link_caps(hw);
 }
 
+static void atl_rx_xoff_set(struct atl_nic *nic, bool fc)
+{
+	struct atl_hw *hw = &nic->hw;
+
+	atl_write_bit(hw, ATL_RX_PBUF_REG2(0), 31, fc);
+}
+
 void atl_refresh_link(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
@@ -279,9 +286,11 @@ void atl_refresh_link(struct atl_nic *nic)
 	if (link != prev_link) {
 		if (link) {
 			atl_nic_info("Link up: %s\n", link->name);
+			atl_rx_xoff_set(nic, !!(hw->link_state.fc.cur & atl_fc_rx));
 			netif_carrier_on(nic->ndev);
 		} else {
 			atl_nic_info("Link down\n");
+			atl_rx_xoff_set(nic, !!(hw->link_state.fc.cur & atl_fc_rx));
 			netif_carrier_off(nic->ndev);
 		}
 	}
