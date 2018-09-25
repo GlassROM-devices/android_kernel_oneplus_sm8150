@@ -437,6 +437,10 @@ void atl_set_rss_tbl(struct atl_hw *hw)
 	}
 }
 
+unsigned int atl_fwd_rx_buf_reserve = 0, atl_fwd_tx_buf_reserve = 0;
+module_param_named(fwd_tx_buf_reserve, atl_fwd_tx_buf_reserve, uint, 0444);
+module_param_named(fwd_rx_buf_reserve, atl_fwd_rx_buf_reserve, uint, 0444);
+
 int atl_start_hw(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
@@ -451,18 +455,26 @@ int atl_start_hw(struct atl_nic *nic)
 	atl_write(hw, 0x5040, 0xf0000);
 
 	/* Alloc TPB */
-	/* 160k */
-	atl_write(hw, ATL_TX_PBUF_REG1(0), 160);
-	/* 4-TC | Enable TPB0 */
+	/* TC1: space for offload engine iface */
+	atl_write(hw, ATL_TX_PBUF_REG1(1), atl_fwd_tx_buf_reserve);
+	/* TC0: 160k minus TC1 size */
+	atl_write(hw, ATL_TX_PBUF_REG1(0), 160 - atl_fwd_tx_buf_reserve);
+	/* 4-TC | Enable TPB */
 	atl_set_bits(hw, ATL_TX_PBUF_CTRL1, BIT(8) | BIT(0));
 
 	/* Alloc RPB */
-	/* 320k */
-	atl_write(hw, ATL_RX_PBUF_REG1(0), 320);
-	/* 4-TC | Enable RPB0 */
+	/* TC1: space for offload engine iface */
+	atl_write(hw, ATL_RX_PBUF_REG1(1), atl_fwd_rx_buf_reserve);
+	atl_write(hw, ATL_RX_PBUF_REG2(1), BIT(31) |
+		(atl_fwd_rx_buf_reserve * 32 * 66 / 100) << 16 |
+		(atl_fwd_rx_buf_reserve * 32 * 50 / 100));
+	/* TC1: 320k minus TC1 size */
+	atl_write(hw, ATL_RX_PBUF_REG1(0), 320 - atl_fwd_rx_buf_reserve);
+	atl_write(hw, ATL_RX_PBUF_REG2(0), BIT(31) |
+		((320 - atl_fwd_rx_buf_reserve) * 32 * 66 / 100) << 16 |
+		((320 - atl_fwd_rx_buf_reserve) * 32 * 50 / 100));
+	/* 4-TC | Enable RPB */
 	atl_set_bits(hw, ATL_RX_PBUF_CTRL1, BIT(8) | BIT(4) | BIT(0));
-	atl_write(hw, ATL_RX_PBUF_REG2(0), BIT(31) | (10240 * 66 / 100) << 16 |
-		(10240 * 50 / 100));
 
 	/* TPO */
 	/* Enable L3 | L4 chksum */
@@ -650,14 +662,14 @@ void atl_set_intr_bits(struct atl_hw *hw, int idx, int rxbit, int txbit)
 	uint32_t val;
 
 	if (rxbit >= 0) {
-		rxbit &= BIT(5) - 1;
-		clear_mask |= BIT(5) - 1;
-		set_mask |= BIT(7) | rxbit;
+		clear_mask |= BIT(7) | (BIT(5) - 1);
+		if (rxbit < ATL_NUM_MSI_VECS)
+			set_mask |= BIT(7) | rxbit;
 	}
 	if (txbit >= 0) {
-		txbit &= BIT(5) - 1;
-		clear_mask |= (BIT(5) - 1) << 0x10;
-		set_mask |= (BIT(7) | txbit) << 0x10;
+		clear_mask |= (BIT(7) | (BIT(5) - 1)) << 0x10;
+		if (txbit < ATL_NUM_MSI_VECS)
+			set_mask |= (BIT(7) | txbit) << 0x10;
 	}
 
 	val = atl_read(hw, ATL_INTR_RING_INTR_MAP(idx));

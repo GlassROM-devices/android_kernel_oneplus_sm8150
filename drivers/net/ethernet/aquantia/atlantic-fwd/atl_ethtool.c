@@ -995,7 +995,7 @@ static int atl_rxf_set_ring(const struct atl_rxf_flt_desc *desc,
 		return 0;
 
 	ring = ethtool_get_flow_spec_ring(ring_cookie);
-	if (ring >= nic->nvecs) {
+	if (ring >= nic->nvecs && !test_bit(ring, &nic->fwd.ring_map[0])) {
 		atl_nic_err("Invalid Rx filter queue %d\n", ring);
 		return -EINVAL;
 	}

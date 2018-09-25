@@ -25,6 +25,10 @@ struct atl_nic;
 #include "atl_compat.h"
 #include "atl_hw.h"
 
+#define ATL_MAX_QUEUES 8
+
+#include "atl_fwd.h"
+
 struct atl_rx_ring_stats {
 	uint64_t packets;
 	uint64_t bytes;
@@ -150,6 +154,20 @@ struct atl_rxf_etype {
 
 struct atl_queue_vec;
 
+#define ATL_NUM_FWD_RINGS ATL_MAX_QUEUES
+#define ATL_FWD_RING_BASE ATL_MAX_QUEUES /* Use TC 1 for offload
+					  * engine rings */
+#define ATL_NUM_MSI_VECS 32
+#define ATL_NUM_NON_RING_IRQS 1
+
+#define ATL_FWD_MSI_BASE (ATL_MAX_QUEUES + ATL_NUM_NON_RING_IRQS)
+
+struct atl_fwd {
+	unsigned long ring_map[2];
+	struct atl_fwd_ring *rings[2][ATL_NUM_FWD_RINGS];
+	unsigned long msi_map;
+};
+
 struct atl_nic {
 	struct net_device *ndev;
 
@@ -168,6 +186,9 @@ struct atl_nic {
 	int tx_intr_delay;
 	struct atl_global_stats stats;
 	spinlock_t stats_lock;
+
+	struct atl_fwd fwd;
+
 	struct atl_rxf_ntuple rxf_ntuple;
 	struct atl_rxf_vlan rxf_vlan;
 	struct atl_rxf_etype rxf_etype;
@@ -201,9 +222,6 @@ enum atl_priv_flag_bits {
 		/* | ATL_PF_BIT(LPB_NET_DMA) */,
 };
 
-#define ATL_MAX_QUEUES 8
-
-#define ATL_NUM_NON_RING_IRQS 1
 #define ATL_MAX_MTU (16352 - ETH_FCS_LEN - ETH_HLEN)
 
 #define ATL_MAX_RING_SIZE (8192 - 8)
@@ -271,6 +289,7 @@ int atl_msm_read(struct atl_hw *hw, uint32_t addr, uint32_t *val);
 int __atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val);
 int atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val);
 int atl_update_msm_stats(struct atl_nic *nic);
+void atl_fwd_release_rings(struct atl_nic *nic);
 
 
 #endif

@@ -1520,8 +1520,8 @@ static void atl_set_lro(struct atl_nic *nic)
 	uint32_t val = nic->ndev->features & NETIF_F_LRO ?
 		BIT(nic->nvecs) - 1 : 0;
 
-	atl_write(hw, ATL_RX_LRO_CTRL1, val);
-	atl_write(hw, ATL_INTR_RSC_EN, val);
+	atl_write_bits(hw, ATL_RX_LRO_CTRL1, 0, nic->nvecs, val);
+	atl_write_bits(hw, ATL_INTR_RSC_EN, 0, nic->nvecs, val);
 }
 
 int atl_start_rings(struct atl_nic *nic)

@@ -371,6 +371,7 @@ static void atl_remove(struct pci_dev *pdev)
 		return;
 
 	unregister_netdev(nic->ndev);
+	atl_fwd_release_rings(nic);
 	atl_clear_datapath(nic);
 	iounmap(nic->hw.regs);
 	free_netdev(nic->ndev);
