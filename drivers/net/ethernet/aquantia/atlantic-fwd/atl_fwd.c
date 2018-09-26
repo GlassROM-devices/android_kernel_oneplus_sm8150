@@ -44,6 +44,7 @@ static void atl_fwd_free_bufs(struct atl_fwd_ring *ring)
 	struct device *dev = &nic->hw.pdev->dev;
 	struct atl_fwd_bufs *bufs = ring->bufs;
 	int ring_size = ring->hw.size;
+	int order = bufs->order;
 	int i;
 
 	if (!bufs)
@@ -55,20 +56,16 @@ static void atl_fwd_free_bufs(struct atl_fwd_ring *ring)
 		kfree(bufs->vaddr_vec);
 	}
 
-	if (bufs->bpgs) {
-		int order = bufs->order;
 
-		for (i = 0; i < bufs->num_pages; i++) {
-			struct atl_fwd_buf_page *bpg = &bufs->bpgs[i];
+	for (i = 0; i < bufs->num_pages; i++) {
+		struct atl_fwd_buf_page *bpg = &bufs->bpgs[i];
 
-			if (bpg->page) {
-				dma_unmap_page(dev, bpg->daddr,
-					PAGE_SIZE << order,
-					DMA_FROM_DEVICE);
-				__free_pages(bpg->page, order);
-			}
+		if (bpg->page) {
+			dma_unmap_page(dev, bpg->daddr,
+				PAGE_SIZE << order,
+				DMA_FROM_DEVICE);
+			__free_pages(bpg->page, order);
 		}
-
 	}
 
 	kfree(bufs);
@@ -334,6 +331,19 @@ void atl_fwd_disable_ring(struct atl_fwd_ring *ring)
 	ring->state &= ~ATL_FWR_ST_ENABLED;
 }
 EXPORT_SYMBOL(atl_fwd_disable_ring);
+
+static void __iomem *atl_msix_bar(struct atl_nic *nic)
+{
+	struct pci_dev *pdev = nic->hw.pdev;
+	struct msi_desc *msi;
+
+	if (!pdev->msix_enabled)
+		return NULL;
+
+	msi = list_first_entry(dev_to_msi_list(&pdev->dev),
+		struct msi_desc, list);
+	return msi->mask_base;
+}
 
 static int atl_fwd_set_msix_vec(struct atl_nic *nic, struct atl_fwd_event *evt)
 {
