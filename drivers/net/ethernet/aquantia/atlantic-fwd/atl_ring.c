@@ -1608,7 +1608,7 @@ void atl_update_global_stats(struct atl_nic *nic)
 
 	spin_lock(&nic->stats_lock);
 
-	atl_update_msm_stats(nic);
+	atl_update_eth_stats(nic);
 
 	for (i = 0; i < nic->nvecs; i++) {
 		atl_get_ring_stats(&nic->qvecs[i].rx, &stats);

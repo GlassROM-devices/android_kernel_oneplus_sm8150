@@ -10,6 +10,8 @@
 #ifndef _ATL_FWD_H_
 #define _ATL_FWD_H_
 
+#include "atl_common.h"
+
 struct atl_fwd_event;
 
 struct atl_fwd_buf_page {

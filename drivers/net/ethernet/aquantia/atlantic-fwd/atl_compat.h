@@ -164,17 +164,6 @@ static inline void page_ref_inc(struct page *page)
 
 #endif	/* 4.6.0 */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,5,0)
-
-/* introduced in commit c7f5d105495a38ed09e70d825f75d9d7d5407264
- * stub it */
-static inline int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
-{
-	return -ENODEV;
-}
-
-#endif	/* 4.5.0 */
-
 #ifdef ATL_COMPAT_PCI_ALLOC_IRQ_VECTORS_AFFINITY
 void atl_compat_set_affinity(int vector, struct atl_queue_vec *qvec);
 void atl_compat_calc_affinities(struct atl_nic *nic);
