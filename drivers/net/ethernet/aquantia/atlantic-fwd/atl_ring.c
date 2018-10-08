@@ -1141,18 +1141,10 @@ int atl_init_ring_interrupts(struct atl_nic *nic)
 		atl_set_intr_throttle(hw, i);
 	}
 
-	if (hw->pdev->msix_enabled)
-		atl_write_bits(hw, ATL_INTR_CTRL, 0, 2, 2);
-	else if (hw->pdev->msi_enabled)
-		atl_write_bits(hw, ATL_INTR_CTRL, 0, 2, 1);
-
-	/* Enable multi-vector mode and auto-masking on intr
-	 * generation
-	 */
-	atl_set_bits(hw, ATL_INTR_CTRL, BIT(2) | BIT(5));
-	atl_write(hw, ATL_INTR_AUTO_MASK, hw->intr_mask);
+	/* Enable auto-masking of ring interrupts on intr generation */
+	atl_set_bits(hw, ATL_INTR_AUTO_MASK, hw->intr_mask);
 	/* Enable status auto-clear on intr generation */
-	atl_write(hw, ATL_INTR_AUTO_CLEAR, hw->intr_mask);
+	atl_set_bits(hw, ATL_INTR_AUTO_CLEAR, hw->intr_mask);
 
 	return 0;
 
@@ -1530,6 +1522,10 @@ int atl_start_rings(struct atl_nic *nic)
 	struct atl_queue_vec *qvec;
 	int ret;
 
+	ret = atl_intr_init(nic);
+	if (ret)
+		return ret;
+
 	atl_for_each_qvec(nic, qvec) {
 		ret = atl_start_qvec(qvec);
 		if (ret)
@@ -1548,11 +1544,14 @@ int atl_start_rings(struct atl_nic *nic)
 	atl_write(hw, ATL_INTR_RSC_DELAY, (atl_min_intr_delay / 2) - 1);
 	atl_set_lro(nic);
 
+	atl_set_rss_tbl(hw);
+
 	return 0;
 free:
 	while (--qvec >= &nic->qvecs[0])
 		atl_stop_qvec(qvec);
 
+	atl_intr_release(nic);
 	return ret;
 }
 
@@ -1563,6 +1562,9 @@ void atl_stop_rings(struct atl_nic *nic)
 	atl_for_each_qvec(nic, qvec)
 		atl_stop_qvec(qvec);
 
+	atl_intr_release(nic);
+	atl_hw_reset(&nic->hw);
+	atl_start_hw_global(nic);
 }
 
 int atl_set_features(struct net_device *ndev, netdev_features_t features)

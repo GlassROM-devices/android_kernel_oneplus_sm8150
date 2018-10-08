@@ -146,7 +146,7 @@ static int atl_hw_reset_nonrbl(struct atl_hw *hw)
 	return atl_fw_init(hw);
 }
 
-static int atl_hw_reset(struct atl_hw *hw)
+int atl_hw_reset(struct atl_hw *hw)
 {
 	uint32_t reg = atl_read(hw, ATL_MCP_SCRATCH(RBL_STS));
 	uint32_t flb_stat = atl_read(hw, ATL_GLOBAL_DAISY_CHAIN_STS1);
@@ -332,7 +332,7 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 	return IRQ_HANDLED;
 }
 
-static int atl_intr_init(struct atl_nic *nic)
+int atl_intr_init(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
 	struct pci_dev *pdev = hw->pdev;
@@ -350,7 +350,11 @@ static int atl_intr_init(struct atl_nic *nic)
 			return ret;
 		}
 
-		return atl_init_ring_interrupts(nic);
+		ret = atl_init_ring_interrupts(nic);
+		if (ret)
+			free_irq(pci_irq_vector(pdev, 0), nic);
+
+		return ret;
 	}
 
 	ret = request_irq(pci_irq_vector(pdev, 0), atl_legacy_irq, IRQF_SHARED,
@@ -360,9 +364,6 @@ static int atl_intr_init(struct atl_nic *nic)
 		return ret;
 	}
 
-	/* Enable intr status clear-on-read */
-	atl_write_bit(hw, ATL_INTR_CTRL, 7, 1);
-
 	/* Map rx[0] and tx[0] into cause 1*/
 	atl_write(hw, ATL_INTR_RING_INTR_MAP(0),
 		  BIT(31) | (1 << 0x18) | BIT(15) | (1 << 8));
@@ -370,7 +371,7 @@ static int atl_intr_init(struct atl_nic *nic)
 	return 0;
 }
 
-static void atl_intr_release(struct atl_nic *nic)
+void atl_intr_release(struct atl_nic *nic)
 {
 	struct pci_dev *pdev = nic->hw.pdev;
 
@@ -450,14 +451,9 @@ unsigned int atl_fwd_rx_buf_reserve = 0, atl_fwd_tx_buf_reserve = 0;
 module_param_named(fwd_tx_buf_reserve, atl_fwd_tx_buf_reserve, uint, 0444);
 module_param_named(fwd_rx_buf_reserve, atl_fwd_rx_buf_reserve, uint, 0444);
 
-int atl_start_hw(struct atl_nic *nic)
+void atl_start_hw_global(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
-	int ret;
-
-	ret = atl_intr_init(nic);
-	if (ret)
-		return ret;
 
 	/* Enable TPO2 */
 	atl_write(hw, 0x7040, 0x10000);
@@ -514,21 +510,26 @@ int atl_start_hw(struct atl_nic *nic)
 	atl_restore_vlan_filters(hw);
 
 	atl_set_rss_key(hw);
-	atl_set_rss_tbl(hw);
 	/* Enable RSS | 8 queues per TC */
 	atl_write(hw, ATL_RX_RSS_CTRL, BIT(31) | 3);
+
+	/* Global interrupt block init */
+	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
+		/* MSI or MSI-X mode interrupt mode */
+		uint32_t ctrl = hw->pdev->msix_enabled ? 2 : 1;
+
+		/* Enable multi-vector mode and mask autoclear
+		 * register */
+		ctrl |= BIT(2) | BIT(5);
+
+		atl_write(hw, ATL_INTR_CTRL, ctrl);
+	} else
+		/* Enable legacy INTx mode and status clear-on-read */
+		atl_write(hw, ATL_INTR_CTRL, BIT(7));
 
 	/* Reset Rx/Tx on unexpected PERST# */
 	atl_write_bit(hw, 0x1000, 29, 0);
 	atl_write(hw, 0x448, 3);
-
-	return 0;
-}
-
-void atl_stop_hw(struct atl_nic *nic)
-{
-	atl_intr_release(nic);
-	atl_hw_reset(&nic->hw);
 }
 
 #define atl_vlan_flt_val(vid) ((uint32_t)(vid) | 1 << 16 | 1 << 31)

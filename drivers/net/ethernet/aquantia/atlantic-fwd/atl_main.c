@@ -38,16 +38,12 @@ static int atl_open(struct net_device *ndev)
 	if (ret)
 		return ret;
 
-	ret = atl_start_hw(nic);
-	if (ret)
-		goto stop_rings;
-
 	ret = netif_set_real_num_tx_queues(ndev, nic->nvecs);
 	if (ret)
-		goto stop_hw;
+		goto stop_rings;
 	ret = netif_set_real_num_rx_queues(ndev, nic->nvecs);
 	if (ret)
-		goto stop_hw;
+		goto stop_rings;
 
 	atl_intr_enable_all(hw);
 
@@ -62,8 +58,6 @@ static int atl_open(struct net_device *ndev)
 	set_bit(ATL_ST_UP, &nic->state);
 	return 0;
 
-stop_hw:
-	atl_stop_hw(nic);
 stop_rings:
 	atl_stop_rings(nic);
 	return ret;
@@ -86,7 +80,6 @@ static int atl_close(struct net_device *ndev)
 	del_timer_sync(&nic->link_timer);
 	netif_carrier_off(ndev);
 
-	atl_stop_hw(nic);
 	atl_stop_rings(nic);
 
 	return 0;
@@ -347,6 +340,8 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	pci_set_drvdata(pdev, nic);
 	netif_carrier_off(ndev);
+
+	atl_start_hw_global(nic);
 
 	return 0;
 
