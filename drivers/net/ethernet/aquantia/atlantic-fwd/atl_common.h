@@ -219,6 +219,8 @@ enum atl_priv_flags {
 	ATL_PF_LPB_SYS_PB,
 	ATL_PF_LPB_SYS_DMA,
 	/* ATL_PF_LPB_NET_DMA, */
+	ATL_PF_LPI_RX,
+	ATL_PF_LPI_TX,
 };
 
 enum atl_priv_flag_bits {
@@ -228,6 +230,10 @@ enum atl_priv_flag_bits {
 
 	ATL_PF_LPB_MASK = ATL_PF_BIT(LPB_SYS_DMA) | ATL_PF_BIT(LPB_SYS_PB)
 		/* | ATL_PF_BIT(LPB_NET_DMA) */,
+	ATL_DEF_PF_BIT(LPI_RX),
+	ATL_DEF_PF_BIT(LPI_TX),
+	ATL_PF_LPI_MASK = ATL_PF_BIT(LPI_RX) | ATL_PF_BIT(LPI_TX),
+	ATL_PF_RW_MASK = ATL_PF_LPB_MASK,
 };
 
 #define ATL_MAX_MTU (16352 - ETH_FCS_LEN - ETH_HLEN)

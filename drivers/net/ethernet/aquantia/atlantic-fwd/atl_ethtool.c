@@ -606,6 +606,8 @@ static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(PKTSystemLoopback, LPB_SYS_PB),
 	ATL_PRIV_FLAG(DMASystemLoopback, LPB_SYS_DMA),
 	/* ATL_PRIV_FLAG(DMANetworkLoopback, LPB_NET_DMA), */
+	ATL_PRIV_FLAG(RX_LPI, LPI_RX),
+	ATL_PRIV_FLAG(TX_LPI, LPI_TX),
 };
 
 static int atl_get_sset_count(struct net_device *ndev, int sset)
@@ -707,19 +709,41 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	}
 }
 
+static int atl_update_eee_pflags(struct atl_nic *nic)
+{
+	int ret;
+	uint32_t val;
+	uint32_t flags = nic->priv_flags;
+
+	ret = atl_msm_read(&nic->hw, ATL_MSM_GEN_STS, &val);
+	if (ret)
+		return ret;
+
+	flags &= ~ATL_PF_LPI_MASK;
+	if (val & BIT(8))
+		flags |= ATL_PF_BIT(LPI_TX);
+	if (val & BIT(4))
+		flags |= ATL_PF_BIT(LPI_RX);
+	nic->priv_flags = flags;
+
+	return 0;
+}
 
 static uint32_t atl_get_priv_flags(struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 
+	atl_update_eee_pflags(nic);
 	return nic->priv_flags;
 }
 
 static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
+	uint32_t diff = (flags ^ nic->priv_flags) & ATL_PF_RW_MASK;
+	uint32_t curr = nic->priv_flags & ATL_PF_LPB_MASK;
 
-	if (flags & ~ATL_PF_LPB_MASK)
+	if (diff & ~ATL_PF_LPB_MASK)
 		return -EOPNOTSUPP;
 
 	flags &= ATL_PF_LPB_MASK;
@@ -733,10 +757,10 @@ static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 		return -EINVAL;
 	}
 
-	if (nic->priv_flags)
-		atl_set_loopback(nic, ffs(nic->priv_flags) - 1, false);
+	if (curr)
+		atl_set_loopback(nic, ffs(curr) - 1, false);
 
-	nic->priv_flags = flags;
+	nic->priv_flags = flags | (nic->priv_flags & ~ATL_PF_LPB_MASK);
 	if (flags)
 		atl_set_loopback(nic, ffs(flags) - 1, true);
 
