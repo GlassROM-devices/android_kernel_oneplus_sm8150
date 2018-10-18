@@ -839,6 +839,130 @@ int atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val)
 	return ret;
 }
 
+static int atl_mdio_wait(struct atl_hw *hw)
+{
+	uint32_t val;
+
+	busy_wait(20, udelay(1), val, atl_read(hw, ATL_GLOBAL_MDIO_CMD),
+		val & BIT(31));
+	if (val & BIT(31))
+		return -ETIME;
+
+	return 0;
+}
+
+int atl_mdio_hwsem_get(struct atl_hw *hw)
+{
+	int ret;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MDIO);
+	if (ret)
+		return ret;
+
+	/* Enable MDIO Clock (active low) in case MBU have disabled
+	 * it. */
+	atl_write_bit(hw, ATL_GLOBAL_MDIO_CTL, 14, 0);
+	return 0;
+}
+
+void atl_mdio_hwsem_put(struct atl_hw *hw)
+{
+	/* It's ok to leave MDIO Clock running according to FW
+	 * guys. In fact that's what FW does. */
+	atl_hwsem_put(hw, ATL_MCP_SEM_MDIO);
+}
+
+static void atl_mdio_set_addr(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr)
+{
+	/* Set address */
+	atl_write(hw, ATL_GLOBAL_MDIO_ADDR, addr & (BIT(16) - 1));
+	/* Address operation | execute | prtad + mmd */
+	atl_write(hw, ATL_GLOBAL_MDIO_CMD, BIT(15) | 3 << 12 |
+		prtad << 5 | mmd);
+}
+
+int __atl_mdio_read(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t *val)
+{
+	int ret;
+
+	ret = atl_mdio_wait(hw);
+	if (ret)
+		return ret;
+
+	atl_mdio_set_addr(hw, prtad, mmd, addr);
+	ret = atl_mdio_wait(hw);
+	if (ret)
+		return ret;
+
+	/* Read operation | execute | prtad + mmd */
+	atl_write(hw, ATL_GLOBAL_MDIO_CMD, BIT(15) | 1 << 12 |
+		prtad << 5 | mmd);
+
+	ret = atl_mdio_wait(hw);
+	if (ret)
+		return ret;
+
+	*val = atl_read(hw, ATL_GLOBAL_MDIO_RDATA);
+	return 0;
+}
+
+int atl_mdio_read(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t *val)
+{
+	int ret;
+
+	ret = atl_mdio_hwsem_get(hw);
+	if (ret)
+		return ret;
+
+	ret = __atl_mdio_read(hw, prtad, mmd, addr, val);
+	atl_mdio_hwsem_put(hw);
+
+	return ret;
+}
+
+int __atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t val)
+{
+	int ret;
+
+	ret = atl_mdio_wait(hw);
+	if (ret)
+		return ret;
+
+	atl_mdio_set_addr(hw, prtad, mmd, addr);
+	ret = atl_mdio_wait(hw);
+	if (ret)
+		return ret;
+
+	atl_write(hw, ATL_GLOBAL_MDIO_WDATA, val);
+	/* Write operation | execute | prtad + mmd */
+	atl_write(hw, ATL_GLOBAL_MDIO_CMD, BIT(15) | 2 << 12 |
+		prtad << 5 | mmd);
+	ret = atl_mdio_wait(hw);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t val)
+{
+	int ret;
+
+	ret = atl_mdio_hwsem_get(hw);
+	if (ret)
+		return ret;
+
+	ret = __atl_mdio_write(hw, prtad, mmd, addr, val);
+	atl_mdio_hwsem_put(hw);
+
+	return 0;
+}
+
 #define __READ_MSM_OR_GOTO(RET, HW, REGISTER, PVARIABLE, label) \
 	RET = __atl_msm_read(HW, REGISTER, PVARIABLE); \
 	if (RET)							\

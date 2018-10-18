@@ -219,8 +219,10 @@ enum atl_priv_flags {
 	ATL_PF_LPB_SYS_PB,
 	ATL_PF_LPB_SYS_DMA,
 	/* ATL_PF_LPB_NET_DMA, */
-	ATL_PF_LPI_RX,
-	ATL_PF_LPI_TX,
+	ATL_PF_LPI_RX_MAC,
+	ATL_PF_LPI_TX_MAC,
+	ATL_PF_LPI_RX_PHY,
+	ATL_PF_LPI_TX_PHY,
 };
 
 enum atl_priv_flag_bits {
@@ -230,9 +232,12 @@ enum atl_priv_flag_bits {
 
 	ATL_PF_LPB_MASK = ATL_PF_BIT(LPB_SYS_DMA) | ATL_PF_BIT(LPB_SYS_PB)
 		/* | ATL_PF_BIT(LPB_NET_DMA) */,
-	ATL_DEF_PF_BIT(LPI_RX),
-	ATL_DEF_PF_BIT(LPI_TX),
-	ATL_PF_LPI_MASK = ATL_PF_BIT(LPI_RX) | ATL_PF_BIT(LPI_TX),
+	ATL_DEF_PF_BIT(LPI_RX_MAC),
+	ATL_DEF_PF_BIT(LPI_TX_MAC),
+	ATL_DEF_PF_BIT(LPI_RX_PHY),
+	ATL_DEF_PF_BIT(LPI_TX_PHY),
+	ATL_PF_LPI_MASK = ATL_PF_BIT(LPI_RX_MAC) | ATL_PF_BIT(LPI_TX_MAC) |
+		ATL_PF_BIT(LPI_RX_PHY) | ATL_PF_BIT(LPI_TX_PHY),
 	ATL_PF_RW_MASK = ATL_PF_LPB_MASK,
 };
 
@@ -307,6 +312,16 @@ int atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val);
 int atl_update_eth_stats(struct atl_nic *nic);
 void atl_fwd_release_rings(struct atl_nic *nic);
 int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay);
+int atl_mdio_hwsem_get(struct atl_hw *hw);
+void atl_mdio_hwsem_put(struct atl_hw *hw);
+int __atl_mdio_read(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t *val);
+int atl_mdio_read(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t *val);
+int __atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t val);
+int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
+	uint16_t addr, uint16_t val);
 
 
 #endif

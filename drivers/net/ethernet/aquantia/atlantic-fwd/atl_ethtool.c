@@ -606,8 +606,10 @@ static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(PKTSystemLoopback, LPB_SYS_PB),
 	ATL_PRIV_FLAG(DMASystemLoopback, LPB_SYS_DMA),
 	/* ATL_PRIV_FLAG(DMANetworkLoopback, LPB_NET_DMA), */
-	ATL_PRIV_FLAG(RX_LPI, LPI_RX),
-	ATL_PRIV_FLAG(TX_LPI, LPI_TX),
+	ATL_PRIV_FLAG(RX_LPI_MAC, LPI_RX_MAC),
+	ATL_PRIV_FLAG(TX_LPI_MAC, LPI_TX_MAC),
+	ATL_PRIV_FLAG(RX_LPI_PHY, LPI_RX_PHY),
+	ATL_PRIV_FLAG(TX_LPI_PHY, LPI_TX_PHY),
 };
 
 static int atl_get_sset_count(struct net_device *ndev, int sset)
@@ -711,22 +713,58 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 
 static int atl_update_eee_pflags(struct atl_nic *nic)
 {
-	int ret;
+	int ret = 0;
+	uint8_t prtad = 0;
 	uint32_t val;
+	uint16_t phy_val;
 	uint32_t flags = nic->priv_flags;
+	struct atl_link_type *link = nic->hw.link_state.link;
+	struct atl_hw *hw = &nic->hw;
+
+	flags &= ~ATL_PF_LPI_MASK;
+
+	if (!link || link->speed == 100)
+		goto done;
+
+	if (link->speed == 1000) {
+		ret = atl_mdio_read(hw, prtad, 3, 1, &phy_val);
+		if (ret)
+			goto done;
+
+		if (phy_val & BIT(9))
+			flags |= ATL_PF_BIT(LPI_TX_PHY);
+
+		if (phy_val & BIT(8))
+			flags |= ATL_PF_BIT(LPI_RX_PHY);
+	} else {
+		ret = atl_mdio_read(hw, prtad, 3, 0xc830, &phy_val);
+		if (ret)
+			goto done;
+
+		if (phy_val & BIT(0))
+			flags |= ATL_PF_BIT(LPI_TX_PHY);
+
+		ret = atl_mdio_read(hw, prtad, 3, 0xe834, &phy_val);
+		if (ret)
+			goto done;
+
+		if (phy_val & BIT(0))
+			flags |= ATL_PF_BIT(LPI_RX_PHY);
+
+	}
 
 	ret = atl_msm_read(&nic->hw, ATL_MSM_GEN_STS, &val);
 	if (ret)
-		return ret;
+		goto done;
 
-	flags &= ~ATL_PF_LPI_MASK;
 	if (val & BIT(8))
-		flags |= ATL_PF_BIT(LPI_TX);
+		flags |= ATL_PF_BIT(LPI_TX_MAC);
 	if (val & BIT(4))
-		flags |= ATL_PF_BIT(LPI_RX);
-	nic->priv_flags = flags;
+		flags |= ATL_PF_BIT(LPI_RX_MAC);
 
-	return 0;
+done:
+	nic->priv_flags = flags;
+	return ret;
 }
 
 static uint32_t atl_get_priv_flags(struct net_device *ndev)
