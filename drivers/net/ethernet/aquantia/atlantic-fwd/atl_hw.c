@@ -13,8 +13,6 @@
 #include "atl_hw.h"
 #include "atl_ring.h"
 
-static void atl_restore_vlan_filters(struct atl_hw *hw);
-
 struct atl_board_info {
 	unsigned int link_mask;
 };
@@ -507,7 +505,9 @@ void atl_start_hw_global(struct atl_nic *nic)
 
 	/* Enable untagged packets */
 	atl_write(hw, ATL_RX_VLAN_FLT_CTRL1, 1 << 2 | 1 << 3);
-	atl_restore_vlan_filters(hw);
+
+	/* Reprogram ethtool Rx filters */
+	atl_refresh_rxfs(nic);
 
 	atl_set_rss_key(hw);
 	/* Enable RSS | 8 queues per TC */
@@ -533,67 +533,6 @@ void atl_start_hw_global(struct atl_nic *nic)
 }
 
 #define atl_vlan_flt_val(vid) ((uint32_t)(vid) | 1 << 16 | 1 << 31)
-#define atl_set_vlan_promisc(hw, promisc)				\
-	atl_write_bit((hw), ATL_RX_VLAN_FLT_CTRL1, 1, (promisc))
-
-static inline bool atl_vlan_promisc_needed(struct atl_hw *hw)
-{
-	return hw->vlans_active > (ATL_VLAN_FLT_NUM - ATL_RXF_VLAN_MAX);
-}
-
-static void atl_restore_vlan_filters(struct atl_hw *hw)
-{
-	int i;
-	int num = hw->vlans_active;
-	long vid = -1;
-	bool promisc = atl_vlan_promisc_needed(hw);
-
-	atl_set_vlan_promisc(hw, promisc);
-	if (promisc)
-		return;
-
-	for (i = ATL_RXF_VLAN_MAX; i < num + ATL_RXF_VLAN_MAX; i++) {
-		vid = find_next_bit(hw->vlan_map, BIT(12), vid + 1);
-		atl_write(hw, ATL_RX_VLAN_FLT(i),
-			atl_vlan_flt_val(vid));
-	}
-
-	for (; i < ATL_VLAN_FLT_NUM; i++)
-		atl_write(hw, ATL_RX_VLAN_FLT(i), 0);
-}
-
-int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
-{
-	struct atl_nic *nic = netdev_priv(ndev);
-	struct atl_hw *hw = &nic->hw;
-
-	atl_dev_dbg("Add vlan id %hd\n", vid);
-
-	vid &= 0xfff;
-	if (!__test_and_set_bit(vid, hw->vlan_map)) {
-		hw->vlans_active++;
-		atl_restore_vlan_filters(hw);
-	}
-
-	return 0;
-}
-
-int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
-{
-	struct atl_nic *nic = netdev_priv(ndev);
-	struct atl_hw *hw = &nic->hw;
-
-	atl_dev_dbg("Kill vlan id %hd\n", vid);
-
-	vid &= 0xfff;
-	if (!__test_and_clear_bit(vid, hw->vlan_map))
-		return -EINVAL;
-
-	hw->vlans_active--;
-	atl_restore_vlan_filters(hw);
-
-	return 0;
-}
 
 static void atl_set_all_multi(struct atl_hw *hw, bool all_multi)
 {
@@ -621,7 +560,7 @@ void atl_set_rx_mode(struct net_device *ndev)
 	 * requested or too many VIDs registered
 	 */
 	atl_set_vlan_promisc(hw,
-		ndev->flags & IFF_PROMISC || atl_vlan_promisc_needed(hw));
+		ndev->flags & IFF_PROMISC || nic->rxf_vlan.promisc_count);
 
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, promisc_needed);
 	if (promisc_needed)

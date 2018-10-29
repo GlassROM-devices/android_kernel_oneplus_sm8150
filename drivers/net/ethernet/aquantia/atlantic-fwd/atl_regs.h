@@ -93,11 +93,13 @@ enum mcp_scratchpad {
 #define ATL_VLAN_FLT_NUM 16
 #define ATL_RX_VLAN_FLT(idx) ATL_REG_STRIDE(0x5290, 4, idx)
 #define ATL_RX_ETYPE_FLT(idx) ATL_REG_STRIDE(0x5300, 4, idx)
+#define ATL_ETYPE_FLT_NUM 16
 #define ATL_NTUPLE_CTRL(idx) ATL_REG_STRIDE(0x5380, 4, idx)
 #define ATL_NTUPLE_SADDR(idx) ATL_REG_STRIDE(0x53b0, 4, idx)
 #define ATL_NTUPLE_DADDR(idx) ATL_REG_STRIDE(0x53d0, 4, idx)
 #define ATL_NTUPLE_SPORT(idx) ATL_REG_STRIDE(0x5400, 4, idx)
 #define ATL_NTUPLE_DPORT(idx) ATL_REG_STRIDE(0x5420, 4, idx)
+#define ATL_NTUPLE_FLT_NUM 8
 #define ATL_RX_RSS_CTRL 0x54c0
 #define ATL_RX_RSS_KEY_ADDR 0x54d0
 #define ATL_RX_RSS_KEY_WR_DATA 0x54d4

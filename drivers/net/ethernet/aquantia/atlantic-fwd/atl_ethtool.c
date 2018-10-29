@@ -855,7 +855,17 @@ struct atl_rxf_flt_desc {
 	int (*set_rxf)(const struct atl_rxf_flt_desc *desc,
 		struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp);
 	void (*update_rxf)(struct atl_nic *nic, int idx);
+	int (*check_rxf)(const struct atl_rxf_flt_desc *desc,
+		struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp);
 };
+
+#define atl_for_each_rxf_desc(_desc)				\
+for (_desc = atl_rxf_descs;					\
+	_desc < atl_rxf_descs + ARRAY_SIZE(atl_rxf_descs);	\
+	_desc++)
+
+#define atl_for_each_rxf_idx(_desc, _idx)		\
+	for (_idx = 0; _idx < _desc->count; _idx++)
 
 static inline int atl_rxf_idx(const struct atl_rxf_flt_desc *desc,
 	struct ethtool_rx_flow_spec *fsp)
@@ -866,9 +876,12 @@ static inline int atl_rxf_idx(const struct atl_rxf_flt_desc *desc,
 static inline uint64_t atl_ring_cookie(const struct atl_rxf_flt_desc *desc,
 	uint32_t cmd)
 {
-	return (cmd & desc->rxq_bit) ?
-		(cmd >> desc->rxq_shift) & ATL_RXF_RXQ_MSK :
-		RX_CLS_FLOW_DISC;
+	if (cmd & desc->rxq_bit)
+		return (cmd >> desc->rxq_shift) & ATL_RXF_RXQ_MSK;
+	else if (cmd & ATL_RXF_ACT_TOHOST)
+		return ATL_RXF_RING_ANY;
+	else
+		return RX_CLS_FLOW_DISC;
 }
 
 static int atl_rxf_get_vlan(const struct atl_rxf_flt_desc *desc,
@@ -1075,7 +1088,9 @@ static int atl_rxf_set_ring(const struct atl_rxf_flt_desc *desc,
 		return 0;
 
 	ring = ethtool_get_flow_spec_ring(ring_cookie);
-	if (ring >= nic->nvecs && !test_bit(ring, &nic->fwd.ring_map[0])) {
+	if (ring > ATL_RXF_RING_ANY ||
+		(ring >= nic->nvecs && ring != ATL_RXF_RING_ANY &&
+			!test_bit(ring, &nic->fwd.ring_map[ATL_FWDIR_RX]))) {
 		atl_nic_err("Invalid Rx filter queue %d\n", ring);
 		return -EINVAL;
 	}
@@ -1085,12 +1100,15 @@ static int atl_rxf_set_ring(const struct atl_rxf_flt_desc *desc,
 		return -EINVAL;
 	}
 
-	*cmd |= ring << desc->rxq_shift | desc->rxq_bit;
+	*cmd |= ATL_RXF_ACT_TOHOST;
+
+	if (ring != ATL_RXF_RING_ANY)
+		*cmd |= ring << desc->rxq_shift | desc->rxq_bit;
 
 	return 0;
 }
 
-static int atl_check_vlan_etype_common(struct ethtool_rx_flow_spec *fsp)
+static int atl_rxf_check_vlan_etype_common(struct ethtool_rx_flow_spec *fsp)
 {
 	int ret;
 
@@ -1110,21 +1128,19 @@ static int atl_check_vlan_etype_common(struct ethtool_rx_flow_spec *fsp)
 	return ret;
 }
 
-static int atl_rxf_set_vlan(const struct atl_rxf_flt_desc *desc,
+static int atl_rxf_check_vlan(const struct atl_rxf_flt_desc *desc,
 	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 {
-	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
-	int idx = atl_rxf_idx(desc, fsp);
-	int ret;
-	uint32_t cmd = ATL_RXF_EN;
 	uint16_t vid, mask;
+	int ret;
 
 	if (fsp->flow_type != (ETHER_FLOW | FLOW_EXT)) {
-		atl_nic_err("Only ether flow-type supported for VLAN filters\n");
+		if (!(fsp->location & RX_CLS_LOC_SPECIAL))
+			atl_nic_err("Only ether flow-type supported for VLAN filters\n");
 		return -EINVAL;
 	}
 
-	ret = atl_check_vlan_etype_common(fsp);
+	ret = atl_rxf_check_vlan_etype_common(fsp);
 	if (ret)
 		return ret;
 
@@ -1140,15 +1156,159 @@ static int atl_rxf_set_vlan(const struct atl_rxf_flt_desc *desc,
 	if ((mask & 0xfff) != 0xfff)
 		return -EINVAL;
 
-	cmd |= vid & 0xfff;
+	return 0;
+}
+
+enum atl_rxf_vlan_idx {
+	ATL_VIDX_FOUND = BIT(31),
+	ATL_VIDX_FREE = BIT(30),
+	ATL_VIDX_REPL = BIT(29),
+	ATL_VIDX_NONE = BIT(28),
+	ATL_VIDX_MASK = BIT(28) - 1,
+};
+
+/* If a filter is enabled for VID, return its index ored with
+ * ATL_VIDX_FOUND.  Otherwise find an unused filter index and return
+ * it ored with ATL_VIDX_FREE.  If no unused filter exists and
+ * try_repl is set, try finding a candidate for replacement and return
+ * its index ored with ATL_VIDX_REPL. If all of the above fail,
+ * return ATL_VIDX_NONE.
+ *
+ * A replacement candidate filter must be configured to accept
+ * packets, not set to direct to a specific ring and must match a VID
+ * from a VLAN subinterface.
+ */
+static uint32_t atl_rxf_find_vid(struct atl_nic *nic, uint16_t vid,
+	bool try_repl)
+{
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	int idx, free = ATL_RXF_VLAN_MAX, repl = ATL_RXF_VLAN_MAX;
+
+	for (idx = 0; idx < ATL_RXF_VLAN_MAX; idx++) {
+		uint32_t cmd = vlan->cmd[idx];
+
+		if (!(cmd & ATL_RXF_EN)) {
+			if (free == ATL_RXF_VLAN_MAX) {
+				free = idx;
+				if (vid == -1)
+					break;
+			}
+			continue;
+		}
+
+		if ((cmd & ATL_VLAN_VID_MASK) == vid)
+			return idx | ATL_VIDX_FOUND;
+
+		if (try_repl && repl == ATL_RXF_VLAN_MAX &&
+			(cmd & ATL_RXF_ACT_TOHOST) &&
+			!(cmd & ATL_VLAN_RXQ)) {
+
+			if (!test_bit(cmd & ATL_VLAN_VID_MASK, vlan->map))
+				continue;
+
+			repl = idx;
+		}
+	}
+
+	if (free != ATL_RXF_VLAN_MAX)
+		return free | ATL_VIDX_FREE;
+
+	if (try_repl && repl != ATL_RXF_VLAN_MAX)
+		return repl | ATL_VIDX_REPL;
+
+	return ATL_VIDX_NONE;
+}
+
+static uint16_t atl_rxf_vid(struct atl_rxf_vlan *vlan, int idx)
+{
+	uint32_t cmd = vlan->cmd[idx];
+
+	return cmd & ATL_RXF_EN ? cmd & ATL_VLAN_VID_MASK : -1;
+}
+
+static int atl_rxf_dup_vid(struct atl_rxf_vlan *vlan, int idx, uint16_t vid)
+{
+	int i;
+
+	for (i = 0; i < ATL_RXF_VLAN_MAX; i++) {
+		if (i == idx)
+			continue;
+
+		if (atl_rxf_vid(vlan, i) == vid)
+			return i;
+	}
+
+	return -1;
+}
+
+static int atl_rxf_set_vlan(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+{
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	int idx;
+	int ret, promisc_delta = 0;
+	uint32_t cmd = ATL_RXF_EN;
+	int present;
+	uint16_t old_vid, vid = ntohs(fsp->h_ext.vlan_tci) & 0xfff;
+
+	if (!(fsp->location & RX_CLS_LOC_SPECIAL)) {
+		int dup;
+
+		idx = atl_rxf_idx(desc, fsp);
+		dup = atl_rxf_dup_vid(vlan, idx, vid);
+		if (dup >= 0) {
+			atl_nic_err("Can't add duplicate VLAN filter @%d (existing @%d)\n",
+				idx, dup);
+			return -EINVAL;
+		}
+
+		old_vid = atl_rxf_vid(vlan, idx);
+		if (old_vid != -1 && vid != old_vid &&
+			test_bit(old_vid, vlan->map)) {
+			atl_nic_err("Can't overwrite Linux VLAN filter @%d VID %hd with a different VID %hd\n",
+				idx, old_vid, vid);
+			return -EINVAL;
+		}
+
+		ret = atl_rxf_check_vlan(desc, nic, fsp);
+		if (ret)
+			return ret;
+
+	} else {
+		/* atl_rxf_check_vlan() already succeeded */
+		idx = atl_rxf_find_vid(nic, vid, true);
+
+		if (idx == ATL_VIDX_NONE)
+			return -EINVAL;
+
+		/* If a filter is being added for a VID without a
+		 * corresponding VLAN subdevice, and we're reusing a
+		 * filter previously used for a VLAN subdevice-covered
+		 * VID, the promisc count needs to be bumped (but
+		 * only if filter change succeeds). */
+		if ((idx & ATL_VIDX_REPL) && !test_bit(vid, vlan->map))
+			promisc_delta++;
+
+		idx &= ATL_VIDX_MASK;
+		fsp->location = idx + desc->base;
+	}
+
+	cmd |= vid;
 
 	ret = atl_rxf_set_ring(desc, nic, fsp, &cmd);
 	if (ret)
 		return ret;
 
-	vlan->cmd[idx] = cmd;
+	/* If a VLAN subdevice exists, override filter to accept
+	 * packets */
+	if (test_bit(vid, vlan->map))
+		cmd |= ATL_RXF_ACT_TOHOST;
 
-	return 0;
+	present = !!(vlan->cmd[idx] & ATL_RXF_EN);
+	vlan->cmd[idx] = cmd;
+	vlan->promisc_count += promisc_delta;
+
+	return !present;
 }
 
 static int atl_rxf_set_etype(const struct atl_rxf_flt_desc *desc,
@@ -1158,13 +1318,14 @@ static int atl_rxf_set_etype(const struct atl_rxf_flt_desc *desc,
 	int idx = atl_rxf_idx(desc, fsp);
 	int ret;
 	uint32_t cmd = ATL_RXF_EN;
+	int present = !!(etype->cmd[idx] & ATL_RXF_EN);
 
 	if (fsp->flow_type != (ETHER_FLOW)) {
 		atl_nic_err("Only ether flow-type supported for ethertype filters\n");
 		return -EINVAL;
 	}
 
-	ret = atl_check_vlan_etype_common(fsp);
+	ret = atl_rxf_check_vlan_etype_common(fsp);
 	if (ret)
 		return ret;
 
@@ -1182,7 +1343,7 @@ static int atl_rxf_set_etype(const struct atl_rxf_flt_desc *desc,
 
 	etype->cmd[idx] = cmd;
 
-	return 0;
+	return !present;
 }
 
 static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
@@ -1193,6 +1354,7 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 	uint32_t cmd = ATL_NTC_EN;
 	int ret;
 	__be16 sport, dport;
+	int present = !!(ntuple->cmd[idx] & ATL_RXF_EN);
 
 	ret = atl_rxf_set_ring(desc, nic, fsp, &cmd);
 	if (ret)
@@ -1349,7 +1511,7 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 
 	ntuple->cmd[idx] = cmd;
 
-	return 0;
+	return !present;
 }
 
 static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
@@ -1373,6 +1535,7 @@ static const struct atl_rxf_flt_desc atl_rxf_descs[] = {
 		.get_rxf = atl_rxf_get_vlan,
 		.set_rxf = atl_rxf_set_vlan,
 		.update_rxf = atl_rxf_update_vlan,
+		.check_rxf = atl_rxf_check_vlan,
 	},
 	{
 		.base = ATL_RXF_ETYPE_BASE,
@@ -1409,22 +1572,106 @@ static int *atl_rxf_count(const struct atl_rxf_flt_desc *desc, struct atl_nic *n
 	return (int *)((char *)nic + desc->count_offt);
 }
 
-static const struct atl_rxf_flt_desc *atl_rxf_desc(struct ethtool_rx_flow_spec *fsp)
+static const struct atl_rxf_flt_desc *atl_rxf_desc(struct atl_nic *nic,
+	struct ethtool_rx_flow_spec *fsp)
 {
 	uint32_t loc = fsp->location;
-	const struct atl_rxf_flt_desc *desc = atl_rxf_descs;
+	const struct atl_rxf_flt_desc *desc;
 
-	while (desc < atl_rxf_descs + ARRAY_SIZE(atl_rxf_descs)) {
+	atl_for_each_rxf_desc(desc) {
+		if (loc & RX_CLS_LOC_SPECIAL) {
+			if (desc->check_rxf && !desc->check_rxf(desc, nic, fsp))
+				return desc;
+
+			continue;
+		}
+
 		if (loc < desc->base)
 			return NULL;
 
 		if (loc < desc->base + desc->count)
 			return desc;
-
-		desc++;
 	}
 
 	return NULL;
+}
+
+static void atl_refresh_rxf_desc(struct atl_nic *nic,
+	const struct atl_rxf_flt_desc *desc)
+{
+	int idx;
+
+	atl_for_each_rxf_idx(desc, idx)
+		desc->update_rxf(nic, idx);
+
+	atl_set_vlan_promisc(&nic->hw, nic->rxf_vlan.promisc_count);
+}
+
+void atl_refresh_rxfs(struct atl_nic *nic)
+{
+	const struct atl_rxf_flt_desc *desc;
+
+	atl_for_each_rxf_desc(desc)
+		atl_refresh_rxf_desc(nic, desc);
+
+	atl_set_vlan_promisc(&nic->hw, nic->rxf_vlan.promisc_count);
+}
+
+static bool atl_vlan_pull_from_promisc(struct atl_nic *nic, uint32_t idx)
+{
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	unsigned long *map;
+	int i;
+	long vid = -1;
+
+	if (!vlan->promisc_count)
+		return false;
+
+	map = kcalloc(ATL_VID_MAP_LEN, sizeof(*map), GFP_KERNEL);
+	if (!map)
+		return false;
+
+	memcpy(map, vlan->map, ATL_VID_MAP_LEN * sizeof(*map));
+	for (i = 0; i < ATL_RXF_VLAN_MAX; i++) {
+		uint32_t cmd = vlan->cmd[i];
+
+		if (cmd & ATL_RXF_EN)
+			clear_bit(cmd & ATL_VLAN_VID_MASK, map);
+	}
+
+	do {
+		idx &= ATL_VIDX_MASK;
+		vid = find_next_bit(map, BIT(12), vid + 1);
+		vlan->cmd[idx] = ATL_RXF_EN | ATL_RXF_ACT_TOHOST | vid;
+		atl_rxf_update_vlan(nic, idx);
+		__clear_bit(vid, map);
+		vlan->promisc_count--;
+		vlan->count++;
+		if (vlan->promisc_count == 0)
+			break;
+
+		idx = atl_rxf_find_vid(nic, -1, false);
+	} while (idx & ATL_VIDX_FREE);
+
+	kfree(map);
+	atl_set_vlan_promisc(&nic->hw, vlan->promisc_count);
+	return true;
+}
+
+static bool atl_rxf_del_vlan_override(const struct atl_rxf_flt_desc *desc,
+	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
+{
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	uint32_t *cmd = &vlan->cmd[atl_rxf_idx(desc, fsp)];
+	uint16_t vid = *cmd & ATL_VLAN_VID_MASK;
+
+	if (!test_bit(vid, vlan->map))
+		return false;
+
+	/* Trying to delete filter via ethtool while VLAN subdev still
+	 * exists. Just drop queue assignment. */
+	*cmd &= ~ATL_VLAN_RXQ;
+	return true;
 }
 
 static int atl_set_rxf(struct atl_nic *nic,
@@ -1433,34 +1680,47 @@ static int atl_set_rxf(struct atl_nic *nic,
 	const struct atl_rxf_flt_desc *desc;
 	uint32_t *cmd;
 	int *count, ret, idx;
-	bool present;
 
-	desc = atl_rxf_desc(fsp);
+	desc = atl_rxf_desc(nic, fsp);
 	if (!desc)
 		return -EINVAL;
 
-	idx = atl_rxf_idx(desc, fsp);
-	cmd = &atl_rxf_cmd(desc, nic)[idx];
 	count = atl_rxf_count(desc, nic);
-	present = !!(*cmd & ATL_RXF_EN);
 
-	if (!delete) {
-		ret = desc->set_rxf(desc, nic, fsp);
-		if (ret)
-			return ret;
+	if (delete) {
+		idx = atl_rxf_idx(desc, fsp);
+		cmd = &atl_rxf_cmd(desc, nic)[idx];
 
-		if (!present)
-			(*count)++;
-	} else if (!present)
-		/* Attempting to delete non-existent filter */
-		return -EINVAL;
-	else {
+		if (!(*cmd & ATL_RXF_EN))
+			/* Attempting to delete non-existent filter */
+			return -EINVAL;
+
+		if (desc->base == ATL_RXF_VLAN_BASE &&
+			atl_rxf_del_vlan_override(desc, nic, fsp))
+			goto done;
+
 		*cmd = 0;
 		(*count)--;
+
+		if (desc->base == ATL_RXF_VLAN_BASE &&
+			atl_vlan_pull_from_promisc(nic, idx))
+			/* Filter already updated by
+			 * atl_vlan_pull_from_promisc(), can just
+			 * return */
+			return 0;
+	} else {
+		ret = desc->set_rxf(desc, nic, fsp);
+		if (ret < 0)
+			return ret;
+
+		/* fsp->location may have been set in
+		 * ->set_rxf(). Guaranteed to be valid now. */
+		idx = atl_rxf_idx(desc, fsp);
+		*count += ret;
 	}
 
+done:
 	desc->update_rxf(nic, idx);
-
 	return 0;
 }
 
@@ -1480,10 +1740,12 @@ static int atl_get_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *rxnfc,
 	case ETHTOOL_GRXCLSRLCNT:
 		rxnfc->rule_cnt = nic->rxf_ntuple.count + nic->rxf_vlan.count +
 			nic->rxf_etype.count;
+		rxnfc->data = (ATL_RXF_VLAN_MAX + ATL_RXF_ETYPE_MAX +
+			ATL_RXF_NTUPLE_MAX) | RX_CLS_LOC_SPECIAL;
 		return 0;
 
 	case ETHTOOL_GRXCLSRULE:
-		desc = atl_rxf_desc(fsp);
+		desc = atl_rxf_desc(nic, fsp);
 		if (!desc)
 			return -EINVAL;
 
@@ -1521,6 +1783,93 @@ static int atl_set_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *rxnfc)
 
 	return -ENOTSUPP;
 }
+
+int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
+{
+	struct atl_nic *nic = netdev_priv(ndev);
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	int idx;
+
+	atl_nic_dbg("Add vlan id %hd\n", vid);
+
+	vid &= 0xfff;
+	if (__test_and_set_bit(vid, vlan->map))
+		/* Already created -- shouldn't happen? */
+		return 0;
+
+	vlan->vlans_active++;
+	idx = atl_rxf_find_vid(nic, vid, false);
+
+	if (idx == ATL_VIDX_NONE) {
+		/* VID not found and no unused filters */
+		vlan->promisc_count++;
+		atl_set_vlan_promisc(&nic->hw, vlan->promisc_count);
+		return 0;
+	}
+
+	if (idx & ATL_VIDX_FREE) {
+		/* VID not found, program unused filter */
+		idx &= ATL_VIDX_MASK;
+		vlan->cmd[idx] = ATL_VLAN_EN | ATL_RXF_ACT_TOHOST | vid;
+		vlan->count++;
+		atl_rxf_update_vlan(nic, idx);
+		return 0;
+	}
+
+	idx &= ATL_VIDX_MASK;
+	if (vlan->cmd[idx]  & ATL_RXF_ACT_TOHOST)
+		/* VID already added via ethtool */
+		return 0;
+
+	/* Ethtool filter set to drop. Override. */
+	atl_nic_warn("%s: Overriding VLAN filter for VID %hd @%d set to drop\n",
+		__func__, vid, idx);
+
+	vlan->cmd[idx] = ATL_RXF_EN | ATL_RXF_ACT_TOHOST | vid;
+	atl_rxf_update_vlan(nic, idx);
+	return 0;
+}
+
+int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
+{
+	struct atl_nic *nic = netdev_priv(ndev);
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	uint32_t cmd;
+	int idx;
+
+	atl_nic_dbg("Kill vlan id %hd\n", vid);
+
+	vid &= 0xfff;
+	if (!__test_and_clear_bit(vid, vlan->map))
+		return -EINVAL;
+
+	vlan->vlans_active--;
+
+	idx = atl_rxf_find_vid(nic, vid, false);
+	if (!(idx & ATL_VIDX_FOUND)) {
+		/* VID not present in filters, decrease promisc count */
+		vlan->promisc_count--;
+		atl_set_vlan_promisc(&nic->hw, vlan->promisc_count);
+		return 0;
+	}
+
+	idx &= ATL_VIDX_MASK;
+	cmd = vlan->cmd[idx];
+	if (cmd & ATL_VLAN_RXQ)
+		/* Queue explicitly set via ethtool, leave the filter
+		 * intact */
+		return 0;
+
+	/* Delete filter, maybe pull vid from promisc overflow */
+	vlan->cmd[idx] = 0;
+	vlan->count--;
+	if (!atl_vlan_pull_from_promisc(nic, idx))
+		atl_rxf_update_vlan(nic, idx);
+
+	return 0;
+}
+
+
 
 const struct ethtool_ops atl_ethtool_ops = {
 	.get_link = atl_ethtool_get_link,

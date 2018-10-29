@@ -82,16 +82,19 @@ struct atl_global_stats {
 
 enum {
 	ATL_RXF_VLAN_BASE = 0,
-	ATL_RXF_VLAN_MAX = 8,
+	ATL_RXF_VLAN_MAX = ATL_VLAN_FLT_NUM,
 	ATL_RXF_ETYPE_BASE = ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX,
-	ATL_RXF_ETYPE_MAX = 16,
+	ATL_RXF_ETYPE_MAX = ATL_ETYPE_FLT_NUM,
 	ATL_RXF_NTUPLE_BASE = ATL_RXF_ETYPE_BASE + ATL_RXF_ETYPE_MAX,
-	ATL_RXF_NTUPLE_MAX = 8,
+	ATL_RXF_NTUPLE_MAX = ATL_NTUPLE_FLT_NUM,
 };
 
 enum atl_rxf_common_cmd {
 	ATL_RXF_EN = BIT(31),
 	ATL_RXF_RXQ_MSK = BIT(5) - 1,
+	ATL_RXF_ACT_SHIFT = 16,
+	ATL_RXF_ACT_MASK = BIT(3) - 1,
+	ATL_RXF_ACT_TOHOST = BIT(0) << ATL_RXF_ACT_SHIFT,
 };
 
 enum atl_ntuple_cmd {
@@ -105,7 +108,7 @@ enum atl_ntuple_cmd {
 	ATL_NTC_PROTO = BIT(25), /* Match L4 proto */
 	ATL_NTC_ARP = BIT(24),
 	ATL_NTC_RXQ = BIT(23),	/* Assign Rx queue */
-	ATL_NTC_ACT_SHIFT = 16,
+	ATL_NTC_ACT_SHIFT = ATL_RXF_ACT_SHIFT,
 	ATL_NTC_RXQ_SHIFT = 8,
 	ATL_NTC_RXQ_MASK = ATL_RXF_RXQ_MSK << ATL_NTC_RXQ_SHIFT,
 	ATL_NTC_L4_MASK = BIT(3) - 1,
@@ -137,13 +140,18 @@ enum atl_vlan_cmd {
 	ATL_VLAN_RXQ = BIT(28),
 	ATL_VLAN_RXQ_SHIFT = 20,
 	ATL_VLAN_RXQ_MASK = ATL_RXF_RXQ_MSK << ATL_VLAN_RXQ_SHIFT,
-	ATL_VLAN_ACT_SHIFT = 16,
+	ATL_VLAN_ACT_SHIFT = ATL_RXF_ACT_SHIFT,
 	ATL_VLAN_VID_MASK = BIT(12) - 1,
 };
+
+#define ATL_VID_MAP_LEN BITS_TO_LONGS(BIT(12))
 
 struct atl_rxf_vlan {
 	uint32_t cmd[ATL_RXF_VLAN_MAX];
 	int count;
+	unsigned long map[ATL_VID_MAP_LEN];
+	int vlans_active;
+	int promisc_count;
 };
 
 enum atl_etype_cmd {
@@ -151,7 +159,7 @@ enum atl_etype_cmd {
 	ATL_ETYPE_RXQ = BIT(29),
 	ATL_ETYPE_RXQ_SHIFT = 20,
 	ATL_ETYPE_RXQ_MASK = ATL_RXF_RXQ_MSK << ATL_ETYPE_RXQ_SHIFT,
-	ATL_ETYPE_ACT_SHIFT = 16,
+	ATL_ETYPE_ACT_SHIFT = ATL_RXF_ACT_SHIFT,
 	ATL_ETYPE_VAL_MASK = BIT(16) - 1,
 };
 
@@ -168,11 +176,19 @@ struct atl_queue_vec;
 #define ATL_NUM_MSI_VECS 32
 #define ATL_NUM_NON_RING_IRQS 1
 
+#define ATL_RXF_RING_ANY 32
+
 #define ATL_FWD_MSI_BASE (ATL_MAX_QUEUES + ATL_NUM_NON_RING_IRQS)
 
+enum atl_fwd_dir {
+	ATL_FWDIR_RX = 0,
+	ATL_FWDIR_TX = 1,
+	ATL_FWDIR_NUM = ATL_FWDIR_TX,
+};
+
 struct atl_fwd {
-	unsigned long ring_map[2];
-	struct atl_fwd_ring *rings[2][ATL_NUM_FWD_RINGS];
+	unsigned long ring_map[ATL_FWDIR_NUM];
+	struct atl_fwd_ring *rings[ATL_FWDIR_NUM][ATL_NUM_FWD_RINGS];
 	unsigned long msi_map;
 };
 
@@ -322,6 +338,7 @@ int __atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 	uint16_t addr, uint16_t val);
 int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 	uint16_t addr, uint16_t val);
+void atl_refresh_rxfs(struct atl_nic *nic);
 
 
 #endif

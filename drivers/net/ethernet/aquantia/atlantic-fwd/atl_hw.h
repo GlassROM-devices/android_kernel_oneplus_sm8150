@@ -41,8 +41,6 @@ enum atl_board {
 	ATL_AQC100,
 };
 
-#define ATL_VID_MAP_LEN BITS_TO_LONGS(BIT(12))
-
 struct atl_hw {
 	uint8_t __iomem *regs;
 	struct pci_dev *pdev;
@@ -54,9 +52,6 @@ struct atl_hw {
 	} mcp;
 	uint32_t intr_mask;
 	uint8_t mac_addr[ETH_ALEN];
-	uint16_t vlan_ids[ATL_VLAN_FLT_NUM];
-	unsigned long vlan_map[ATL_VID_MAP_LEN];
-	int vlans_active;
 #define ATL_RSS_KEY_SIZE 40
 	uint8_t rss_key[ATL_RSS_KEY_SIZE];
 #define ATL_RSS_TBL_SIZE (1 << 6)
@@ -167,6 +162,11 @@ static inline void atl_init_rss_table(struct atl_hw *hw, int nvecs)
 
 	for (i = 0; i < ATL_RSS_TBL_SIZE; i++)
 		hw->rss_tbl[i] = i % nvecs;
+}
+
+static inline void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
+{
+	atl_write_bit(hw, ATL_RX_VLAN_FLT_CTRL1, 1, !!promisc);
 }
 
 bool atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
