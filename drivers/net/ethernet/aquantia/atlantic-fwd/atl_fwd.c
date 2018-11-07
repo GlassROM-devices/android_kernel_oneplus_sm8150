@@ -453,11 +453,12 @@ int atl_fwd_request_event(struct atl_fwd_event *evt)
 		goto fail;
 	}
 
+	evt->idx = idx;
+
 	ret = atl_fwd_set_msix_vec(nic, evt);
 	if (ret)
 		goto fail;
 
-	evt->idx = idx;
 	__set_bit(idx, map);
 
 	atl_set_intr_bits(&nic->hw, ring->idx,

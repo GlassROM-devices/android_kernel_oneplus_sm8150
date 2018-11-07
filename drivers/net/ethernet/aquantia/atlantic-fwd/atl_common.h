@@ -183,7 +183,7 @@ struct atl_queue_vec;
 enum atl_fwd_dir {
 	ATL_FWDIR_RX = 0,
 	ATL_FWDIR_TX = 1,
-	ATL_FWDIR_NUM = ATL_FWDIR_TX,
+	ATL_FWDIR_NUM,
 };
 
 struct atl_fwd {
