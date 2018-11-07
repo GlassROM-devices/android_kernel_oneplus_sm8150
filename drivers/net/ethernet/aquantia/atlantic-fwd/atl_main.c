@@ -12,7 +12,7 @@
 #include <linux/module.h>
 #include <linux/etherdevice.h>
 
-const char atl_driver_name[] = "atlnew";
+const char atl_driver_name[] = "atlantic-fwd";
 
 int atl_max_queues = ATL_MAX_QUEUES;
 module_param_named(max_queues, atl_max_queues, uint, 0444);
