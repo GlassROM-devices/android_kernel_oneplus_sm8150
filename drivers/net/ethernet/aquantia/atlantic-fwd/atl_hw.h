@@ -177,5 +177,7 @@ void atl_free_descs(struct atl_nic *nic, struct atl_hw_ring *ring);
 void atl_set_intr_bits(struct atl_hw *hw, int idx, int rxbit, int txbit);
 int atl_alloc_link_intr(struct atl_nic *nic);
 void atl_free_link_intr(struct atl_nic *nic);
+int atl_write_mcp_mem(struct atl_hw *hw, uint32_t offt, void *addr,
+	size_t size);
 
 #endif

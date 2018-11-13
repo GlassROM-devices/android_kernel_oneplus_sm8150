@@ -8,6 +8,7 @@
  */
 #include "atl_common.h"
 #include "atl_hw.h"
+#include "atl_drviface.h"
 
 struct atl_link_type atl_link_types[] = {
 #define LINK_TYPE(_name, _speed, _ethtl_idx, _fw1_bit, _fw2_bit)	\
@@ -294,6 +295,44 @@ static void atl_fw2_set_default_link(struct atl_hw *hw)
 	lstate->eee_enabled = 1;
 }
 
+static int atl_fw2_enable_wol(struct atl_hw *hw)
+{
+	int ret;
+	struct offloadInfo *info;
+	struct drvIface *msg;
+	uint32_t val, wol_bits = atl_fw2_nic_proxy | atl_fw2_wol;
+
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	info = &msg->fw2xOffloads;
+	info->version = 0;
+	info->len = sizeof(*info);
+	memcpy(info->macAddr, hw->mac_addr, ETH_ALEN);
+
+	ret = atl_write_mcp_mem(hw, 0, msg,
+		(info->len + offsetof(struct drvIface, fw2xOffloads) + 3) & ~3);
+	if (ret) {
+		atl_dev_err("Failed to upload sleep proxy info to FW\n");
+		goto free;
+	}
+
+	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), 0);
+	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), wol_bits);
+	busy_wait(100, mdelay(1), val,
+		atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH)),
+		(val & wol_bits) != wol_bits);
+
+	ret = (val & wol_bits) == wol_bits ? 0 : -EIO;
+	if (ret)
+		atl_dev_err("Timeout waiting for WoL enable\n");
+
+free:
+	kfree(msg);
+	return ret;
+}
+
 static struct atl_fw_ops atl_fw_ops[2] = {
 	[0] = {
 		.wait_fw_init = atl_fw1_wait_fw_init,
@@ -302,6 +341,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.get_link_caps = atl_fw1_get_link_caps,
 		.restart_aneg = atl_fw1_unsupported,
 		.set_default_link = atl_fw1_set_default_link,
+		.enable_wol = atl_fw1_unsupported,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW),
 	},
 	[1] = {
@@ -311,6 +351,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.get_link_caps = atl_fw2_get_link_caps,
 		.restart_aneg = atl_fw2_restart_aneg,
 		.set_default_link = atl_fw2_set_default_link,
+		.enable_wol = atl_fw2_enable_wol,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW2_EFUSE_SHADOW),
 	},
 };

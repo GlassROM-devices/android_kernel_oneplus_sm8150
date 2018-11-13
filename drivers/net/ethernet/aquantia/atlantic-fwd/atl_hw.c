@@ -974,3 +974,51 @@ int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay)
 
 	return ret;
 }
+
+static uint32_t atl_mcp_mbox_wait(struct atl_hw *hw, int loops)
+{
+	uint32_t stat;
+
+	busy_wait(loops, cpu_relax(), stat,
+		(atl_read(hw, ATL_MCP_SCRATCH(FW2_MBOX_CMD)) >> 28) & 0xf,
+		stat == 8);
+
+	return stat;
+}
+
+int atl_write_mcp_mem(struct atl_hw *hw, uint32_t offt, void *host_addr,
+	size_t size)
+{
+	uint32_t *addr = (uint32_t *)host_addr;
+
+	while (size) {
+		uint32_t stat;
+
+		atl_write(hw, ATL_MCP_SCRATCH(FW2_MBOX_DATA), *addr++);
+		atl_write(hw, ATL_MCP_SCRATCH(FW2_MBOX_CMD), BIT(31) | offt);
+		ndelay(750);
+		stat = atl_mcp_mbox_wait(hw, 5);
+
+		if (stat == 8) {
+			/* Send MCP mbox interrupt */
+			atl_set_bits(hw, ATL_GLOBAL_CTRL2, BIT(1));
+			ndelay(1200);
+			stat = atl_mcp_mbox_wait(hw, 10000);
+		}
+
+		if (stat == 8) {
+			atl_dev_err("FW mbox timeout offt %x, remaining %lx\n",
+				offt, size);
+			return -ETIME;
+		} else if (stat != 4) {
+			atl_dev_err("FW mbox error status %x, offt %x, remaining %lx\n",
+				stat, offt, size);
+			return -EIO;
+		}
+
+		offt += 4;
+		size -= 4;
+	}
+
+	return 0;
+}

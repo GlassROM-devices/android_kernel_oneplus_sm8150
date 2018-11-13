@@ -440,6 +440,7 @@ static int atl_suspend_common(struct device *dev, bool deep)
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct atl_nic *nic = pci_get_drvdata(pdev);
 	struct atl_hw *hw = &nic->hw;
+	int ret;
 
 	rtnl_lock();
 	netif_device_detach(nic->ndev);
@@ -449,6 +450,12 @@ static int atl_suspend_common(struct device *dev, bool deep)
 
 	if (deep && atl_keep_link)
 		atl_link_down(nic);
+
+	if (deep && nic->flags & ATL_FL_WOL) {
+		ret = hw->mcp.ops->enable_wol(hw);
+		if (ret)
+			atl_dev_err("Enable WoL failed: %d\n", -ret);
+	}
 
 	pci_disable_device(pdev);
 	__clear_bit(ATL_ST_ENABLED, &nic->state);

@@ -218,8 +218,10 @@ struct atl_nic {
 	struct atl_rxf_etype rxf_etype;
 };
 
+/* Flags only modified with RTNL lock held */
 enum atl_nic_flags {
 	ATL_FL_MULTIPLE_VECTORS = BIT(0),
+	ATL_FL_WOL = BIT(1),
 };
 
 enum atl_nic_state {

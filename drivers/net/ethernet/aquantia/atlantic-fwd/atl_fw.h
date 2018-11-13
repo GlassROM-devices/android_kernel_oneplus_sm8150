@@ -27,20 +27,22 @@ extern const int atl_num_rates;
 	     idx < atl_num_rates;		\
 	     idx++, type++)
 
+#define atl_define_bit(_name, _bit)		\
+	_name ## _shift = (_bit),		\
+	_name = BIT(_name ## _shift),
+
 enum atl_fw2_opts {
-	atl_fw2_pause_shift = 3,
-	atl_fw2_asym_pause_shift = 4,
-	atl_fw2_pause = BIT(atl_fw2_pause_shift),
-	atl_fw2_asym_pause = BIT(atl_fw2_asym_pause_shift),
+	atl_define_bit(atl_fw2_pause, 3)
+	atl_define_bit(atl_fw2_asym_pause, 4)
 	atl_fw2_pause_mask = atl_fw2_pause | atl_fw2_asym_pause,
+	atl_define_bit(atl_fw2_nic_proxy, 0x17)
+	atl_define_bit(atl_fw2_wol, 0x18)
 };
 
 enum atl_fc_mode {
 	atl_fc_none = 0,
-	atl_fc_rx_shift = 0,
-	atl_fc_tx_shift = 1,
-	atl_fc_rx = BIT(atl_fc_rx_shift),
-	atl_fc_tx = BIT(atl_fc_tx_shift),
+	atl_define_bit(atl_fc_rx, 0)
+	atl_define_bit(atl_fc_tx, 1)
 	atl_fc_full = atl_fc_rx | atl_fc_tx,
 };
 
@@ -76,6 +78,7 @@ struct atl_fw_ops {
 	int (*get_link_caps)(struct atl_hw *hw);
 	int (*restart_aneg)(struct atl_hw *hw);
 	void (*set_default_link)(struct atl_hw *hw);
+	int (*enable_wol)(struct atl_hw *hw);
 	unsigned efuse_shadow_addr_reg;
 };
 

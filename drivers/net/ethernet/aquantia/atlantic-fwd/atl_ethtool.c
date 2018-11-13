@@ -1869,7 +1869,38 @@ int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
 	return 0;
 }
 
+static void atl_get_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
+{
+	struct atl_nic *nic = netdev_priv(ndev);
 
+	wol->supported = WAKE_MAGIC;
+	wol->wolopts = nic->flags & ATL_FL_WOL ? WAKE_MAGIC : 0;
+}
+
+static int atl_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
+{
+	int ret;
+	struct atl_nic *nic = netdev_priv(ndev);
+
+	if (wol->wolopts & ~WAKE_MAGIC) {
+		atl_nic_err("%s: unsupported WoL mode %x\n", __func__,
+			wol->wolopts);
+		return -EINVAL;
+	}
+
+	if (wol->wolopts & WAKE_MAGIC)
+		nic->flags |= ATL_FL_WOL;
+	else
+		nic->flags &= ~ATL_FL_WOL;
+
+	ret = device_set_wakeup_enable(&nic->hw.pdev->dev,
+		!!(nic->flags & ATL_FL_WOL));
+
+	if (ret)
+		atl_nic_err("device_set_wakeup_enable failed: %d\n", -ret);
+
+	return ret;
+}
 
 const struct ethtool_ops atl_ethtool_ops = {
 	.get_link = atl_ethtool_get_link,
@@ -1904,4 +1935,6 @@ const struct ethtool_ops atl_ethtool_ops = {
 	.set_priv_flags = atl_set_priv_flags,
 	.get_coalesce = atl_get_coalesce,
 	.set_coalesce = atl_set_coalesce,
+	.get_wol = atl_get_wol,
+	.set_wol = atl_set_wol,
 };

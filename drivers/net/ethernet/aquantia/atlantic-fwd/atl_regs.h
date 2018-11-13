@@ -47,6 +47,8 @@
 #define ATL_GLOBAL_DAISY_CHAIN_STS1 0x704
 
 enum mcp_scratchpad {
+	FW2_MBOX_DATA = 11,	/* 0x328 */
+	FW2_MBOX_CMD = 12,	/* 0x32c */
 	FW_STAT_STRUCT = 25, 	/* 0x360 */
 	FW2_EFUSE_SHADOW = 26,	/* 0x364 */
 	FW1_LINK_REQ = 27,
