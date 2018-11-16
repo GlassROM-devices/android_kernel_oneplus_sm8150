@@ -145,6 +145,11 @@ static inline struct atl_hw *ring_hw(struct atl_desc_ring *ring)
 	return &ring->qvec->nic->hw;
 }
 
+static inline int atl_qvec_intr(struct atl_queue_vec *qvec)
+{
+	return qvec->idx + ATL_NUM_NON_RING_IRQS;
+}
+
 static inline void *atl_buf_vaddr(struct atl_pgref *pgref)
 {
 	return page_to_virt(pgref->rxpage->page) + pgref->pg_off;

@@ -232,24 +232,24 @@ static uint64_t atl_set_fw_bits(struct atl_hw *hw, int fw_idx)
 	return link;
 }
 
-static void atl_fw1_set_link(struct atl_hw *hw)
+static void atl_fw1_set_link(struct atl_hw *hw, bool force)
 {
 	uint32_t bits;
 
-	if (!atl_fw1_set_link_needed(&hw->link_state))
+	if (!force && !atl_fw1_set_link_needed(&hw->link_state))
 		return;
 
 	bits = (atl_set_fw_bits(hw, 0) << 16) | 2;
 	atl_write(hw, ATL_MCP_SCRATCH(FW1_LINK_REQ), bits);
 }
 
-static void atl_fw2_set_link(struct atl_hw *hw)
+static void atl_fw2_set_link(struct atl_hw *hw, bool force)
 {
 	struct atl_link_state *lstate = &hw->link_state;
 	uint32_t hi_bits = 0;
 	uint64_t bits;
 
-	if (!atl_fw2_set_link_needed(lstate))
+	if (!force && !atl_fw2_set_link_needed(lstate))
 		return;
 
 	if (lstate->fc.req & atl_fc_rx)

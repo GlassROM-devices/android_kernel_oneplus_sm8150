@@ -70,7 +70,7 @@ struct atl_link_state{
 };
 
 struct atl_fw_ops {
-	void (*set_link)(struct atl_hw *hw);
+	void (*set_link)(struct atl_hw *hw, bool force);
 	struct atl_link_type *(*check_link)(struct atl_hw *hw);
 	int (*wait_fw_init)(struct atl_hw *hw);
 	int (*get_link_caps)(struct atl_hw *hw);

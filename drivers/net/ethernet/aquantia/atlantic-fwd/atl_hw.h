@@ -136,11 +136,6 @@ static inline void atl_intr_enable(struct atl_hw *hw, uint32_t mask)
 	atl_write(hw, ATL_INTR_MSK_SET, mask);
 }
 
-static inline void atl_intr_enable_all(struct atl_hw *hw)
-{
-	atl_intr_enable(hw, hw->intr_mask);
-}
-
 static inline void atl_intr_disable(struct atl_hw *hw, uint32_t mask)
 {
 	atl_write(hw, ATL_INTR_MSK_CLEAR, mask);
@@ -173,7 +168,6 @@ bool atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 	unsigned size);
 int atl_hwinit(struct atl_nic *nic, enum atl_board brd_id);
 void atl_refresh_link(struct atl_nic *nic);
-int atl_start_hw(struct atl_nic *nic);
 void atl_set_rss_key(struct atl_hw *hw);
 void atl_set_rss_tbl(struct atl_hw *hw);
 void atl_set_uc_flt(struct atl_hw *hw, int idx, uint8_t mac_addr[ETH_ALEN]);
@@ -181,5 +175,7 @@ void atl_set_uc_flt(struct atl_hw *hw, int idx, uint8_t mac_addr[ETH_ALEN]);
 int atl_alloc_descs(struct atl_nic *nic, struct atl_hw_ring *ring);
 void atl_free_descs(struct atl_nic *nic, struct atl_hw_ring *ring);
 void atl_set_intr_bits(struct atl_hw *hw, int idx, int rxbit, int txbit);
+int atl_alloc_link_intr(struct atl_nic *nic);
+void atl_free_link_intr(struct atl_nic *nic);
 
 #endif

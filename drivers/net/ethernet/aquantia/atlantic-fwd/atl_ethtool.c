@@ -180,7 +180,7 @@ static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed)
 		}
 
 	lstate->autoneg = false;
-	hw->mcp.ops->set_link(hw);
+	hw->mcp.ops->set_link(hw, false);
 	return 0;
 }
 
@@ -277,7 +277,7 @@ static int atl_ethtool_set_ksettings(struct net_device *ndev,
 
 	atl_ethtool_set_common(base, lstate, cmd->link_modes.advertising, tmp,
 		false, cmd->base.speed);
-	hw->mcp.ops->set_link(hw);
+	hw->mcp.ops->set_link(hw, false);
 	return 0;
 }
 
@@ -411,7 +411,7 @@ static int atl_set_pauseparam(struct net_device *ndev,
 		(!!pause->rx_pause << atl_fc_rx_shift) |
 		(!!pause->tx_pause << atl_fc_tx_shift);
 
-	hw->mcp.ops->set_link(hw);
+	hw->mcp.ops->set_link(hw, false);
 	return 0;
 }
 
@@ -477,7 +477,7 @@ static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
 	if (lstate->eee_enabled)
 		lstate->advertized |= tmp << ATL_EEE_BIT_OFFT;
 
-	hw->mcp.ops->set_link(hw);
+	hw->mcp.ops->set_link(hw, false);
 	return 0;
 }
 

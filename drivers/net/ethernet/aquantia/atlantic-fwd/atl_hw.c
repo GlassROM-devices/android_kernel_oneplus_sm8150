@@ -281,17 +281,16 @@ void atl_refresh_link(struct atl_nic *nic)
 
 	link = hw->mcp.ops->check_link(hw);
 
-	if (link != prev_link) {
-		if (link) {
+	if (link) {
+		if (link != prev_link)
 			atl_nic_info("Link up: %s\n", link->name);
-			atl_rx_xoff_set(nic, !!(hw->link_state.fc.cur & atl_fc_rx));
-			netif_carrier_on(nic->ndev);
-		} else {
+		netif_carrier_on(nic->ndev);
+	} else {
+		if (link != prev_link)
 			atl_nic_info("Link down\n");
-			atl_rx_xoff_set(nic, !!(hw->link_state.fc.cur & atl_fc_rx));
-			netif_carrier_off(nic->ndev);
-		}
+		netif_carrier_off(nic->ndev);
 	}
+	atl_rx_xoff_set(nic, !!(hw->link_state.fc.cur & atl_fc_rx));
 }
 
 static irqreturn_t atl_link_irq(int irq, void *priv)
@@ -307,6 +306,7 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 {
 	struct atl_nic *nic = priv;
 	struct atl_hw *hw = &nic->hw;
+	uint32_t mask = hw->intr_mask | atl_qvec_intr(nic->qvecs);
 	uint32_t stat;
 
 
@@ -315,7 +315,7 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 	/* Mask asserted intr sources */
 	atl_intr_disable(hw, stat);
 
-	if (!(stat & hw->intr_mask))
+	if (!(stat & mask))
 		/* Interrupt from another device on a shared int
 		 * line. As no status bits were set, nothing was
 		 * masked above, so no need to unmask anything. */
@@ -330,56 +330,31 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 	return IRQ_HANDLED;
 }
 
-int atl_intr_init(struct atl_nic *nic)
+int atl_alloc_link_intr(struct atl_nic *nic)
 {
-	struct atl_hw *hw = &nic->hw;
-	struct pci_dev *pdev = hw->pdev;
+	struct pci_dev *pdev = nic->hw.pdev;
 	int ret;
-
-	/* Map link interrupt to cause 0 */
-	atl_write(hw, ATL_INTR_GEN_INTR_MAP4, BIT(7) | (0 << 0));
 
 	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
 		ret = request_irq(pci_irq_vector(pdev, 0), atl_link_irq, 0,
 		nic->ndev->name, nic);
-		if (ret) {
+		if (ret)
 			atl_nic_err("request MSI link vector failed: %d\n",
 				-ret);
-			return ret;
-		}
-
-		ret = atl_init_ring_interrupts(nic);
-		if (ret)
-			free_irq(pci_irq_vector(pdev, 0), nic);
-
 		return ret;
 	}
 
 	ret = request_irq(pci_irq_vector(pdev, 0), atl_legacy_irq, IRQF_SHARED,
-			  nic->ndev->name, nic);
-	if (ret) {
+		nic->ndev->name, nic);
+	if (ret)
 		atl_nic_err("request legacy irq failed: %d\n", -ret);
-		return ret;
-	}
 
-	/* Map rx[0] and tx[0] into cause 1*/
-	atl_write(hw, ATL_INTR_RING_INTR_MAP(0),
-		  BIT(31) | (1 << 0x18) | BIT(15) | (1 << 8));
-
-	return 0;
+	return ret;
 }
 
-void atl_intr_release(struct atl_nic *nic)
+void atl_free_link_intr(struct atl_nic *nic)
 {
-	struct pci_dev *pdev = nic->hw.pdev;
-
-	atl_intr_disable_all(&nic->hw);
-
-	free_irq(pci_irq_vector(pdev, 0), nic);
-	if (!(nic->flags & ATL_FL_MULTIPLE_VECTORS))
-		return;
-
-	atl_release_ring_interrupts(nic);
+	free_irq(pci_irq_vector(nic->hw.pdev, 0), nic);
 }
 
 void atl_set_uc_flt(struct atl_hw *hw, int idx, uint8_t mac_addr[ETH_ALEN])
@@ -491,6 +466,13 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* RPO */
 	/* Enable  L3 | L4 chksum */
 	atl_set_bits(hw, ATL_RX_PO_CTRL1, 3);
+	atl_write_bits(hw, ATL_RX_LRO_CTRL2, 12, 2, 0);
+	atl_write_bits(hw, ATL_RX_LRO_CTRL2, 5, 2, 0);
+	/* 10uS base, 20uS inactive timeout, 60 uS max coalescing
+	 * interval
+	 */
+	atl_write(hw, ATL_RX_LRO_TMRS, 0xc35 << 20 | 2 << 10 | 6);
+	atl_write(hw, ATL_INTR_RSC_DELAY, (atl_min_intr_delay / 2) - 1);
 
 	/* RPF */
 	/* Default RPF2 parser options */
@@ -523,13 +505,27 @@ void atl_start_hw_global(struct atl_nic *nic)
 		ctrl |= BIT(2) | BIT(5);
 
 		atl_write(hw, ATL_INTR_CTRL, ctrl);
+
+		/* Enable auto-masking of link interrupt on intr generation */
+		atl_set_bits(hw, ATL_INTR_AUTO_MASK, BIT(0));
+		/* Enable status auto-clear on link intr generation */
+		atl_set_bits(hw, ATL_INTR_AUTO_CLEAR, BIT(0));
 	} else
 		/* Enable legacy INTx mode and status clear-on-read */
 		atl_write(hw, ATL_INTR_CTRL, BIT(7));
 
+	/* Map link interrupt to cause 0 */
+	atl_write(hw, ATL_INTR_GEN_INTR_MAP4, BIT(7) | (0 << 0));
+
+	atl_write(hw, ATL_TX_INTR_CTRL, BIT(4));
+	atl_write(hw, ATL_RX_INTR_CTRL, 2 << 4 | BIT(3));
+
 	/* Reset Rx/Tx on unexpected PERST# */
 	atl_write_bit(hw, 0x1000, 29, 0);
 	atl_write(hw, 0x448, 3);
+
+	/* Enable non-ring interrupts */
+	atl_intr_enable(hw, hw->intr_mask | (uint32_t)(nic->fwd.msi_map));
 }
 
 #define atl_vlan_flt_val(vid) ((uint32_t)(vid) | 1 << 16 | 1 << 31)

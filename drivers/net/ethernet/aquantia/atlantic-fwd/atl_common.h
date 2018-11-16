@@ -225,6 +225,7 @@ enum atl_nic_flags {
 enum atl_nic_state {
 	ATL_ST_UP,
 	ATL_ST_CONFIGURED,
+	ATL_ST_ENABLED,
 };
 
 #define ATL_PF(_name) ATL_PF_ ## _name
@@ -306,8 +307,8 @@ int atl_setup_datapath(struct atl_nic *nic);
 void atl_clear_datapath(struct atl_nic *nic);
 int atl_start_rings(struct atl_nic *nic);
 void atl_stop_rings(struct atl_nic *nic);
-int atl_init_ring_interrupts(struct atl_nic *nic);
-void atl_release_ring_interrupts(struct atl_nic *nic);
+int atl_alloc_rings(struct atl_nic *nic);
+void atl_free_rings(struct atl_nic *nic);
 irqreturn_t atl_ring_irq(int irq, void *priv);
 void atl_start_hw_global(struct atl_nic *nic);
 int atl_intr_init(struct atl_nic *nic);

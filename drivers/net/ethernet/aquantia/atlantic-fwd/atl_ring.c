@@ -647,6 +647,9 @@ static inline void atl_put_rxpage(struct atl_pgref *pgref, struct device *dev)
 {
 	struct atl_rxpage *rxpage = pgref->rxpage;
 
+	if (!rxpage)
+		return;
+
 	if (--rxpage->mapcount)
 		return;
 
@@ -1027,9 +1030,10 @@ static int atl_clean_rx(struct atl_desc_ring *ring, int budget)
 unsigned int atl_min_intr_delay = 10;
 module_param_named(min_intr_delay, atl_min_intr_delay, uint, 0644);
 
-static void atl_set_intr_throttle(struct atl_hw *hw, int idx)
+static void atl_set_intr_throttle(struct atl_queue_vec *qvec)
 {
-	atl_write(hw, ATL_INTR_THRTL(idx + ATL_NUM_NON_RING_IRQS),
+	struct atl_hw *hw = &qvec->nic->hw;
+	atl_write(hw, ATL_INTR_THRTL(atl_qvec_intr(qvec)),
 		1 << 0x1f | ((atl_min_intr_delay / 2) & 0x1ff) << 0x10);
 }
 
@@ -1052,7 +1056,7 @@ static int atl_poll(struct napi_struct *napi, int budget)
 		return budget;
 
 	napi_complete_done(napi, rx_cleaned);
-	atl_intr_enable(&nic->hw, BIT(qvec->idx + ATL_NUM_NON_RING_IRQS));
+	atl_intr_enable(&nic->hw, BIT(atl_qvec_intr(qvec)));
 	/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
 	return rx_cleaned;
 }
@@ -1082,7 +1086,6 @@ static int atl_config_interrupts(struct atl_nic *nic)
 		 * than min_vectors
 		 */
 		if (ret > 0) {
-			hw->intr_mask = BIT(ret) - 1;
 			ret -= ATL_NUM_NON_RING_IRQS;
 			nic->nvecs = ret;
 			nic->flags |= ATL_FL_MULTIPLE_VECTORS;
@@ -1098,7 +1101,6 @@ static int atl_config_interrupts(struct atl_nic *nic)
 		return ret;
 	}
 
-	hw->intr_mask = BIT(ATL_NUM_NON_RING_IRQS + 1) - 1;
 	nic->nvecs = 1;
 	nic->flags &= ~ATL_FL_MULTIPLE_VECTORS;
 
@@ -1111,66 +1113,6 @@ irqreturn_t atl_ring_irq(int irq, void *priv)
 
 	napi_schedule_irqoff(napi);
 	return IRQ_HANDLED;
-}
-
-int atl_init_ring_interrupts(struct atl_nic *nic)
-{
-	struct atl_hw *hw = &nic->hw;
-	int ret, i;
-
-	for (i = 0; i < nic->nvecs; i++) {
-		struct atl_queue_vec *qvec = &nic->qvecs[i];
-		int vector = pci_irq_vector(hw->pdev,
-			ATL_NUM_NON_RING_IRQS + i);
-
-		snprintf(qvec->name, sizeof(qvec->name), "%s-ring-%d",
-			nic->ndev->name, i);
-		ret = request_irq(vector, atl_ring_irq, 0,
-			qvec->name, &qvec->napi);
-		if (ret) {
-			atl_nic_err("request MSI ring vector failed: %d\n",
-				-ret);
-			goto free_irqs;
-		}
-
-		atl_compat_set_affinity(vector, qvec);
-
-		/* Map ring interrups into corresponding cause bit*/
-		atl_set_intr_bits(hw, i, i + ATL_NUM_NON_RING_IRQS,
-			i + ATL_NUM_NON_RING_IRQS);
-		atl_set_intr_throttle(hw, i);
-	}
-
-	/* Enable auto-masking of ring interrupts on intr generation */
-	atl_set_bits(hw, ATL_INTR_AUTO_MASK, hw->intr_mask);
-	/* Enable status auto-clear on intr generation */
-	atl_set_bits(hw, ATL_INTR_AUTO_CLEAR, hw->intr_mask);
-
-	return 0;
-
-free_irqs:
-	while (i-- > 0) {
-		int vector = pci_irq_vector(hw->pdev,
-			ATL_NUM_NON_RING_IRQS + i);
-
-		atl_compat_set_affinity(vector, NULL);
-		free_irq(vector, &nic->qvecs[i].napi);
-	}
-
-	return ret;
-}
-
-void atl_release_ring_interrupts(struct atl_nic *nic)
-{
-	int i;
-
-	for (i = 0; i < nic->nvecs; i++) {
-		int vector = pci_irq_vector(nic->hw.pdev,
-			ATL_NUM_NON_RING_IRQS + i);
-
-		atl_compat_set_affinity(vector, NULL);
-		free_irq(vector, &nic->qvecs[i].napi);
-	}
 }
 
 void atl_clear_datapath(struct atl_nic *nic)
@@ -1265,32 +1207,43 @@ static inline void atl_free_rxpage(struct atl_pgref *pgref, struct device *dev)
 	pgref->rxpage = 0;
 }
 
-static void atl_free_rx_bufs(struct atl_desc_ring *ring)
+/* Releases any skbs that may have been queued on ring positions yet
+ * to be processes by poll. The buffers are kept to be re-used after
+ * resume / thaw. */
+static void atl_clear_rx_bufs(struct atl_desc_ring *ring)
 {
 	unsigned int bufs = ring_occupied(ring);
 	struct device *dev = ring->qvec->dev;
-
-	if (!ring->rxbufs)
-		return;
 
 	while (bufs) {
 		struct atl_rxbuf *rxbuf = &ring->rxbufs[ring->head];
 		struct sk_buff *skb = rxbuf->skb;
 
-		atl_free_rxpage(&rxbuf->head, dev);
-		atl_free_rxpage(&rxbuf->data, dev);
-
 		if (skb) {
 			struct atl_pgref *pgref = &ATL_CB(skb)->pgref;
 
-			if (pgref->rxpage)
-				atl_put_rxpage(pgref, dev);
+			atl_put_rxpage(pgref, dev);
 			dev_kfree_skb_any(skb);
 			rxbuf->skb = NULL;
 		}
 
 		bump_head(ring, 1);
 		bufs--;
+	}
+}
+
+static void atl_free_rx_bufs(struct atl_desc_ring *ring)
+{
+	struct device *dev = ring->qvec->dev;
+	struct atl_rxbuf *rxbuf;
+
+	if (!ring->rxbufs)
+		return;
+
+	for (rxbuf = ring->rxbufs;
+	     rxbuf < &ring->rxbufs[ring->hw.size]; rxbuf++) {
+		atl_free_rxpage(&rxbuf->head, dev);
+		atl_free_rxpage(&rxbuf->data, dev);
 	}
 }
 
@@ -1322,12 +1275,11 @@ static void atl_free_ring(struct atl_desc_ring *ring)
 	atl_free_descs(ring->qvec->nic, &ring->hw);
 }
 
-static int atl_init_ring(struct atl_desc_ring *ring, size_t buf_size,
+static int atl_alloc_ring(struct atl_desc_ring *ring, size_t buf_size,
 	char *type)
 {
 	int ret;
 	struct atl_nic *nic = ring->qvec->nic;
-	struct atl_hw *hw = &nic->hw;
 	int idx = ring->qvec->idx;
 
 	ret = atl_alloc_descs(nic, &ring->hw);
@@ -1343,10 +1295,8 @@ static int atl_init_ring(struct atl_desc_ring *ring, size_t buf_size,
 		goto free;
 	}
 
-	ring->head = ring->tail = atl_read(hw, ATL_RING_HEAD(ring) & 0x1fff);
-	atl_write(hw, ATL_RING_BASE_LSW(ring), ring->hw.daddr);
-	atl_write(hw, ATL_RING_BASE_MSW(ring), ring->hw.daddr >> 32);
-
+	ring->head = ring->tail =
+		atl_read(&nic->hw, ATL_RING_HEAD(ring)) & 0x1fff;
 	return 0;
 
 free:
@@ -1354,41 +1304,111 @@ free:
 	return ret;
 }
 
-static int atl_init_rx_ring(struct atl_desc_ring *ring)
+static int atl_alloc_qvec_intr(struct atl_queue_vec *qvec)
 {
+	struct atl_nic *nic = qvec->nic;
+	int vector;
 	int ret;
 
-	ret = atl_init_ring(ring, sizeof(struct atl_rxbuf), "rx");
-	if (ret)
+	snprintf(qvec->name, sizeof(qvec->name), "%s-ring-%d",
+		nic->ndev->name, qvec->idx);
+
+	if (!(nic->flags & ATL_FL_MULTIPLE_VECTORS))
+		return 0;
+
+	vector = pci_irq_vector(nic->hw.pdev, atl_qvec_intr(qvec));
+	ret = request_irq(vector, atl_ring_irq, 0, qvec->name, &qvec->napi);
+	if (ret) {
+		atl_nic_err("request MSI ring vector failed: %d\n", -ret);
 		return ret;
+	}
 
-	ring->next_to_recycle = ring->head;
-
-	ret = atl_fill_rx(ring, ring_space(ring));
-	if (ret)
-		goto free;
+	atl_compat_set_affinity(vector, qvec);
 
 	return 0;
-
-free:
-	atl_free_ring(ring);
-	return ret;
 }
 
-static int atl_init_tx_ring(struct atl_desc_ring *ring)
+static void atl_free_qvec_intr(struct atl_queue_vec *qvec)
 {
-	int ret;
-	int count = ring->hw.size;
+	int vector = pci_irq_vector(qvec->nic->hw.pdev, atl_qvec_intr(qvec));
+
+	if (!(qvec->nic->flags & ATL_FL_MULTIPLE_VECTORS))
+		return;
+
+	atl_compat_set_affinity(vector, NULL);
+	free_irq(vector, &qvec->napi);
+}
+
+static int atl_alloc_qvec(struct atl_queue_vec *qvec)
+{
 	struct atl_txbuf *txbuf;
+	int count = qvec->tx.hw.size;
+	int ret;
 
-	ret = atl_init_ring(ring, sizeof(struct atl_txbuf), "tx");
+	ret = atl_alloc_qvec_intr(qvec);
 	if (ret)
 		return ret;
 
-	for (txbuf = ring->txbufs; count; count--)
+	ret = atl_alloc_ring(&qvec->tx, sizeof(struct atl_txbuf), "tx");
+	if (ret)
+		goto free_irq;
+
+	ret = atl_alloc_ring(&qvec->rx, sizeof(struct atl_rxbuf), "rx");
+	if (ret)
+		goto free_tx;
+
+	for (txbuf = qvec->tx.txbufs; count; count--)
 		(txbuf++)->last = -1;
 
 	return 0;
+
+free_tx:
+	atl_free_ring(&qvec->tx);
+free_irq:
+	atl_free_qvec_intr(qvec);
+
+	return ret;
+}
+
+static void atl_free_qvec(struct atl_queue_vec *qvec)
+{
+	struct atl_desc_ring *rx = &qvec->rx;
+	struct atl_desc_ring *tx = &qvec->tx;
+
+	atl_free_rx_bufs(rx);
+	atl_free_ring(rx);
+
+	atl_free_ring(tx);
+	atl_free_qvec_intr(qvec);
+}
+
+int atl_alloc_rings(struct atl_nic *nic)
+{
+	struct atl_queue_vec *qvec;
+	int ret;
+
+	atl_for_each_qvec(nic, qvec) {
+		ret = atl_alloc_qvec(qvec);
+		if (ret)
+			goto free;
+	}
+
+	return 0;
+
+free:
+	while(--qvec >= &nic->qvecs[0])
+		atl_free_qvec(qvec);
+
+	return ret;
+}
+
+void atl_free_rings(struct atl_nic *nic)
+{
+	struct atl_queue_vec *qvec;
+
+	atl_for_each_qvec(nic, qvec)
+		atl_free_qvec(qvec);
+
 }
 
 static unsigned int atl_rx_mod_hyst = 10, atl_tx_mod_hyst = 10;
@@ -1429,6 +1449,9 @@ static void atl_start_rx_ring(struct atl_desc_ring *ring)
 	int idx = ring->qvec->idx;
 	unsigned int rx_ctl;
 
+	atl_write(hw, ATL_RING_BASE_LSW(ring), ring->hw.daddr);
+	atl_write(hw, ATL_RING_BASE_MSW(ring), ring->hw.daddr >> 32);
+
 	atl_write(hw, ATL_RX_RING_TAIL(ring), ring->tail);
 	atl_write(hw, ATL_RX_RING_BUF_SIZE(ring),
 		(ATL_RX_HDR_SIZE / 64) << 8 | ATL_RX_BUF_SIZE / 1024);
@@ -1449,6 +1472,9 @@ static void atl_start_tx_ring(struct atl_desc_ring *ring)
 	struct atl_nic *nic = ring->qvec->nic;
 	struct atl_hw *hw = &nic->hw;
 
+	atl_write(hw, ATL_RING_BASE_LSW(ring), ring->hw.daddr);
+	atl_write(hw, ATL_RING_BASE_MSW(ring), ring->hw.daddr >> 32);
+
 	/* Enable TSO on all active Tx rings */
 	atl_write(hw, ATL_TX_LSO_CTRL, BIT(nic->nvecs) - 1);
 
@@ -1460,26 +1486,44 @@ static void atl_start_tx_ring(struct atl_desc_ring *ring)
 
 static int atl_start_qvec(struct atl_queue_vec *qvec)
 {
+	struct atl_desc_ring *rx = &qvec->rx;
+	struct atl_desc_ring *tx = &qvec->tx;
+	struct atl_hw *hw = &qvec->nic->hw;
+	int intr = atl_qvec_intr(qvec);
+	struct atl_rxbuf *rxbuf;
 	int ret;
 
-	ret = atl_init_tx_ring(&qvec->tx);
+	rx->head = rx->tail = atl_read(hw, ATL_RING_HEAD(rx)) & 0x1fff;
+	tx->head = tx->tail = atl_read(hw, ATL_RING_HEAD(tx)) & 0x1fff;
+
+	ret = atl_fill_rx(rx, ring_space(rx));
 	if (ret)
 		return ret;
 
-	ret = atl_init_rx_ring(&qvec->rx);
-	if (ret)
-		goto free_tx;
+	rx->next_to_recycle = rx->tail;
+	/* rxbuf at ->next_to_recycle is always kept empty so that
+	 * atl_maybe_recycle_rxbuf() always have a spot to recyle into
+	 * without overwriting a pgref to an already allocated page,
+	 * leaking memory. It's also the guard element in the ring
+	 * that keeps ->tail from overrunning ->head. If it's nonempty
+	 * on ring init (e.g. after a sleep-wake cycle) just release
+	 * the pages. */
+	rxbuf = &rx->rxbufs[rx->next_to_recycle];
+	atl_put_rxpage(&rxbuf->head, qvec->dev);
+	atl_put_rxpage(&rxbuf->data, qvec->dev);
+
+	/* Map ring interrups into corresponding cause bit*/
+	atl_set_intr_bits(hw, qvec->idx, intr, intr);
+	atl_set_intr_throttle(qvec);
 
 	napi_enable(&qvec->napi);
 	atl_set_intr_mod_qvec(qvec);
-	atl_start_tx_ring(&qvec->tx);
-	atl_start_rx_ring(&qvec->rx);
+	atl_intr_enable(hw, BIT(atl_qvec_intr(qvec)));
+
+	atl_start_tx_ring(tx);
+	atl_start_rx_ring(rx);
 
 	return 0;
-
-free_tx:
-	atl_free_ring(&qvec->tx);
-	return ret;
 }
 
 static void atl_stop_qvec(struct atl_queue_vec *qvec)
@@ -1488,22 +1532,18 @@ static void atl_stop_qvec(struct atl_queue_vec *qvec)
 	struct atl_desc_ring *tx = &qvec->tx;
 	struct atl_hw *hw = &qvec->nic->hw;
 
-	atl_write_bit(hw,
-		ATL_RX_RING_CTL(rx), 31, 0);
-	atl_write_bit(hw,
-		ATL_RX_RING_CTL(rx), 25, 1);
-	atl_write_bit(hw,
-		ATL_TX_RING_CTL(tx), 31, 0);
-	atl_write_bit(hw,
-		ATL_TX_RING_CTL(tx), 25, 1);
+	/* Disable and reset rings */
+	atl_write(hw, ATL_RING_CTL(rx), BIT(25));
+	atl_write(hw, ATL_RING_CTL(tx), BIT(25));
+	udelay(10);
+	atl_write(hw, ATL_RING_CTL(rx), 0);
+	atl_write(hw, ATL_RING_CTL(tx), 0);
 
+	atl_intr_disable(hw, BIT(atl_qvec_intr(qvec)));
 	napi_disable(&qvec->napi);
 
-	atl_free_rx_bufs(rx);
-	atl_free_ring(rx);
-
+	atl_clear_rx_bufs(rx);
 	atl_free_tx_bufs(tx);
-	atl_free_ring(tx);
 }
 
 static void atl_set_lro(struct atl_nic *nic)
@@ -1519,52 +1559,46 @@ static void atl_set_lro(struct atl_nic *nic)
 int atl_start_rings(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
+	uint32_t mask;
 	struct atl_queue_vec *qvec;
 	int ret;
 
-	ret = atl_intr_init(nic);
-	if (ret)
-		return ret;
+	mask = BIT(nic->nvecs + ATL_NUM_NON_RING_IRQS) -
+		BIT(ATL_NUM_NON_RING_IRQS);
+	/* Enable auto-masking of ring interrupts on intr generation */
+	atl_set_bits(hw, ATL_INTR_AUTO_MASK, mask);
+	/* Enable status auto-clear on intr generation */
+	atl_set_bits(hw, ATL_INTR_AUTO_CLEAR, mask);
+
+	atl_set_lro(nic);
+	atl_set_rss_tbl(hw);
 
 	atl_for_each_qvec(nic, qvec) {
 		ret = atl_start_qvec(qvec);
 		if (ret)
-			goto free;
+			goto stop;
 	}
 
-	atl_write(hw, ATL_TX_INTR_CTRL, BIT(4));
-	atl_write(hw, ATL_RX_INTR_CTRL, 2 << 4 | BIT(3));
-
-	atl_write_bits(hw, ATL_RX_LRO_CTRL2, 12, 2, 0);
-	atl_write_bits(hw, ATL_RX_LRO_CTRL2, 5, 2, 0);
-	/* 10uS base, 20uS inactive timeout, 60 uS max coalescing
-	 * interval
-	 */
-	atl_write(hw, ATL_RX_LRO_TMRS, 0xc35 << 20 | 2 << 10 | 6);
-	atl_write(hw, ATL_INTR_RSC_DELAY, (atl_min_intr_delay / 2) - 1);
-	atl_set_lro(nic);
-
-	atl_set_rss_tbl(hw);
-
 	return 0;
-free:
+
+stop:
 	while (--qvec >= &nic->qvecs[0])
 		atl_stop_qvec(qvec);
 
-	atl_intr_release(nic);
 	return ret;
 }
 
 void atl_stop_rings(struct atl_nic *nic)
 {
 	struct atl_queue_vec *qvec;
+	struct atl_hw *hw = &nic->hw;
 
 	atl_for_each_qvec(nic, qvec)
 		atl_stop_qvec(qvec);
 
-	atl_intr_release(nic);
-	atl_hw_reset(&nic->hw);
-	atl_start_hw_global(nic);
+	atl_write_bit(hw, 0x5a00, 0, 1);
+	udelay(10);
+	atl_write_bit(hw, 0x5a00, 0, 0);
 }
 
 int atl_set_features(struct net_device *ndev, netdev_features_t features)
