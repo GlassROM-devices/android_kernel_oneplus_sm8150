@@ -297,7 +297,7 @@ static irqreturn_t atl_link_irq(int irq, void *priv)
 {
 	struct atl_nic *nic = (struct atl_nic *)priv;
 
-	atl_refresh_link(nic);
+	atl_schedule_work(nic);
 	atl_intr_enable(&nic->hw, BIT(0));
 	return IRQ_HANDLED;
 }

@@ -49,6 +49,7 @@ struct atl_hw {
 		uint32_t fw_rev;
 		bool poll_link;
 		struct atl_fw_ops *ops;
+		struct mutex lock;
 	} mcp;
 	uint32_t intr_mask;
 	uint8_t mac_addr[ETH_ALEN];

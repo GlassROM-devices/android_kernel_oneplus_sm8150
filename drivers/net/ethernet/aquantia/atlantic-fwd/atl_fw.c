@@ -36,6 +36,16 @@ struct atl_link_type atl_link_types[] = {
 
 const int atl_num_rates = ARRAY_SIZE(atl_link_types);
 
+static inline void atl_lock_fw(struct atl_hw *hw)
+{
+	mutex_lock(&hw->mcp.lock);
+}
+
+static inline void atl_unlock_fw(struct atl_hw *hw)
+{
+	mutex_unlock(&hw->mcp.lock);
+}
+
 static int atl_fw1_wait_fw_init(struct atl_hw *hw)
 {
 	uint32_t hostData_addr;
@@ -120,27 +130,39 @@ static struct atl_link_type *atl_parse_fw_bits(struct atl_hw *hw,
 
 static struct atl_link_type *atl_fw1_check_link(struct atl_hw *hw)
 {
-	uint32_t reg = atl_read(hw, ATL_MCP_SCRATCH(FW1_LINK_STS));
+	uint32_t reg;
+	struct atl_link_type *link;
+
+	atl_lock_fw(hw);
+	reg = atl_read(hw, ATL_MCP_SCRATCH(FW1_LINK_STS));
 
 	if ((reg & 0xf) != 2)
 		reg = 0;
 
 	reg = (reg >> 16) & 0xff;
 
-	return atl_parse_fw_bits(hw, reg, 0, 0);
+	link = atl_parse_fw_bits(hw, reg, 0, 0);
+
+	atl_unlock_fw(hw);
+	return link;
 }
 
 static struct atl_link_type *atl_fw2_check_link(struct atl_hw *hw)
 {
 	struct atl_link_type *link;
 	struct atl_link_state *lstate = &hw->link_state;
-	uint32_t low = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_LOW));
-	uint32_t high = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH));
+	uint32_t low;
+	uint32_t high;
 	enum atl_fc_mode fc = atl_fc_none;
+
+	atl_lock_fw(hw);
+
+	low = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_LOW));
+	high = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH));
 
 	link = atl_parse_fw_bits(hw, low, high, 1);
 	if (!link)
-		return link;
+		goto unlock;
 
 	if (high & atl_fw2_pause)
 		fc |= atl_fc_rx;
@@ -148,6 +170,9 @@ static struct atl_link_type *atl_fw2_check_link(struct atl_hw *hw)
 		fc |= atl_fc_tx;
 
 	lstate->fc.cur = fc;
+
+unlock:
+	atl_unlock_fw(hw);
 	return link;
 }
 
@@ -164,13 +189,15 @@ static int atl_fw2_get_link_caps(struct atl_hw *hw)
 	bool ret;
 	int i;
 
+	atl_lock_fw(hw);
+
 	atl_dev_dbg("Host data struct addr: %#x\n", fw_stat_addr);
 	ret = atl_read_mcp_mem(hw,
 			       fw_stat_addr + ATL_FW_STAT_LINK_CAPS,
 			       caps,
 			       8);
 	if (!ret)
-		return -EIO;
+		goto unlock;
 
 	for (i = 0; i < atl_num_rates; i++)
 		if (atl_link_types[i].fw_bits[1] & caps[0]) {
@@ -180,7 +207,10 @@ static int atl_fw2_get_link_caps(struct atl_hw *hw)
 		}
 
 	hw->link_state.supported = supported;
-	return 0;
+
+unlock:
+	atl_unlock_fw(hw);
+	return ret;
 }
 
 static inline unsigned int atl_link_adv(struct atl_link_state *lstate)
@@ -240,8 +270,12 @@ static void atl_fw1_set_link(struct atl_hw *hw, bool force)
 	if (!force && !atl_fw1_set_link_needed(&hw->link_state))
 		return;
 
+	atl_lock_fw(hw);
+
 	bits = (atl_set_fw_bits(hw, 0) << 16) | 2;
 	atl_write(hw, ATL_MCP_SCRATCH(FW1_LINK_REQ), bits);
+
+	atl_unlock_fw(hw);
 }
 
 static void atl_fw2_set_link(struct atl_hw *hw, bool force)
@@ -252,6 +286,8 @@ static void atl_fw2_set_link(struct atl_hw *hw, bool force)
 
 	if (!force && !atl_fw2_set_link_needed(lstate))
 		return;
+
+	atl_lock_fw(hw);
 
 	if (lstate->fc.req & atl_fc_rx)
 		hi_bits |= atl_fw2_pause | atl_fw2_asym_pause;
@@ -265,6 +301,8 @@ static void atl_fw2_set_link(struct atl_hw *hw, bool force)
 
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), bits);
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), hi_bits);
+
+	atl_unlock_fw(hw);
 }
 
 static int atl_fw1_unsupported(struct atl_hw *hw)
@@ -274,7 +312,9 @@ static int atl_fw1_unsupported(struct atl_hw *hw)
 
 static int atl_fw2_restart_aneg(struct atl_hw *hw)
 {
+	atl_lock_fw(hw);
 	atl_set_bits(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), BIT(31));
+	atl_unlock_fw(hw);
 	return 0;
 }
 
@@ -311,6 +351,8 @@ static int atl_fw2_enable_wol(struct atl_hw *hw)
 	info->len = sizeof(*info);
 	memcpy(info->macAddr, hw->mac_addr, ETH_ALEN);
 
+	atl_lock_fw(hw);
+
 	ret = atl_write_mcp_mem(hw, 0, msg,
 		(info->len + offsetof(struct drvIface, fw2xOffloads) + 3) & ~3);
 	if (ret) {
@@ -329,6 +371,7 @@ static int atl_fw2_enable_wol(struct atl_hw *hw)
 		atl_dev_err("Timeout waiting for WoL enable\n");
 
 free:
+	atl_unlock_fw(hw);
 	kfree(msg);
 	return ret;
 }

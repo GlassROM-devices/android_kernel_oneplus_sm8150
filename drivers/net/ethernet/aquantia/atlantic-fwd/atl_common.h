@@ -215,6 +215,7 @@ struct atl_nic {
 	int tx_intr_delay;
 	struct atl_global_stats stats;
 	spinlock_t stats_lock;
+	struct work_struct work;
 
 	struct atl_fwd fwd;
 
@@ -233,6 +234,7 @@ enum atl_nic_state {
 	ATL_ST_UP,
 	ATL_ST_CONFIGURED,
 	ATL_ST_ENABLED,
+	ATL_ST_WORK_SCHED,
 };
 
 #define ATL_PF(_name) ATL_PF_ ## _name
@@ -359,5 +361,6 @@ int __atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 	uint16_t addr, uint16_t val);
 void atl_refresh_rxfs(struct atl_nic *nic);
+void atl_schedule_work(struct atl_nic *nic);
 
 #endif

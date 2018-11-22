@@ -211,12 +211,28 @@ err:
 	return ret;
 }
 
+static struct workqueue_struct *atl_wq;
+
+void atl_schedule_work(struct atl_nic *nic)
+{
+	if (!test_and_set_bit(ATL_ST_WORK_SCHED, &nic->state))
+		queue_work(atl_wq, &nic->work);
+}
+
+static void atl_work(struct work_struct *work)
+{
+	struct atl_nic *nic = container_of(work, struct atl_nic, work);
+
+	atl_refresh_link(nic);
+	clear_bit(ATL_ST_WORK_SCHED, &nic->state);
+}
+
 static void atl_link_timer(struct timer_list *timer)
 {
 	struct atl_nic *nic =
 		container_of(timer, struct atl_nic, link_timer);
 
-	atl_refresh_link(nic);
+	atl_schedule_work(nic);
 	mod_timer(&nic->link_timer, jiffies + HZ);
 }
 
@@ -307,6 +323,8 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	nic->ndev = ndev;
 	nic->hw.pdev = pdev;
 	spin_lock_init(&nic->stats_lock);
+	INIT_WORK(&nic->work, atl_work);
+	mutex_init(&nic->hw.mcp.lock);
 	__set_bit(ATL_ST_ENABLED, &nic->state);
 
 	hw = &nic->hw;
@@ -429,6 +447,7 @@ static void atl_remove(struct pci_dev *pdev)
 	atl_clear_datapath(nic);
 	iounmap(nic->hw.regs);
 	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &nic->state);
+	cancel_work_sync(&nic->work);
 	free_netdev(nic->ndev);
 	pci_release_regions(pdev);
 	if (disable_needed)
@@ -552,13 +571,32 @@ static struct pci_driver atl_pci_ops = {
 
 static int __init atl_module_init(void)
 {
-	return pci_register_driver(&atl_pci_ops);
+	int ret;
+
+	atl_wq = create_singlethread_workqueue(atl_driver_name);
+	if (!atl_wq) {
+		pr_err("%s: Couldn't create workqueue\n", atl_driver_name);
+		return -ENOMEM;
+	}
+
+	ret = pci_register_driver(&atl_pci_ops);
+	if (ret) {
+		destroy_workqueue(atl_wq);
+		return ret;
+	}
+
+	return 0;
 }
 module_init(atl_module_init);
 
 static void __exit atl_module_exit(void)
 {
 	pci_unregister_driver(&atl_pci_ops);
+
+	if (atl_wq) {
+		destroy_workqueue(atl_wq);
+		atl_wq = NULL;
+	}
 }
 module_exit(atl_module_exit);
 
