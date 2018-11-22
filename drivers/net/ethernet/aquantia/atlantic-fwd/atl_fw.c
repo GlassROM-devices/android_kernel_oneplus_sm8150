@@ -50,7 +50,7 @@ static int atl_fw1_wait_fw_init(struct atl_hw *hw)
 {
 	uint32_t hostData_addr;
 	uint32_t id, new_id;
-	bool mem_read_ok;
+	int ret;
 
 	mdelay(10);
 
@@ -60,14 +60,15 @@ static int atl_fw1_wait_fw_init(struct atl_hw *hw)
 
 	atl_dev_dbg("got hostData address: 0x%x\n", hostData_addr);
 
-	if (!atl_read_mcp_mem(hw, hostData_addr + 4, &id, 4))
-		return  -EIO;
+	ret = atl_read_mcp_mem(hw, hostData_addr + 4, &id, 4);
+	if (ret)
+		return  ret;
 
-	busy_wait(10000, mdelay(1), mem_read_ok,
+	busy_wait(10000, mdelay(1), ret,
 		  atl_read_mcp_mem(hw, hostData_addr + 4, &new_id, 4),
-		  mem_read_ok && new_id == id);
-	if (!mem_read_ok)
-		return -EIO;
+		  !ret && new_id == id);
+	if (ret)
+		return ret;
 	if (new_id == id) {
 		atl_dev_err("timeout waiting for FW to start (initial transactionId 0x%x, hostData addr 0x%x)\n",
 			    id, hostData_addr);
@@ -183,20 +184,17 @@ static int atl_fw1_get_link_caps(struct atl_hw *hw)
 
 static int atl_fw2_get_link_caps(struct atl_hw *hw)
 {
-	uint32_t fw_stat_addr = atl_read(hw, ATL_MCP_SCRATCH(FW_STAT_STRUCT));
+	uint32_t fw_stat_addr = hw->mcp.fw_stat_addr;
 	unsigned int supported = 0;
 	uint32_t caps[2];
-	bool ret;
-	int i;
+	int i, ret;
 
 	atl_lock_fw(hw);
 
 	atl_dev_dbg("Host data struct addr: %#x\n", fw_stat_addr);
-	ret = atl_read_mcp_mem(hw,
-			       fw_stat_addr + ATL_FW_STAT_LINK_CAPS,
-			       caps,
-			       8);
-	if (!ret)
+	ret = atl_read_mcp_mem(hw, fw_stat_addr + atl_fw2_stat_lcaps,
+		caps, 8);
+	if (ret)
 		goto unlock;
 
 	for (i = 0; i < atl_num_rates; i++)
@@ -376,6 +374,50 @@ free:
 	return ret;
 }
 
+int atl_read_fwstat_word(struct atl_hw *hw, uint32_t offt, uint32_t *val)
+{
+	int ret;
+	uint32_t addr = hw->mcp.fw_stat_addr + (offt & ~3);
+
+	ret = atl_read_mcp_mem(hw, addr, val, 4);
+	if (ret)
+		return ret;
+
+	*val >>= 8 * (offt & 3);
+	return 0;
+}
+
+static int atl_fw2_get_phy_temperature(struct atl_hw *hw, int *temp)
+{
+	uint32_t req, res;
+	int ret = 0;
+
+	atl_lock_fw(hw);
+
+	req = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH));
+	req ^= atl_fw2_phy_temp;
+	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), req);
+
+	busy_wait(1000, udelay(10), res,
+		atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH)),
+		((res ^ req) & atl_fw2_phy_temp) != 0);
+	if (((res ^ req) & atl_fw2_phy_temp) != 0) {
+		atl_dev_err("Timeout waiting for PHY temperature\n");
+		ret = -EIO;
+		goto unlock;
+	}
+
+	ret = atl_read_fwstat_word(hw, atl_fw2_stat_temp, &res);
+	if (ret)
+		goto unlock;
+
+	*temp = (res & 0xffff) * 1000 / 256;
+
+unlock:
+	atl_unlock_fw(hw);
+	return ret;
+}
+
 static struct atl_fw_ops atl_fw_ops[2] = {
 	[0] = {
 		.wait_fw_init = atl_fw1_wait_fw_init,
@@ -385,6 +427,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.restart_aneg = atl_fw1_unsupported,
 		.set_default_link = atl_fw1_set_default_link,
 		.enable_wol = atl_fw1_unsupported,
+		.get_phy_temperature = (void *)atl_fw1_unsupported,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW),
 	},
 	[1] = {
@@ -395,6 +438,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.restart_aneg = atl_fw2_restart_aneg,
 		.set_default_link = atl_fw2_set_default_link,
 		.enable_wol = atl_fw2_enable_wol,
+		.get_phy_temperature = atl_fw2_get_phy_temperature,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW2_EFUSE_SHADOW),
 	},
 };
@@ -420,6 +464,7 @@ int atl_fw_init(struct atl_hw *hw)
 	hw->mcp.ops = &atl_fw_ops[major - 1];
 	hw->mcp.poll_link = major == 1;
 	hw->mcp.fw_rev = reg;
+	hw->mcp.fw_stat_addr = atl_read(hw, ATL_MCP_SCRATCH(FW_STAT_STRUCT));
 
 	return hw->mcp.ops->wait_fw_init(hw);
 }

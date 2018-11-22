@@ -49,6 +49,7 @@ struct atl_hw {
 		uint32_t fw_rev;
 		bool poll_link;
 		struct atl_fw_ops *ops;
+		uint32_t fw_stat_addr;
 		struct mutex lock;
 	} mcp;
 	uint32_t intr_mask;
@@ -165,7 +166,7 @@ static inline void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
 	atl_write_bit(hw, ATL_RX_VLAN_FLT_CTRL1, 1, !!promisc);
 }
 
-bool atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
+int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 	unsigned size);
 int atl_hwinit(struct atl_nic *nic, enum atl_board brd_id);
 void atl_refresh_link(struct atl_nic *nic);

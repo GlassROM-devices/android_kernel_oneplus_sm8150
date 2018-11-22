@@ -57,7 +57,7 @@ void atl_check_unplug(struct atl_hw *hw, uint32_t addr)
 		atl_unplugged(hw);
 }
 
-bool atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
+int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 		      unsigned int size)
 {
 	uint32_t *addr = (uint32_t *)host_addr;
@@ -74,14 +74,14 @@ bool atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 		if (next == mcp_addr) {
 			atl_dev_err("mcp mem read timed out (%d remaining)\n",
 				    size);
-			return false;
+			return -EIO;
 		}
 		*addr = atl_read(hw, ATL_GLOBAL_MBOX_DATA);
 		mcp_addr += 4;
 		addr++;
 		size -= 4;
 	}
-	return true;
+	return 0;
 }
 
 
@@ -223,12 +223,12 @@ int atl_hw_reset(struct atl_hw *hw)
 	return atl_fw_init(hw);
 }
 
-static bool atl_get_mac_addr(struct atl_hw *hw, uint8_t *buf)
+static int atl_get_mac_addr(struct atl_hw *hw, uint8_t *buf)
 {
 	uint32_t efuse_shadow_addr =
 		atl_read(hw, hw->mcp.ops->efuse_shadow_addr_reg);
 	uint8_t tmp[8];
-	bool ret;
+	int ret;
 
 	if (!efuse_shadow_addr)
 		return false;
@@ -259,9 +259,10 @@ int atl_hwinit(struct atl_nic *nic, enum atl_board brd_id)
 	if (ret)
 		return ret;
 
-	if (!atl_get_mac_addr(hw, hw->mac_addr)) {
+	ret = atl_get_mac_addr(hw, hw->mac_addr);
+	if (ret) {
 		atl_dev_err("couldn't read MAC address\n");
-		return -EIO;
+		return ret;
 	}
 
 	return hw->mcp.ops->get_link_caps(hw);

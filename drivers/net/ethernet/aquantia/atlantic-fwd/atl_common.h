@@ -362,5 +362,6 @@ int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 	uint16_t addr, uint16_t val);
 void atl_refresh_rxfs(struct atl_nic *nic);
 void atl_schedule_work(struct atl_nic *nic);
+int atl_hwmon_init(struct atl_nic *nic);
 
 #endif

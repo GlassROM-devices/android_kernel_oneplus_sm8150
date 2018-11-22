@@ -35,8 +35,14 @@ enum atl_fw2_opts {
 	atl_define_bit(atl_fw2_pause, 3)
 	atl_define_bit(atl_fw2_asym_pause, 4)
 	atl_fw2_pause_mask = atl_fw2_pause | atl_fw2_asym_pause,
+	atl_define_bit(atl_fw2_phy_temp, 18)
 	atl_define_bit(atl_fw2_nic_proxy, 0x17)
 	atl_define_bit(atl_fw2_wol, 0x18)
+};
+
+enum atl_fw2_stat_offt {
+	atl_fw2_stat_temp = 0x50,
+	atl_fw2_stat_lcaps = 0x84,
 };
 
 enum atl_fc_mode {
@@ -79,9 +85,10 @@ struct atl_fw_ops {
 	int (*restart_aneg)(struct atl_hw *hw);
 	void (*set_default_link)(struct atl_hw *hw);
 	int (*enable_wol)(struct atl_hw *hw);
+	int (*get_phy_temperature)(struct atl_hw *hw, int *temp);
 	unsigned efuse_shadow_addr_reg;
 };
 
-#define ATL_FW_STAT_LINK_CAPS	0x84
+int atl_read_fwstat_word(struct atl_hw *hw, uint32_t offt, uint32_t *val);
 
 #endif

@@ -405,12 +405,18 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_link_intr;
 
+	ret = atl_hwmon_init(nic);
+	if (ret)
+		goto err_hwmon_init;
+
 	atl_start_hw_global(nic);
 	if (atl_keep_link)
 		atl_link_up(nic);
 
 	return 0;
 
+err_hwmon_init:
+	atl_free_link_intr(nic);
 err_link_intr:
 	unregister_netdev(nic->ndev);
 err_register:
