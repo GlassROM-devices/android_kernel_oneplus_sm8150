@@ -138,6 +138,8 @@ static int atl_fwd_alloc_bufs(struct atl_fwd_ring *ring,
 		bufs->vaddr_vec = page_to_virt(bpg[0].page);
 	}
 
+	bufs->paddr = page_to_phys(bpg[0].page);
+
 	bpg = bufs->bpgs;
 	for (i = 0; i < ring_size; i++) {
 		union atl_desc *desc = &ring->hw.descs[i];
@@ -245,6 +247,14 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring)
 }
 EXPORT_SYMBOL(atl_fwd_release_ring);
 
+static phys_addr_t atl_dma_coherent_virt_to_phys(void *vaddr)
+{
+	if (is_vmalloc_addr(vaddr))
+		return page_to_phys(vmalloc_to_page(vaddr));
+	else
+		return virt_to_phys(vaddr);
+}
+
 static unsigned int atl_fwd_rx_mod_max = 25, atl_fwd_rx_mod_min = 15,
 	atl_fwd_tx_mod_max = 25, atl_fwd_tx_mod_min = 15;
 atl_module_param(fwd_rx_mod_max, uint, 0644);
@@ -312,6 +322,8 @@ struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 		ring->intr_mod_max = atl_fwd_rx_mod_max;
 		ring->intr_mod_min = atl_fwd_rx_mod_min;
 	}
+
+	ring->desc_paddr = atl_dma_coherent_virt_to_phys(ring->hw.descs);
 
 	atl_fwd_init_ring(ring);
 	return ring;

@@ -43,11 +43,14 @@ struct atl_fwd_buf_page {
  *    	@vaddr_vec:		A vector of buffers' virtual addresses
  *    				or first buffer's virtual address
  *    				depending on ring flags
+ *    	@paddr:			Physical address of the first (or
+ *    				only) buffer page
  */
 struct atl_fwd_bufs {
 	dma_addr_t daddr_vec_base;
 	dma_addr_t *daddr_vec;
 	void **vaddr_vec;
+	phys_addr_t paddr;
 
 	/* The following is not part of API and subject to change */
 	int num_pages;
@@ -83,6 +86,7 @@ union atl_desc;
  *			request.
  *	@nic:		struct atl_nic backreference
  *	@idx:		Ring index
+ *	@desc_paddr:	Physical address of the descriptor ring
  */
 struct atl_fwd_ring {
 	struct atl_hw_ring hw;
@@ -90,6 +94,7 @@ struct atl_fwd_ring {
 	struct atl_fwd_bufs *bufs;
 	struct atl_nic *nic;
 	int idx;
+	phys_addr_t desc_paddr;
 
 	/* The following is not part of API and subject to change */
 	unsigned int flags;
