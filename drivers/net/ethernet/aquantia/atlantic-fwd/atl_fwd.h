@@ -95,6 +95,8 @@ struct atl_fwd_ring {
 	unsigned int flags;
 	unsigned long state;
 	int buf_size;
+	unsigned intr_mod_min;
+	unsigned intr_mod_max;
 };
 
 enum atl_fwd_event_flags {
@@ -181,6 +183,37 @@ struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
  * releases ring's event if non-NULL, and frees the ring.
  */
 void atl_fwd_release_ring(struct atl_fwd_ring *ring);
+
+/**
+ * atl_fwd_set_ring_intr_mod() - Set ring's interrupt moderation
+ * delays
+ *
+ * 	@ring:	ring
+ * 	@min:	min delay
+ * 	@max:	max delay
+ *
+ * Each ring has two configurable interrupt moderation timers. When an
+ * interrupt condition occurs (write-back of the final descriptor of a
+ * packet on receive, or writeback on a transmit descriptor with WB
+ * bit set), the min timer is restarted unconditionally and max timer
+ * is started only if it's not running yet. When any of the timers
+ * expires, the interrupt is signalled.
+ *
+ * Thus if a single interrupt event occurs it will be subjected to min
+ * delay. If subsequent events keep occuring with intervals less than
+ * min_delay between each other, the interrupt will be triggered
+ * max_delay after the initial event.
+ *
+ * When called with negative @min or @max, the corresponding setting
+ * is left unchanged.
+ *
+ * Interrupt moderation is only supported for MSI-X vectors, not head
+ * pointer writeback events.
+ *
+ * Returns 0 on success or -EINVAL on attempt to set moderation delays
+ * for a ring with attached Tx WB event.
+ */
+int atl_fwd_set_ring_intr_mod(struct atl_fwd_ring *ring, int min, int max);
 
 /**
  * atl_fwd_enable_channel() - Enable offload engine's ring

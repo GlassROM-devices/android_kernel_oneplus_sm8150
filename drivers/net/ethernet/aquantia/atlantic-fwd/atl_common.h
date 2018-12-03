@@ -309,6 +309,9 @@ extern unsigned atl_min_intr_delay;
 #define atl_nic_err(fmt, args...)		\
 	dev_err(&nic->hw.pdev->dev, fmt, ## args)
 
+#define atl_module_param(_name, _type, _mode)			\
+	module_param_named(_name, atl_ ## _name, _type, _mode)
+
 netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev);
 int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid);
 int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid);

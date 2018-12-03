@@ -16,6 +16,11 @@ static const char *atl_fwd_dir_str(struct atl_fwd_ring *ring)
 	return ring->flags & ATL_FWR_TX ? "Tx" : "Rx";
 }
 
+static int atl_fwd_ring_tx(struct atl_fwd_ring *ring)
+{
+	return !!(ring->flags & ATL_FWR_TX);
+}
+
 static int atl_fwd_get_page(struct atl_fwd_buf_page *bpg, struct device *dev,
 	int order)
 {
@@ -143,7 +148,7 @@ static int atl_fwd_alloc_bufs(struct atl_fwd_ring *ring,
 			bufs->vaddr_vec[i] = page_to_virt(bpg->page) + pg_off;
 		}
 
-		if (ring->flags & ATL_FWR_TX)
+		if (atl_fwd_ring_tx(ring))
 			desc->tx.daddr = daddr;
 		else
 			desc->rx.daddr = daddr;
@@ -163,12 +168,25 @@ free:
 	return ret;
 }
 
+static void atl_fwd_update_im(struct atl_fwd_ring *ring)
+{
+	struct atl_hw *hw = &ring->nic->hw;
+	int idx = ring->idx;
+	uint32_t addr;
+
+	addr = atl_fwd_ring_tx(ring) ? ATL_TX_INTR_MOD_CTRL(idx) :
+		ATL_RX_INTR_MOD_CTRL(idx);
+
+	atl_write(hw, addr, (ring->intr_mod_max / 2) << 0x10 |
+		(ring->intr_mod_min / 2) << 8 | 2);
+}
+
 static void atl_fwd_init_ring(struct atl_fwd_ring *fwd_ring)
 {
 	struct atl_hw *hw = &fwd_ring->nic->hw;
 	struct atl_hw_ring *ring = &fwd_ring->hw;
 	unsigned int flags = fwd_ring->flags;
-	int dir_tx = !!(flags & ATL_FWR_TX);
+	int dir_tx = atl_fwd_ring_tx(fwd_ring);
 	int idx = fwd_ring->idx;
 	int lxo_bit = !!(flags & ATL_FWR_LXO);
 
@@ -199,13 +217,15 @@ static void atl_fwd_init_ring(struct atl_fwd_ring *fwd_ring)
 		atl_write_bit(hw, ATL_RX_LRO_CTRL1, idx, lxo_bit);
 		atl_write_bit(hw, ATL_INTR_RSC_EN, idx, lxo_bit);
 	}
+
+	atl_fwd_update_im(fwd_ring);
 }
 
 void atl_fwd_release_ring(struct atl_fwd_ring *ring)
 {
 	struct atl_nic *nic = ring->nic;
 	int idx = ring->idx;
-	int dir_tx = !!(ring->flags & ATL_FWR_TX);
+	int dir_tx = atl_fwd_ring_tx(ring);
 	struct atl_fwd *fwd = &nic->fwd;
 	unsigned long *map = &fwd->ring_map[dir_tx];
 	struct atl_fwd_ring **rings = fwd->rings[dir_tx];
@@ -224,6 +244,13 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring)
 	kfree(ring);
 }
 EXPORT_SYMBOL(atl_fwd_release_ring);
+
+static unsigned int atl_fwd_rx_mod_max = 25, atl_fwd_rx_mod_min = 15,
+	atl_fwd_tx_mod_max = 25, atl_fwd_tx_mod_min = 15;
+atl_module_param(fwd_rx_mod_max, uint, 0644);
+atl_module_param(fwd_rx_mod_min, uint, 0644);
+atl_module_param(fwd_tx_mod_max, uint, 0644);
+atl_module_param(fwd_tx_mod_min, uint, 0644);
 
 struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 	int flags, int ring_size, int buf_size, int page_order)
@@ -278,6 +305,14 @@ struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 	__set_bit(idx, map);
 	rings[idx - ATL_FWD_RING_BASE] = ring;
 
+	if (dir_tx) {
+		ring->intr_mod_max = atl_fwd_tx_mod_max;
+		ring->intr_mod_min = atl_fwd_tx_mod_min;
+	} else {
+		ring->intr_mod_max = atl_fwd_rx_mod_max;
+		ring->intr_mod_min = atl_fwd_rx_mod_min;
+	}
+
 	atl_fwd_init_ring(ring);
 	return ring;
 
@@ -289,6 +324,28 @@ free_ring:
 	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL(atl_fwd_request_ring);
+
+int atl_fwd_set_ring_intr_mod(struct atl_fwd_ring *ring, int min, int max)
+{
+	if (atl_fwd_ring_tx(ring) && ring->evt &&
+		ring->evt->flags & ATL_FWD_EVT_TXWB) {
+		struct atl_nic *nic = ring->nic;
+
+		atl_nic_err("%s: Interrupt moderation not supported for head pointer writeback events\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	if (min >= 0)
+		ring->intr_mod_min = min;
+
+	if (max >= 0)
+		ring->intr_mod_max = max;
+
+	atl_fwd_update_im(ring);
+	return 0;
+}
+EXPORT_SYMBOL(atl_fwd_set_ring_intr_mod);
 
 void atl_fwd_release_rings(struct atl_nic *nic)
 {
@@ -394,15 +451,15 @@ void atl_fwd_release_event(struct atl_fwd_event *evt)
 
 	__clear_bit(idx, map);
 	atl_set_intr_bits(&nic->hw, ring->idx,
-		(ring->flags & ATL_FWR_TX) ? -1 : ATL_NUM_MSI_VECS,
-		(ring->flags & ATL_FWR_TX) ? ATL_NUM_MSI_VECS : -1);
+		atl_fwd_ring_tx(ring) ? -1 : ATL_NUM_MSI_VECS,
+		atl_fwd_ring_tx(ring) ? ATL_NUM_MSI_VECS : -1);
 }
 EXPORT_SYMBOL(atl_fwd_release_event);
 
 int atl_fwd_request_event(struct atl_fwd_event *evt)
 {
 	struct atl_fwd_ring *ring = evt->ring;
-	int dir_tx = !!(ring->flags & ATL_FWR_TX);
+	int dir_tx = atl_fwd_ring_tx(ring);
 	struct atl_nic *nic = ring->nic;
 	struct atl_hw *hw = &nic->hw;
 	unsigned long *map = &nic->fwd.msi_map;
@@ -421,7 +478,7 @@ int atl_fwd_request_event(struct atl_fwd_event *evt)
 		return -EINVAL;
 	}
 
-	if (tx_wb && !(ring->flags & ATL_FWR_TX)) {
+	if (tx_wb && !atl_fwd_ring_tx(ring)) {
 		atl_nic_err("%s: head pointer writeback events supported "
 			"on Tx rings only\n", __func__);
 		return -EINVAL;
