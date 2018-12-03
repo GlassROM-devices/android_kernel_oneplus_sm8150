@@ -250,6 +250,7 @@ enum atl_priv_flags {
 	ATL_PF_LPI_RX_PHY,
 	ATL_PF_LPI_TX_PHY,
 	ATL_PF_STATS_RESET,
+	ATL_PF_STRIP_PAD,
 };
 
 enum atl_priv_flag_bits {
@@ -269,7 +270,10 @@ enum atl_priv_flag_bits {
 
 	ATL_DEF_PF_BIT(STATS_RESET),
 
-	ATL_PF_RW_MASK = ATL_PF_LPB_MASK | ATL_PF_BIT(STATS_RESET),
+	ATL_DEF_PF_BIT(STRIP_PAD),
+
+	ATL_PF_RW_MASK = ATL_PF_LPB_MASK | ATL_PF_BIT(STATS_RESET) |
+		ATL_PF_BIT(STRIP_PAD),
 	ATL_PF_RO_MASK = ATL_PF_LPI_MASK,
 };
 

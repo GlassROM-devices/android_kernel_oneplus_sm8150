@@ -736,7 +736,7 @@ int atl_msm_read(struct atl_hw *hw, uint32_t addr, uint32_t *val)
 
 	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
 	if (ret)
-		return -1;
+		return ret;
 
 	ret = __atl_msm_read(hw, addr, val);
 	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);

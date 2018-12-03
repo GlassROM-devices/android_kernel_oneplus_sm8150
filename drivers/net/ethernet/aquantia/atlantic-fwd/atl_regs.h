@@ -164,6 +164,7 @@ enum mcp_scratchpad {
 #define ATL_TX_INTR_MOD_CTRL(idx) ATL_REG_STRIDE(0x8980, 0x4, idx)
 
 /* MSM */
+#define ATL_MSM_GEN_CTRL 0x8
 #define ATL_MSM_GEN_STS 0x40
 #define ATL_MSM_TX_LPI_DELAY 0x78
 #define ATL_MSM_CTR_RX_PKTS_GOOD 0x88

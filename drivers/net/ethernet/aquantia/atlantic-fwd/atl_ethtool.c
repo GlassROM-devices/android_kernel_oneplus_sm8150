@@ -611,6 +611,7 @@ static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(RX_LPI_PHY, LPI_RX_PHY),
 	ATL_PRIV_FLAG(TX_LPI_PHY, LPI_TX_PHY),
 	ATL_PRIV_FLAG(ResetStatistics, STATS_RESET),
+	ATL_PRIV_FLAG(StripEtherPadding, STRIP_PAD),
 };
 
 static int atl_get_sset_count(struct net_device *ndev, int sset)
@@ -788,6 +789,32 @@ void atl_reset_stats(struct atl_nic *nic)
 	spin_unlock(&nic->stats_lock);
 }
 
+static int atl_set_pad_stripping(struct atl_nic *nic, bool on)
+{
+	struct atl_hw *hw = &nic->hw;
+	int ret;
+	uint32_t ctrl;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
+	if (ret)
+		return ret;
+
+	ret = __atl_msm_read(hw, ATL_MSM_GEN_CTRL, &ctrl);
+	if (ret)
+		goto unlock;
+
+	if (on)
+		ctrl |= BIT(5);
+	else
+		ctrl &= ~BIT(5);
+
+	ret = __atl_msm_write(hw, ATL_MSM_GEN_CTRL, ctrl);
+
+unlock:
+	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);
+	return ret;
+}
+
 static uint32_t atl_get_priv_flags(struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
@@ -801,6 +828,8 @@ static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 	struct atl_nic *nic = netdev_priv(ndev);
 	uint32_t diff = flags ^ nic->priv_flags;
 	uint32_t curr = nic->priv_flags & ATL_PF_LPB_MASK;
+	uint32_t lpb = flags & ATL_PF_LPB_MASK;
+	int ret;
 
 	if (diff & ATL_PF_RO_MASK)
 		return -EINVAL;
@@ -812,13 +841,19 @@ static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 		atl_reset_stats(nic);
 	flags &= ~ATL_PF_BIT(STATS_RESET);
 
-	flags &= ATL_PF_LPB_MASK;
-	if (hweight32(flags) > 1) {
+	if (diff & ATL_PF_BIT(STRIP_PAD)) {
+		ret = atl_set_pad_stripping(nic,
+			!!(flags & ATL_PF_BIT(STRIP_PAD)));
+		if (ret)
+			return ret;
+	}
+
+	if (hweight32(lpb) > 1) {
 		atl_nic_err("Can't enable more than one loopback simultaneously\n");
 		return -EINVAL;
 	}
 
-	if (flags & ATL_PF_BIT(LPB_SYS_DMA) && !atl_rx_linear) {
+	if (lpb & ATL_PF_BIT(LPB_SYS_DMA) && !atl_rx_linear) {
 		atl_nic_err("System DMA loopback suported only in rx_linear mode\n");
 		return -EINVAL;
 	}
@@ -826,10 +861,10 @@ static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 	if (curr)
 		atl_set_loopback(nic, ffs(curr) - 1, false);
 
-	nic->priv_flags = flags | (nic->priv_flags & ~ATL_PF_LPB_MASK);
-	if (flags)
-		atl_set_loopback(nic, ffs(flags) - 1, true);
+	if (lpb)
+		atl_set_loopback(nic, ffs(lpb) - 1, true);
 
+	nic->priv_flags = flags;
 	return 0;
 }
 
