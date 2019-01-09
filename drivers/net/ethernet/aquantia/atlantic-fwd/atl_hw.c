@@ -519,7 +519,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 	atl_write(hw, ATL_INTR_GEN_INTR_MAP4, BIT(7) | (0 << 0));
 
 	atl_write(hw, ATL_TX_INTR_CTRL, BIT(4));
-	atl_write(hw, ATL_RX_INTR_CTRL, 2 << 4 | BIT(3));
+	atl_write(hw, ATL_RX_INTR_CTRL, BIT(3));
 
 	/* Reset Rx/Tx on unexpected PERST# */
 	atl_write_bit(hw, 0x1000, 29, 0);

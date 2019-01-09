@@ -844,6 +844,13 @@ static struct sk_buff *atl_process_rx_frag(struct atl_desc_ring *ring,
 	struct atl_pgref *headref = &rxbuf->head, *dataref = &rxbuf->data;
 	struct device *dev = ring->qvec->dev;
 
+	if (unlikely(wb->rdm_err)) {
+		if (skb && skb != (void *)-1l)
+			dev_kfree_skb_any(skb);
+
+		skb = (void *)-1l;
+	}
+
 	if (!skb) {
 		 /* First buffer of a packet */
 		skb = atl_init_skb(ring, rxbuf, wb);
