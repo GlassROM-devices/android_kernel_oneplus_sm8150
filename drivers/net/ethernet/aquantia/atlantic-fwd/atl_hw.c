@@ -421,7 +421,20 @@ void atl_set_rss_tbl(struct atl_hw *hw)
 	}
 }
 
-unsigned int atl_fwd_rx_buf_reserve = 0, atl_fwd_tx_buf_reserve = 0;
+unsigned int atl_fwd_rx_buf_reserve =
+#ifdef CONFIG_ATLFWD_FWD_RXBUF
+	CONFIG_ATLFWD_FWD_RXBUF;
+#else
+	0;
+#endif
+
+unsigned int atl_fwd_tx_buf_reserve =
+#ifdef CONFIG_ATLFWD_FWD_TXBUF
+	CONFIG_ATLFWD_FWD_TXBUF;
+#else
+	0;
+#endif
+
 module_param_named(fwd_tx_buf_reserve, atl_fwd_tx_buf_reserve, uint, 0444);
 module_param_named(fwd_rx_buf_reserve, atl_fwd_rx_buf_reserve, uint, 0444);
 
@@ -526,7 +539,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 	atl_write(hw, 0x448, 3);
 
 	/* Enable non-ring interrupts */
-	atl_intr_enable(hw, hw->intr_mask | (uint32_t)(nic->fwd.msi_map));
+	atl_intr_enable_non_ring(nic);
 }
 
 #define atl_vlan_flt_val(vid) ((uint32_t)(vid) | 1 << 16 | 1 << 31)

@@ -217,7 +217,9 @@ struct atl_nic {
 	spinlock_t stats_lock;
 	struct work_struct work;
 
+#ifdef CONFIG_ATLFWD_FWD
 	struct atl_fwd fwd;
+#endif
 
 	struct atl_rxf_ntuple rxf_ntuple;
 	struct atl_rxf_vlan rxf_vlan;
@@ -317,6 +319,17 @@ extern unsigned atl_min_intr_delay;
 
 #define atl_module_param(_name, _type, _mode)			\
 	module_param_named(_name, atl_ ## _name, _type, _mode)
+
+static inline void atl_intr_enable_non_ring(struct atl_nic *nic)
+{
+	struct atl_hw *hw = &nic->hw;
+	uint32_t mask = hw->intr_mask;
+
+#ifdef CONFIG_ATLFWD_FWD
+	mask |= (uint32_t)(nic->fwd.msi_map);
+#endif
+	atl_intr_enable(hw, mask);
+}
 
 netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev);
 int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid);

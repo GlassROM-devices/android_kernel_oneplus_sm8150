@@ -1141,6 +1141,22 @@ static int atl_check_mask(uint8_t *mask, int len, uint32_t *cmd, uint32_t flag)
 	return 0;
 }
 
+static int atl_rxf_check_ring(struct atl_nic *nic, uint32_t ring)
+{
+	if (ring > ATL_RXF_RING_ANY)
+		return -EINVAL;
+
+	if (ring < nic->nvecs || ring == ATL_RXF_RING_ANY)
+		return 0;
+
+#ifdef CONFIG_ATLFWD_FWD
+	if (test_bit(ring, &nic->fwd.ring_map[ATL_FWDIR_RX]))
+		return 0;
+#endif
+
+	return -EINVAL;
+}
+
 static int atl_rxf_set_ring(const struct atl_rxf_flt_desc *desc,
 	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp, uint32_t *cmd)
 {
@@ -1151,9 +1167,7 @@ static int atl_rxf_set_ring(const struct atl_rxf_flt_desc *desc,
 		return 0;
 
 	ring = ethtool_get_flow_spec_ring(ring_cookie);
-	if (ring > ATL_RXF_RING_ANY ||
-		(ring >= nic->nvecs && ring != ATL_RXF_RING_ANY &&
-			!test_bit(ring, &nic->fwd.ring_map[ATL_FWDIR_RX]))) {
+	if (atl_rxf_check_ring(nic, ring)) {
 		atl_nic_err("Invalid Rx filter queue %d\n", ring);
 		return -EINVAL;
 	}
