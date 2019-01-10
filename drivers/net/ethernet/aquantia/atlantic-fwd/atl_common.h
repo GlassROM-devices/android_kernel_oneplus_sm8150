@@ -92,6 +92,8 @@ enum {
 	ATL_RXF_ETYPE_MAX = ATL_ETYPE_FLT_NUM,
 	ATL_RXF_NTUPLE_BASE = ATL_RXF_ETYPE_BASE + ATL_RXF_ETYPE_MAX,
 	ATL_RXF_NTUPLE_MAX = ATL_NTUPLE_FLT_NUM,
+	ATL_RXF_FLEX_BASE = ATL_RXF_NTUPLE_BASE + ATL_RXF_NTUPLE_MAX,
+	ATL_RXF_FLEX_MAX = 1,
 };
 
 enum atl_rxf_common_cmd {
@@ -173,6 +175,19 @@ struct atl_rxf_etype {
 	int count;
 };
 
+enum atl_flex_cmd {
+	ATL_FLEX_EN = ATL_RXF_EN,
+	ATL_FLEX_RXQ = BIT(30),
+	ATL_FLEX_RXQ_SHIFT = 20,
+	ATL_FLEX_RXQ_MASK = ATL_RXF_RXQ_MSK << ATL_FLEX_RXQ_SHIFT,
+	ATL_FLEX_ACT_SHIFT = ATL_RXF_ACT_SHIFT,
+};
+
+struct atl_rxf_flex {
+	uint32_t cmd[ATL_RXF_FLEX_MAX];
+	int count;
+};
+
 struct atl_queue_vec;
 
 #define ATL_NUM_FWD_RINGS ATL_MAX_QUEUES
@@ -224,6 +239,7 @@ struct atl_nic {
 	struct atl_rxf_ntuple rxf_ntuple;
 	struct atl_rxf_vlan rxf_vlan;
 	struct atl_rxf_etype rxf_etype;
+	struct atl_rxf_flex rxf_flex;
 };
 
 /* Flags only modified with RTNL lock held */
