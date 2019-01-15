@@ -243,7 +243,7 @@ static int atl_ethtool_set_settings(struct net_device *ndev,
 
 	atl_ethtool_set_common(cmd, lstate,
 		(unsigned long *)&cmd->advertising, &tmp, true, speed);
-	hw->mcp.ops->set_link(hw);
+	hw->mcp.ops->set_link(hw, false);
 	return 0;
 }
 
