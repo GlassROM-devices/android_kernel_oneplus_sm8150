@@ -1605,12 +1605,14 @@ int atl_start_rings(struct atl_nic *nic)
 	struct atl_queue_vec *qvec;
 	int ret;
 
-	mask = BIT(nic->nvecs + ATL_NUM_NON_RING_IRQS) -
-		BIT(ATL_NUM_NON_RING_IRQS);
-	/* Enable auto-masking of ring interrupts on intr generation */
-	atl_set_bits(hw, ATL_INTR_AUTO_MASK, mask);
-	/* Enable status auto-clear on intr generation */
-	atl_set_bits(hw, ATL_INTR_AUTO_CLEAR, mask);
+	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
+		mask = BIT(nic->nvecs + ATL_NUM_NON_RING_IRQS) -
+			BIT(ATL_NUM_NON_RING_IRQS);
+		/* Enable auto-masking of ring interrupts on intr generation */
+		atl_set_bits(hw, ATL_INTR_AUTO_MASK, mask);
+		/* Enable status auto-clear on intr generation */
+		atl_set_bits(hw, ATL_INTR_AUTO_CLEAR, mask);
+	}
 
 	atl_set_lro(nic);
 	atl_set_rss_tbl(hw);

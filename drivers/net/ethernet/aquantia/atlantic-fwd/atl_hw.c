@@ -307,7 +307,7 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 {
 	struct atl_nic *nic = priv;
 	struct atl_hw *hw = &nic->hw;
-	uint32_t mask = hw->intr_mask | atl_qvec_intr(nic->qvecs);
+	uint32_t mask = hw->intr_mask | BIT(atl_qvec_intr(nic->qvecs));
 	uint32_t stat;
 
 
