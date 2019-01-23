@@ -766,7 +766,7 @@ int __atl_msm_write(struct atl_hw *hw, uint32_t addr, uint32_t val)
 		return ret;
 
 	atl_write(hw, ATL_MPI_MSM_WR, val);
-	atl_write(hw, ATL_MPI_MSM_ADDR, addr | BIT(8));
+	atl_write(hw, ATL_MPI_MSM_ADDR, (addr >> 2) | BIT(8));
 	ret = atl_msm_wait(hw);
 	if (ret)
 		return ret;
