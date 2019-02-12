@@ -1135,13 +1135,13 @@ void atl_clear_datapath(struct atl_nic *nic)
 	if (!test_and_clear_bit(ATL_ST_CONFIGURED, &nic->state))
 		return;
 
-#ifdef ATL_COMPAT_PCI_ALLOC_IRQ_VECTORS_AFFINITY
+	atl_free_link_intr(nic);
+
 	for (i = 0; i < nic->nvecs; i++) {
 		int vector = pci_irq_vector(nic->hw.pdev,
 			i + ATL_NUM_NON_RING_IRQS);
 		irq_set_affinity_hint(vector, NULL);
 	}
-#endif
 
 	pci_free_irq_vectors(nic->hw.pdev);
 
@@ -1195,9 +1195,13 @@ int atl_setup_datapath(struct atl_nic *nic)
 	if (!qvec) {
 		atl_nic_err("Couldn't alloc qvecs\n");
 		ret = -ENOMEM;
-		goto exit_free;
+		goto err_alloc;
 	}
 	nic->qvecs = qvec;
+
+	ret = atl_alloc_link_intr(nic);
+	if (ret)
+		goto err_link_intr;
 
 	for (i = 0; i < nvecs; i++, qvec++) {
 		qvec->nic = nic;
@@ -1225,8 +1229,13 @@ int atl_setup_datapath(struct atl_nic *nic)
 	set_bit(ATL_ST_CONFIGURED, &nic->state);
 	return 0;
 
-exit_free:
-	atl_clear_datapath(nic);
+err_link_intr:
+	kfree(nic->qvecs);
+	nic->qvecs = NULL;
+
+err_alloc:
+	pci_free_irq_vectors(nic->hw.pdev);
+
 	return ret;
 }
 

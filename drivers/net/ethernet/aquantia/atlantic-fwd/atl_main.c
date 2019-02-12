@@ -192,6 +192,9 @@ int atl_reconfigure(struct atl_nic *nic)
 	if (ret)
 		goto err;
 
+	/* Re-enable link interrupts disabled in atl_clear_datapath() */
+	atl_intr_enable(&nic->hw, BIT(0));
+
 	/* Number of rings might have changed, re-init RSS
 	 * redirection table.
 	 */
@@ -401,10 +404,6 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_set_drvdata(pdev, nic);
 	netif_carrier_off(ndev);
 
-	ret = atl_alloc_link_intr(nic);
-	if (ret)
-		goto err_link_intr;
-
 	ret = atl_hwmon_init(nic);
 	if (ret)
 		goto err_hwmon_init;
@@ -416,8 +415,6 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	return 0;
 
 err_hwmon_init:
-	atl_free_link_intr(nic);
-err_link_intr:
 	unregister_netdev(nic->ndev);
 err_register:
 	atl_clear_datapath(nic);
@@ -447,7 +444,6 @@ static void atl_remove(struct pci_dev *pdev)
 	netif_carrier_off(nic->ndev);
 	atl_intr_disable_all(&nic->hw);
 	/* atl_hw_reset(&nic->hw); */
-	atl_free_link_intr(nic);
 	unregister_netdev(nic->ndev);
 
 #ifdef CONFIG_ATLFWD_FWD

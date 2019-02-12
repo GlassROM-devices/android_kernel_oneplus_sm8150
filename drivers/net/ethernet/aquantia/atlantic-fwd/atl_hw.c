@@ -355,7 +355,10 @@ int atl_alloc_link_intr(struct atl_nic *nic)
 
 void atl_free_link_intr(struct atl_nic *nic)
 {
-	free_irq(pci_irq_vector(nic->hw.pdev, 0), nic);
+	struct atl_hw *hw = &nic->hw;
+
+	atl_intr_disable(hw, BIT(0));
+	free_irq(pci_irq_vector(hw->pdev, 0), nic);
 }
 
 void atl_set_uc_flt(struct atl_hw *hw, int idx, uint8_t mac_addr[ETH_ALEN])
