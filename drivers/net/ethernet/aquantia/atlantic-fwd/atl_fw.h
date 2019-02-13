@@ -43,6 +43,8 @@ enum atl_fw2_opts {
 enum atl_fw2_stat_offt {
 	atl_fw2_stat_temp = 0x50,
 	atl_fw2_stat_lcaps = 0x84,
+	atl_fw2_stat_settings_addr = 0x110,
+	atl_fw2_stat_settings_len = 0x114,
 };
 
 enum atl_fc_mode {
@@ -89,6 +91,6 @@ struct atl_fw_ops {
 	unsigned efuse_shadow_addr_reg;
 };
 
-int atl_read_fwstat_word(struct atl_hw *hw, uint32_t offt, uint32_t *val);
+int atl_read_mcp_word(struct atl_hw *hw, uint32_t offt, uint32_t *val);
 
 #endif
