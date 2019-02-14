@@ -47,6 +47,14 @@ enum atl_fw2_stat_offt {
 	atl_fw2_stat_settings_len = 0x114,
 };
 
+enum atl_fw2_settings_offt {
+	atl_fw2_setings_msm_opts = 0x90,
+};
+
+enum atl_fw2_msm_opts {
+	atl_define_bit(atl_fw2_settings_msm_opts_strip_pad, 0)
+};
+
 enum atl_fc_mode {
 	atl_fc_none = 0,
 	atl_define_bit(atl_fc_rx, 0)

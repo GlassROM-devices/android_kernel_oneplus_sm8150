@@ -793,26 +793,27 @@ static int atl_set_pad_stripping(struct atl_nic *nic, bool on)
 {
 	struct atl_hw *hw = &nic->hw;
 	int ret;
-	uint32_t ctrl;
+	uint32_t msm_opts;
 
-	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
+	if (hw->mcp.fw_rev < 0x0300008e)
+		return -EOPNOTSUPP;
+
+	ret = atl_read_fwsettings_word(hw, atl_fw2_setings_msm_opts,
+		&msm_opts);
 	if (ret)
 		return ret;
 
-	ret = __atl_msm_read(hw, ATL_MSM_GEN_CTRL, &ctrl);
+	msm_opts &= ~atl_fw2_settings_msm_opts_strip_pad;
+	msm_opts |= !!on << atl_fw2_settings_msm_opts_strip_pad_shift;
+
+	ret = atl_write_fwsettings_word(hw, atl_fw2_setings_msm_opts,
+		msm_opts);
 	if (ret)
-		goto unlock;
+		return ret;
 
-	if (on)
-		ctrl |= BIT(5);
-	else
-		ctrl &= ~BIT(5);
-
-	ret = __atl_msm_write(hw, ATL_MSM_GEN_CTRL, ctrl);
-
-unlock:
-	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);
-	return ret;
+	/* Restart aneg to make FW apply the new settings */
+	hw->mcp.ops->restart_aneg(hw);
+	return 0;
 }
 
 static uint32_t atl_get_priv_flags(struct net_device *ndev)
