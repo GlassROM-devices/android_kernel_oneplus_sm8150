@@ -107,8 +107,10 @@ static int atl_fwd_alloc_bufs(struct atl_fwd_ring *ring,
 	bufs = kzalloc(sizeof(*bufs) +
 			sizeof(struct atl_fwd_buf_page) * num_pages,
 		GFP_KERNEL);
-	if (!bufs)
+	if (!bufs) {
+		atl_nic_err("%s: couldn't alloc buffers structure\n", __func__);
 		return -ENOMEM;
+	}
 
 	ring->bufs = bufs;
 	bufs->num_pages = num_pages;
@@ -117,8 +119,11 @@ static int atl_fwd_alloc_bufs(struct atl_fwd_ring *ring,
 	bpg = bufs->bpgs;
 	for (i = 0; i < num_pages; i++) {
 		ret = atl_fwd_get_page(&bpg[i], dev, order);
-		if (ret)
+		if (ret) {
+			atl_nic_err("%s: couldn't alloc buffer page (order %d)\n",
+				__func__, order);
 			goto free;
+		}
 	}
 
 	if (want_vecs) {
@@ -126,13 +131,19 @@ static int atl_fwd_alloc_bufs(struct atl_fwd_ring *ring,
 		bufs->daddr_vec = dma_alloc_coherent(dev,
 			ring_size * sizeof(dma_addr_t),
 			&bufs->daddr_vec_base, GFP_KERNEL);
-		if (!bufs->daddr_vec)
+		if (!bufs->daddr_vec) {
+			atl_nic_err("%s: couldn't alloc DMA addr table\n",
+				__func__);
 			goto free;
+		}
 
 		bufs->vaddr_vec = kcalloc(ring_size, sizeof(void *),
 			GFP_KERNEL);
-		if (!bufs->vaddr_vec)
+		if (!bufs->vaddr_vec) {
+			atl_nic_err("%s: couldn't alloc virtual addr table\n",
+				__func__);
 			goto free;
+		}
 	} else {
 		bufs->daddr_vec_base = bpg[0].daddr;
 		bufs->vaddr_vec = page_to_virt(bpg[0].page);
@@ -274,27 +285,29 @@ struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 	int idx;
 
 	if (ring_size & 7 || ring_size > ATL_MAX_RING_SIZE) {
-		atl_nic_err("%s: bad ring size %d, must be no more than %d "
-			"and a multiple of 8\n", __func__, ring_size,
-			ATL_MAX_RING_SIZE);
+		atl_nic_err("%s: bad ring size %d, must be no more than %d and a multiple of 8\n",
+			__func__, ring_size, ATL_MAX_RING_SIZE);
 		return ERR_PTR(-EINVAL);
 	}
 
 	if (buf_size & 1023 || buf_size > 16 * 1024) {
-		atl_nic_err("%s: bad buffer size %d, must be no more than 16k "
-			"and a multiple of 1024\n",
+		atl_nic_err("%s: bad buffer size %d, must be no more than 16k and a multiple of 1024\n",
 			__func__, buf_size);
 		return ERR_PTR(-EINVAL);
 	}
 
 	idx = find_next_zero_bit(map, ATL_FWD_RING_BASE + ATL_NUM_FWD_RINGS,
 		ATL_FWD_RING_BASE);
-	if (idx >= ATL_FWD_RING_BASE + ATL_NUM_FWD_RINGS)
+	if (idx >= ATL_FWD_RING_BASE + ATL_NUM_FWD_RINGS) {
+		atl_nic_err("%s: no more rings available\n", __func__);
 		return ERR_PTR(ret);
+	}
 
 	ring = kzalloc(sizeof(*ring), GFP_KERNEL);
-	if (!ring)
+	if (!ring) {
+		atl_nic_err("%s: couldn't alloc ring structure\n", __func__);
 		return ERR_PTR(ret);
+	}
 
 	ring->nic = nic;
 	ring->idx = idx;
@@ -303,8 +316,10 @@ struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 	ring->buf_size = buf_size;
 
 	ret = atl_alloc_descs(nic, &ring->hw);
-	if (ret)
+	if (ret) {
+		atl_nic_err("%s: couldn't alloc the ring\n", __func__);
 		goto free_ring;
+	}
 
 	ring->hw.reg_base = dir_tx ? ATL_TX_RING(idx) : ATL_RX_RING(idx);
 
