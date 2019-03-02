@@ -501,18 +501,19 @@ module_param_named(rx_linear, atl_rx_linear, uint, 0444);
  * for the target page.
  */
 static int atl_get_page(struct atl_pgref *pgref, unsigned int order,
-	struct device *dev)
+	struct device *dev, bool atomic)
 {
 	struct atl_rxpage *rxpage;
 	struct page *page;
 	dma_addr_t daddr;
 	int ret = -ENOMEM;
+	gfp_t flags = atomic ? GFP_ATOMIC | __GFP_NOWARN : GFP_KERNEL;
 
-	rxpage = kmalloc(sizeof(*rxpage), GFP_ATOMIC | __GFP_NOWARN);
+	rxpage = kmalloc(sizeof(*rxpage), flags);
 	if (unlikely(!rxpage))
 		return ret;
 
-	page = dev_alloc_pages(order);
+	page = __dev_alloc_pages(flags, order);
 	if (unlikely(!page))
 		goto free_rxpage;
 
@@ -542,7 +543,7 @@ free_rxpage:
 }
 
 static int atl_get_pages(struct atl_rxbuf *rxbuf,
-	struct atl_desc_ring *ring)
+	struct atl_desc_ring *ring, bool atomic)
 {
 	int ret;
 	struct device *dev = ring->qvec->dev;
@@ -552,7 +553,8 @@ static int atl_get_pages(struct atl_rxbuf *rxbuf,
 		return 0;
 
 	if (!rxbuf->head.rxpage && !atl_rx_linear) {
-		ret = atl_get_page(&rxbuf->head, ATL_RX_HEAD_ORDER, dev);
+		ret = atl_get_page(&rxbuf->head, ATL_RX_HEAD_ORDER,
+			dev, atomic);
 		if (ret) {
 			atl_update_ring_stat(ring,
 				rx.alloc_head_page_failed, 1);
@@ -562,7 +564,8 @@ static int atl_get_pages(struct atl_rxbuf *rxbuf,
 	}
 
 	if (!rxbuf->data.rxpage) {
-		ret = atl_get_page(&rxbuf->data, ATL_RX_DATA_ORDER, dev);
+		ret = atl_get_page(&rxbuf->data, ATL_RX_DATA_ORDER,
+			dev, atomic);
 		if (ret) {
 			atl_update_ring_stat(ring,
 				rx.alloc_data_page_failed, 1);
@@ -595,14 +598,14 @@ static inline void atl_fill_rx_desc(struct atl_desc_ring *ring,
 	COMMIT_DESC(ring, ring->tail, scratch);
 }
 
-static int atl_fill_rx(struct atl_desc_ring *ring, uint32_t count)
+static int atl_fill_rx(struct atl_desc_ring *ring, uint32_t count, bool atomic)
 {
 	int ret = 0;
 
 	while (count) {
 		struct atl_rxbuf *rxbuf = &ring->rxbufs[ring->tail];
 
-		ret = atl_get_pages(rxbuf, ring);
+		ret = atl_get_pages(rxbuf, ring, atomic);
 		if (ret)
 			break;
 
@@ -977,7 +980,7 @@ static int atl_clean_rx(struct atl_desc_ring *ring, int budget)
 		DECLARE_SCRATCH_DESC(scratch);
 
 		if (space >= atl_rx_refill_batch)
-			atl_fill_rx(ring, space);
+			atl_fill_rx(ring, space, true);
 
 		rxbuf = &ring->rxbufs[ring->head];
 
@@ -1547,7 +1550,7 @@ static int atl_start_qvec(struct atl_queue_vec *qvec)
 	rx->head = rx->tail = atl_read(hw, ATL_RING_HEAD(rx)) & 0x1fff;
 	tx->head = tx->tail = atl_read(hw, ATL_RING_HEAD(tx)) & 0x1fff;
 
-	ret = atl_fill_rx(rx, ring_space(rx));
+	ret = atl_fill_rx(rx, ring_space(rx), false);
 	if (ret)
 		return ret;
 
