@@ -295,6 +295,10 @@ static void atl_fw2_set_link(struct atl_hw *hw, bool force)
 
 	bits = atl_set_fw_bits(hw, 1);
 
+	/* If no modes are advertized, put PHY into low-power */
+	if (!bits)
+		hi_bits |= atl_fw2_link_drop;
+
 	hi_bits |= bits >> 32;
 
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), bits);
