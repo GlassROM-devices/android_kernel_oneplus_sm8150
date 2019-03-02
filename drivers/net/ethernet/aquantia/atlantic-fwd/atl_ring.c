@@ -1070,8 +1070,8 @@ static int atl_poll(struct napi_struct *napi, int budget)
 }
 
 /* XXX NOTE: only checked on device probe for now */
-static int enable_msi = 1;
-module_param_named(msi, enable_msi, int, 0444);
+int atl_enable_msi = 1;
+module_param_named(msi, atl_enable_msi, int, 0444);
 
 static int atl_config_interrupts(struct atl_nic *nic)
 {
@@ -1079,7 +1079,7 @@ static int atl_config_interrupts(struct atl_nic *nic)
 	unsigned int flags;
 	int ret;
 
-	if (enable_msi) {
+	if (atl_enable_msi) {
 		int nvecs;
 
 		nvecs = min_t(int, nic->requested_nvecs, num_present_cpus());

@@ -350,8 +350,14 @@ static void atl_get_channels(struct net_device *ndev,
 	struct ethtool_channels *chan)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
+	int max_rings;
 
-	chan->max_combined = ATL_MAX_QUEUES;
+	if (atl_enable_msi)
+		max_rings = min_t(int, ATL_MAX_QUEUES, num_present_cpus());
+	else
+		max_rings = 1;
+
+	chan->max_combined = max_rings;
 	chan->combined_count = nic->nvecs;
 	if (nic->flags & ATL_FL_MULTIPLE_VECTORS)
 		chan->max_other = chan->other_count = ATL_NUM_NON_RING_IRQS;

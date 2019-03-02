@@ -307,6 +307,7 @@ extern const struct ethtool_ops atl_ethtool_ops;
 extern int atl_max_queues;
 extern unsigned atl_rx_linear;
 extern unsigned atl_min_intr_delay;
+extern int atl_enable_msi;
 
 /* Logging conviniency macros.
  *
