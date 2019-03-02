@@ -1603,6 +1603,9 @@ static void atl_set_lro(struct atl_nic *nic)
 	uint32_t val = nic->ndev->features & NETIF_F_LRO ?
 		BIT(nic->nvecs) - 1 : 0;
 
+	if (val)
+		atl_nic_warn("There are unresolved issues with LRO, enabling it isn't recommended for now\n");
+
 	atl_write_bits(hw, ATL_RX_LRO_CTRL1, 0, nic->nvecs, val);
 	atl_write_bits(hw, ATL_INTR_RSC_EN, 0, nic->nvecs, val);
 }

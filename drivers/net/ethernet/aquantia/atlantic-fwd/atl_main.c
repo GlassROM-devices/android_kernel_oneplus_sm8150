@@ -371,13 +371,13 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	ndev->features |= NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 |
 		NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-		NETIF_F_RXHASH | NETIF_F_LRO;
+		NETIF_F_RXHASH;
 
 	ndev->vlan_features |= ndev->features;
 	ndev->features |= NETIF_F_HW_VLAN_CTAG_RX | NETIF_F_HW_VLAN_CTAG_TX |
 		NETIF_F_HW_VLAN_CTAG_FILTER;
 
-	ndev->hw_features |= ndev->features | NETIF_F_RXALL;
+	ndev->hw_features |= ndev->features | NETIF_F_RXALL | NETIF_F_LRO;
 
 	if (pci_64)
 		ndev->features |= NETIF_F_HIGHDMA;
