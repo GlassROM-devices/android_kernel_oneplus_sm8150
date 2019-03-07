@@ -307,7 +307,6 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring)
 			hwring->size * sizeof(*hwring->descs), hwring->daddr);
 	else
 		atl_free_descs(nic, &ring->hw);
-	atl_free_descs(nic, &ring->hw);
 	kfree(ring);
 }
 EXPORT_SYMBOL(atl_fwd_release_ring);
