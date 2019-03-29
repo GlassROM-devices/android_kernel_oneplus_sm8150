@@ -1,3 +1,62 @@
+Version 1.0.17
+==============
+Add compatibility to kernel 4.1
+create empty atl_hwmon_init for old kernels
+Fix legacy interrupt handling
+Fix MSM register writes
+Free link interrupt before reconfiguring the rings
+Implement FW settings table access
+Use new FW interface to control ethernet padding stripping
+Disable LRO by default until all issues are resolved.
+Clamp max number of rings as reported by ethtool to num_present_cpus() (AQ037)
+Use __GFP_NOWARN for Rx buffers only in NAPI poll (AQ037)
+Put PHY into low-power state on ifdown or disabling link
+Improve error reporting for forwarding-engine ring creation (AQ041)
+Allow custom memory allocators for atl_fwd_request_ring() (AQ041)
+
+Version 1.0.16
+==============
+Introduce the config options for forwarding API (AQ033)
+Implement catchall ethtool filter (AQ034)
+Fix MSI-X vectors being disabled on cpu unplug (AQ032)
+Fix Kconfig changes for AQ033
+
+Version 1.0.15
+==============
+Reset statistics via private flag
+Implement interrupt moderation for offload engine's rings
+Introduce a FW mutex, handle link interrupts in a workqueue
+Implement PHY temperature sensor
+Report ring's and buffer's physical addresses on fwd ring request
+Implement ethtool control for stripping Rx ethernet frame's padding
+
+Version 1.0.14
+==============
+Remove old IPA implementation (replaced by atl_fwd.[ch])
+Fix forwarding engine interface
+Change the driver name to reflect the new module name
+Implement Linux PM support
+Implement WoL support
+
+Version 1.0.13
+==============
+Integrate Linux VLAN filter hw acceleration with ethtool filters
+Rename the module to atlantic-fwd
+
+Version 1.0.12
+==============
+Expose PHY LPI state via ethtool private flags
+
+Version 1.0.11
+==============
+Minor IPA interface fixes
+Turn on/off Rx XOFF flow control when needed
+Fix advertizing EEE link modes and show LPI timer
+Add some HW counters from RMON MIB
+Add Host and Lost counters to statistics
+Add more Felicity PCI IDs
+Add ethtool private flags tracking LPI state
+
 Version 1.0.10
 ==============
 Add module parameter to force align IP headers
@@ -26,6 +85,7 @@ Version 1.0.6
 Implement compat fixes for kernels without IPv6 ethtool NFC API
 
 Version 1.0.5
+==============
 Fix ifdown / ifup link state race
 Fix autoneg re-enable on pre-ethtool_ksettings kernels
 Implement n-tuple Rx filters
