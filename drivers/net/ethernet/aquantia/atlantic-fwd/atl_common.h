@@ -210,6 +210,7 @@ struct atl_fwd {
 	unsigned long ring_map[ATL_FWDIR_NUM];
 	struct atl_fwd_ring *rings[ATL_FWDIR_NUM][ATL_NUM_FWD_RINGS];
 	unsigned long msi_map;
+	void *private;
 };
 
 struct atl_nic {
