@@ -1,3 +1,9 @@
+Version 1.0.18
+==============
+Fix double free in the new fwd ring memory allocation code.
+Fix 32-bit warnings (AQ036)
+Add a pointer for forwarding engine's private data. (AQ043)
+
 Version 1.0.17
 ==============
 Add compatibility to kernel 4.1
