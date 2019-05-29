@@ -140,8 +140,10 @@ static int atl_fwd_alloc_bufs(struct atl_fwd_ring *ring, int order)
 		order = get_order(frag_size);
 		num_pages = 1;
 	} else {
+		int bufs_per_page;
+
 		frag_size = PAGE_SIZE << order;
-		int bufs_per_page = frag_size / buf_size;
+		bufs_per_page = frag_size / buf_size;
 		num_pages = ring_size / bufs_per_page +
 			!!(ring_size % bufs_per_page);
 	}
@@ -318,7 +320,7 @@ atl_module_param(fwd_rx_mod_min, uint, 0644);
 atl_module_param(fwd_tx_mod_max, uint, 0644);
 atl_module_param(fwd_tx_mod_min, uint, 0644);
 
-static struct atl_fwd_mem_ops null_ops = {0};
+static struct atl_fwd_mem_ops null_ops;
 
 struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 	int flags, int ring_size, int buf_size, int page_order,
