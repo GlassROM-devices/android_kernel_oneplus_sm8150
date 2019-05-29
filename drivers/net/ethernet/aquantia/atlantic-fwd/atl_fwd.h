@@ -12,6 +12,9 @@
 
 #include "atl_common.h"
 
+/* Each incompatible API change bumps the API version */
+#define ATL_FWD_API_VERSION 1
+
 struct atl_fwd_event;
 
 struct atl_fwd_buf_frag {
