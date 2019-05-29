@@ -249,8 +249,8 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring);
  * delays
  *
  * 	@ring:	ring
- * 	@min:	min delay
- * 	@max:	max delay
+ * 	@min:	min delay (0 - 511 uS)
+ * 	@max:	max delay (0 - 1023 uS)
  *
  * Each ring has two configurable interrupt moderation timers. When an
  * interrupt condition occurs (write-back of the final descriptor of a
@@ -264,6 +264,9 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring);
  * min_delay between each other, the interrupt will be triggered
  * max_delay after the initial event.
  *
+ * Delays are internally represented in units of 2 microseconds, so
+ * the values supplied are rounded down to an even value.
+ *
  * When called with negative @min or @max, the corresponding setting
  * is left unchanged.
  *
@@ -271,7 +274,8 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring);
  * pointer writeback events.
  *
  * Returns 0 on success or -EINVAL on attempt to set moderation delays
- * for a ring with attached Tx WB event.
+ * for a ring with attached Tx WB event or when a requested delay is
+ * out of range.
  */
 int atl_fwd_set_ring_intr_mod(struct atl_fwd_ring *ring, int min, int max);
 

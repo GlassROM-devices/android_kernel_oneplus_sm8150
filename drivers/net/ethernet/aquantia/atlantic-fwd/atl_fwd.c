@@ -446,6 +446,7 @@ EXPORT_SYMBOL(atl_fwd_request_ring);
 
 int atl_fwd_set_ring_intr_mod(struct atl_fwd_ring *ring, int min, int max)
 {
+	struct atl_nic *nic = ring->nic;
 	if (atl_fwd_ring_tx(ring) && ring->evt &&
 		ring->evt->flags & ATL_FWD_EVT_TXWB) {
 		struct atl_nic *nic = ring->nic;
@@ -455,11 +456,23 @@ int atl_fwd_set_ring_intr_mod(struct atl_fwd_ring *ring, int min, int max)
 		return -EINVAL;
 	}
 
-	if (min >= 0)
+	if (min >= 0) {
+		if (min > 511) {
+			atl_nic_err("%s: min delay out of range (0..511): %d\n",
+				__func__, min);
+			return -EINVAL;
+		}
 		ring->intr_mod_min = min;
+	}
 
-	if (max >= 0)
+	if (max >= 0) {
+		if (max > 1023) {
+			atl_nic_err("%s: max delay out of range (0..1023): %d\n",
+				__func__, max);
+			return -EINVAL;
+		}
 		ring->intr_mod_max = max;
+	}
 
 	atl_fwd_update_im(ring);
 	return 0;
