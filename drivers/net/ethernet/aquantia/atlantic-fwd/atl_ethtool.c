@@ -413,8 +413,7 @@ static int atl_set_pauseparam(struct net_device *ndev,
 	if (pause->autoneg && !lstate->autoneg)
 		return -EINVAL;
 
-	fc->req = pause->autoneg ? atl_fc_full :
-		(!!pause->rx_pause << atl_fc_rx_shift) |
+	fc->req = (!!pause->rx_pause << atl_fc_rx_shift) |
 		(!!pause->tx_pause << atl_fc_tx_shift);
 
 	hw->mcp.ops->set_link(hw, false);
