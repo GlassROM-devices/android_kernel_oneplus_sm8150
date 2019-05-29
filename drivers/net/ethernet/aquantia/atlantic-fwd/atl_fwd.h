@@ -95,6 +95,12 @@ union atl_desc;
  * 	because the mapping is required to program the hardware ring
  * 	registers.
  *
+ * 	A private data pointer @private is reserved for offload
+ * 	engine's use. A pointer to the ops struct is provided to each
+ * 	allocator / deallocator so they can get to the private
+ * 	data. The @ops argument can be ignored by allocator /
+ * 	deallocator functions if access to private data is not needed.
+ *
  * 	Either both allocator and deallocator or none of them must be
  * 	provided for each memory type.
  *
@@ -102,13 +108,14 @@ union atl_desc;
  */
 struct atl_fwd_mem_ops {
 	void *(*alloc_descs)(struct device *dev, size_t size, dma_addr_t *daddr,
-		gfp_t gfp);
+		gfp_t gfp, struct atl_fwd_mem_ops *ops);
 	void *(*alloc_buf)(struct device *dev, size_t size, dma_addr_t *daddr,
-		gfp_t gfp);
+		gfp_t gfp, struct atl_fwd_mem_ops *ops);
 	void (*free_descs)(void *buf, struct device *dev, size_t size,
-		dma_addr_t daddr);
+		dma_addr_t daddr, struct atl_fwd_mem_ops *ops);
 	void (*free_buf)(void *buf, struct device *dev, size_t size,
-		dma_addr_t daddr);
+		dma_addr_t daddr, struct atl_fwd_mem_ops *ops);
+	void *private;
 };
 
 /**

@@ -41,7 +41,7 @@ static int atl_fwd_get_frag(struct atl_fwd_ring *ring, int idx)
 
 	if (ops->alloc_buf) {
 		void *buf = ops->alloc_buf(dev, bufs->frag_size,
-			&daddr, GFP_KERNEL);
+			&daddr, GFP_KERNEL, ops);
 
 		if (!IS_ERR_OR_NULL(buf)) {
 			frag->buf = buf;
@@ -98,7 +98,7 @@ static void atl_fwd_free_bufs(struct atl_fwd_ring *ring)
 		if (ops->free_buf) {
 			if (frag->buf)
 				ops->free_buf(frag->buf, dev, frag_size,
-					frag->daddr);
+					frag->daddr, ops);
 			continue;
 		}
 
@@ -306,7 +306,8 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring)
 	atl_fwd_free_bufs(ring);
 	if (ops->free_descs)
 		ops->free_descs(hwring->descs, dev,
-			hwring->size * sizeof(*hwring->descs), hwring->daddr);
+			hwring->size * sizeof(*hwring->descs), hwring->daddr,
+			ops);
 	else
 		atl_free_descs(nic, &ring->hw);
 	kfree(ring);
@@ -398,7 +399,8 @@ struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 		dma_addr_t daddr;
 
 		descs = ops->alloc_descs(dev,
-			ring_size * sizeof(*hwring->descs), &daddr, GFP_KERNEL);
+			ring_size * sizeof(*hwring->descs), &daddr, GFP_KERNEL,
+			ops);
 		if (!IS_ERR_OR_NULL(descs)) {
 			hwring->descs = descs;
 			hwring->daddr = daddr;
@@ -436,7 +438,8 @@ struct atl_fwd_ring *atl_fwd_request_ring(struct net_device *ndev,
 free_descs:
 	if (ops->free_descs)
 		ops->free_descs(hwring->descs, dev,
-			hwring->size * sizeof(*hwring->descs), hwring->daddr);
+			hwring->size * sizeof(*hwring->descs), hwring->daddr,
+			ops);
 	else
 		atl_free_descs(nic, hwring);
 
