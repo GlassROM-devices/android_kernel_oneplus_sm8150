@@ -89,7 +89,7 @@ static void atl_fwd_free_bufs(struct atl_fwd_ring *ring)
 		dma_free_coherent(dev, ring_size * sizeof(dma_addr_t),
 			bufs->daddr_vec, bufs->daddr_vec_base);
 
-	if (bufs->vaddr_vec)
+	if (ring->flags & ATL_FWR_WANT_VIRT_BUF_VEC)
 		kfree(bufs->vaddr_vec);
 
 	for (i = 0; i < bufs->num_pages; i++) {
