@@ -12,6 +12,16 @@
 
 struct atl_hw;
 
+struct atl_mcp {
+	uint32_t fw_rev;
+	bool poll_link;
+	struct atl_fw_ops *ops;
+	uint32_t fw_stat_addr;
+	uint32_t fw_settings_addr;
+	uint32_t fw_settings_len;
+	struct mutex lock;
+};
+
 struct atl_link_type {
 	unsigned speed;
 	unsigned ethtool_idx;

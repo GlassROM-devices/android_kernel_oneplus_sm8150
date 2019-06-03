@@ -458,6 +458,7 @@ int atl_fw_init(struct atl_hw *hw)
 {
 	uint32_t tries, reg, major;
 	int ret;
+	struct atl_mcp *mcp = &hw->mcp;
 
 	tries = busy_wait(10000, mdelay(1), reg, atl_read(hw, 0x18), !reg);
 	if (!reg) {
@@ -473,22 +474,22 @@ int atl_fw_init(struct atl_hw *hw)
 	}
 	if (major > 2)
 		major--;
-	hw->mcp.ops = &atl_fw_ops[major - 1];
-	hw->mcp.poll_link = major == 1;
-	hw->mcp.fw_rev = reg;
-	hw->mcp.fw_stat_addr = atl_read(hw, ATL_MCP_SCRATCH(FW_STAT_STRUCT));
+	mcp->ops = &atl_fw_ops[major - 1];
+	mcp->poll_link = major == 1;
+	mcp->fw_rev = reg;
+	mcp->fw_stat_addr = atl_read(hw, ATL_MCP_SCRATCH(FW_STAT_STRUCT));
 
 	if (major > 1) {
 		ret = atl_read_fwstat_word(hw, atl_fw2_stat_settings_addr,
-			&hw->mcp.fw_settings_addr);
+			&mcp->fw_settings_addr);
 		if (ret)
 			return ret;
 
 		ret = atl_read_fwstat_word(hw, atl_fw2_stat_settings_len,
-			&hw->mcp.fw_settings_len);
+			&mcp->fw_settings_len);
 		if (ret)
 			return ret;
 	}
 
-	return hw->mcp.ops->wait_fw_init(hw);
+	return mcp->ops->wait_fw_init(hw);
 }

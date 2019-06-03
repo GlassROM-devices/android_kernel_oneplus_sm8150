@@ -48,15 +48,7 @@ struct atl_hw {
 	struct pci_dev *pdev;
 	struct atl_link_state link_state;
 	unsigned wol_mode;
-	struct {
-		uint32_t fw_rev;
-		bool poll_link;
-		struct atl_fw_ops *ops;
-		uint32_t fw_stat_addr;
-		uint32_t fw_settings_addr;
-		uint32_t fw_settings_len;
-		struct mutex lock;
-	} mcp;
+	struct atl_mcp mcp;
 	uint32_t intr_mask;
 	uint8_t mac_addr[ETH_ALEN];
 #define ATL_RSS_KEY_SIZE 40
