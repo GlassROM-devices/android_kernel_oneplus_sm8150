@@ -226,8 +226,9 @@ static void atl_work(struct work_struct *work)
 {
 	struct atl_nic *nic = container_of(work, struct atl_nic, work);
 
-	atl_refresh_link(nic);
 	clear_bit(ATL_ST_WORK_SCHED, &nic->state);
+
+	atl_refresh_link(nic);
 }
 
 static void atl_link_timer(struct timer_list *timer)
@@ -587,9 +588,35 @@ static struct pci_driver atl_pci_ops = {
 #endif
 };
 
+struct atl_thermal atl_def_thermal;
+
+static bool atl_def_thermal_monitor = true, atl_def_thermal_throttle = false,
+	atl_def_thermal_ignore_lims = false;
+module_param_named(thermal_monitor, atl_def_thermal_monitor, bool, 0444);
+module_param_named(thermal_throttle, atl_def_thermal_throttle, bool, 0444);
+module_param_named(thermal_ignore_limits, atl_def_thermal_ignore_lims, bool, 0444);
+
+static uint8_t atl_def_thermal_crit = 108, atl_def_thermal_high = 100,
+	atl_def_thermal_low = 80;
+module_param_named(thermal_crit, atl_def_thermal_crit, byte, 0444);
+module_param_named(thermal_high, atl_def_thermal_high, byte, 0444);
+module_param_named(thermal_low, atl_def_thermal_low, byte, 0444);
+
 static int __init atl_module_init(void)
 {
 	int ret;
+
+	atl_def_thermal.flags =
+		atl_def_thermal_monitor << atl_thermal_monitor_shift |
+		atl_def_thermal_throttle << atl_thermal_throttle_shift |
+		atl_def_thermal_ignore_lims << atl_thermal_ignore_lims_shift;
+	atl_def_thermal.crit = atl_def_thermal_crit;
+	atl_def_thermal.high = atl_def_thermal_high;
+	atl_def_thermal.low = atl_def_thermal_low;
+
+	ret = atl_verify_thermal_limits(NULL, &atl_def_thermal);
+	if (ret)
+		return ret;
 
 	atl_wq = create_singlethread_workqueue(atl_driver_name);
 	if (!atl_wq) {

@@ -249,6 +249,8 @@ int atl_hwinit(struct atl_nic *nic, enum atl_board brd_id)
 	/* Default supported speed set based on device id. */
 	hw->link_state.supported = brd->link_mask;
 
+	hw->thermal = atl_def_thermal;
+
 	ret = atl_hw_reset(hw);
 
 	atl_dev_info("rev 0x%x chip 0x%x FW img 0x%x\n",
@@ -260,12 +262,10 @@ int atl_hwinit(struct atl_nic *nic, enum atl_board brd_id)
 		return ret;
 
 	ret = atl_get_mac_addr(hw, hw->mac_addr);
-	if (ret) {
+	if (ret)
 		atl_dev_err("couldn't read MAC address\n");
-		return ret;
-	}
 
-	return hw->mcp.ops->get_link_caps(hw);
+	return ret;
 }
 
 static void atl_rx_xoff_set(struct atl_nic *nic, bool fc)

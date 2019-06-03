@@ -335,6 +335,22 @@ extern int atl_enable_msi;
 #define atl_nic_err(fmt, args...)		\
 	dev_err(&nic->hw.pdev->dev, fmt, ## args)
 
+#define atl_dev_init_warn(fmt, args...)					\
+do {									\
+	if (hw)								\
+		atl_dev_warn(fmt, ## args);				\
+	else								\
+		printk(KERN_WARNING "%s: " fmt, atl_driver_name, ##args); \
+} while(0)
+
+#define atl_dev_init_err(fmt, args...)					\
+do {									\
+	if (hw)								\
+		atl_dev_warn(fmt, ## args);				\
+	else								\
+		printk(KERN_ERR "%s: " fmt, atl_driver_name, ##args);	\
+} while(0)
+
 #define atl_module_param(_name, _type, _mode)			\
 	module_param_named(_name, atl_ ## _name, _type, _mode)
 
@@ -404,5 +420,8 @@ int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
 void atl_refresh_rxfs(struct atl_nic *nic);
 void atl_schedule_work(struct atl_nic *nic);
 int atl_hwmon_init(struct atl_nic *nic);
+int atl_update_thermal(struct atl_hw *hw);
+int atl_update_thermal_flag(struct atl_hw *hw, int bit, bool val);
+int atl_verify_thermal_limits(struct atl_hw *hw, struct atl_thermal *thermal);
 
 #endif

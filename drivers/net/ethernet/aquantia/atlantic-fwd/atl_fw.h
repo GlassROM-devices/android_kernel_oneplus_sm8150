@@ -19,6 +19,10 @@ struct atl_mcp {
 	uint32_t fw_stat_addr;
 	uint32_t fw_settings_addr;
 	uint32_t fw_settings_len;
+	uint32_t req_high;
+	uint32_t req_high_mask;	/* Clears link rate-dependend bits */
+	uint32_t caps_low;
+	uint32_t caps_high;
 	struct mutex lock;
 };
 
@@ -31,6 +35,13 @@ struct atl_link_type {
 
 extern struct atl_link_type atl_link_types[];
 extern const int atl_num_rates;
+
+struct atl_fw2_thermal_cfg {
+	uint32_t msg_id;
+	uint8_t shutdown_temp;
+	uint8_t high_temp;
+	uint8_t normal_temp;
+};
 
 #define atl_for_each_rate(idx, type)		\
 	for (idx = 0, type = atl_link_types;	\
@@ -47,9 +58,11 @@ enum atl_fw2_opts {
 	atl_fw2_pause_mask = atl_fw2_pause | atl_fw2_asym_pause,
 	atl_define_bit(atl_fw2_wake_on_link, 16)
 	atl_define_bit(atl_fw2_phy_temp, 18)
+	atl_define_bit(atl_fw2_set_thermal, 21)
 	atl_define_bit(atl_fw2_link_drop, 22)
 	atl_define_bit(atl_fw2_nic_proxy, 0x17)
 	atl_define_bit(atl_fw2_wol, 0x18)
+	atl_define_bit(atl_fw2_thermal_alarm, 29)
 };
 
 enum atl_fw2_stat_offt {
@@ -74,6 +87,12 @@ enum atl_fc_mode {
 	atl_fc_full = atl_fc_rx | atl_fc_tx,
 };
 
+enum atl_thermal_flags {
+	atl_define_bit(atl_thermal_monitor, 0)
+	atl_define_bit(atl_thermal_throttle, 1)
+	atl_define_bit(atl_thermal_ignore_lims, 2)
+};
+
 struct atl_fc_state {
 	enum atl_fc_mode req;
 	enum atl_fc_mode prev_req;
@@ -91,7 +110,11 @@ struct atl_link_state{
 	unsigned advertized;
 	unsigned lp_advertized;
 	unsigned prev_advertized;
+	int lp_lowest; 		/* Idx of lowest rate advertized by
+				 * link partner in atl_link_types[] */
+	int throttled_to;	/* Idx of the rate we're throttled to */
 	bool force_off;
+	bool thermal_throttled;
 	bool autoneg;
 	bool eee;
 	bool eee_enabled;

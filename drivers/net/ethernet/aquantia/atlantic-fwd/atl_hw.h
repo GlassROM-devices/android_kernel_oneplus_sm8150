@@ -42,6 +42,15 @@ enum atl_board {
 	ATL_AQC100,
 };
 
+struct atl_thermal {
+	unsigned flags;
+	uint8_t crit;
+	uint8_t high;
+	uint8_t low;
+};
+
+extern struct atl_thermal atl_def_thermal;
+
 #define ATL_WAKE_SUPPORTED (WAKE_MAGIC | WAKE_PHY)
 struct atl_hw {
 	uint8_t __iomem *regs;
@@ -55,6 +64,7 @@ struct atl_hw {
 	uint8_t rss_key[ATL_RSS_KEY_SIZE];
 #define ATL_RSS_TBL_SIZE (1 << 6)
 	uint8_t rss_tbl[ATL_RSS_TBL_SIZE];
+	struct atl_thermal thermal;
 };
 
 union atl_desc;
