@@ -360,6 +360,7 @@ int atl_setup_datapath(struct atl_nic *nic);
 void atl_clear_datapath(struct atl_nic *nic);
 int atl_start_rings(struct atl_nic *nic);
 void atl_stop_rings(struct atl_nic *nic);
+void atl_clear_rdm_cache(struct atl_nic *nic);
 int atl_alloc_rings(struct atl_nic *nic);
 void atl_free_rings(struct atl_nic *nic);
 irqreturn_t atl_ring_irq(int irq, void *priv);

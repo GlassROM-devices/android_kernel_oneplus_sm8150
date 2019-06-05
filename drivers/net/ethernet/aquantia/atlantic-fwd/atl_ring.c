@@ -1647,17 +1647,21 @@ stop:
 	return ret;
 }
 
-void atl_stop_rings(struct atl_nic *nic)
+void atl_clear_rdm_cache(struct atl_nic *nic)
 {
-	struct atl_queue_vec *qvec;
 	struct atl_hw *hw = &nic->hw;
-
-	atl_for_each_qvec(nic, qvec)
-		atl_stop_qvec(qvec);
 
 	atl_write_bit(hw, 0x5a00, 0, 1);
 	udelay(10);
 	atl_write_bit(hw, 0x5a00, 0, 0);
+}
+
+void atl_stop_rings(struct atl_nic *nic)
+{
+	struct atl_queue_vec *qvec;
+
+	atl_for_each_qvec(nic, qvec)
+		atl_stop_qvec(qvec);
 }
 
 int atl_set_features(struct net_device *ndev, netdev_features_t features)

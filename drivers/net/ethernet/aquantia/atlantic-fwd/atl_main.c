@@ -476,6 +476,8 @@ static int atl_suspend_common(struct device *dev, bool deep)
 	if (deep && atl_keep_link)
 		atl_link_down(nic);
 
+	atl_clear_rdm_cache(nic);
+
 	if (deep && nic->flags & ATL_FL_WOL) {
 		ret = hw->mcp.ops->enable_wol(hw);
 		if (ret)
