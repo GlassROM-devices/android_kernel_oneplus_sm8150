@@ -16,6 +16,9 @@
 #include <linux/vmalloc.h>
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
+#include <uapi/linux/ip.h>
+#include <uapi/linux/tcp.h>
+#include <uapi/linux/udp.h>
 
 #include "atl_trace.h"
 
@@ -394,12 +397,72 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 	return !!budget;
 }
 
+/* work around HW bugs in checksum calculation:
+ * - packets less than 60 octets
+ * - ip, tcp or udp checksum is 0xFFFF
+ */
+static bool atl_checksum_workaround(struct sk_buff *skb,
+				    struct atl_rx_desc_wb *desc)
+{
+	int ip_header_offset = 14;
+	int l4_header_offset = 0;
+	struct iphdr *ip;
+	struct tcphdr *tcp;
+	struct udphdr *udp;
+
+	if (desc->pkt_len <= 60)
+		return true;
+
+	if ((desc->pkt_type & atl_rx_pkt_type_vlan_msk) ==
+	    atl_rx_pkt_type_vlan)
+		ip_header_offset += 4;
+
+	if ((desc->pkt_type & atl_rx_pkt_type_vlan_msk) ==
+	    atl_rx_pkt_type_dbl_vlan)
+		ip_header_offset += 8;
+
+	switch (desc->pkt_type & atl_rx_pkt_type_l3_msk) {
+	case atl_rx_pkt_type_ipv4:
+		ip = (struct iphdr *) &skb->data[ip_header_offset];
+
+		if (ip->check == 0xFFFF)
+			return true;
+		l4_header_offset = ip->ihl << 2;
+		break;
+	case atl_rx_pkt_type_ipv6:
+		l4_header_offset = ip_header_offset + sizeof(struct ipv6hdr);
+		break;
+	default:
+		return false;
+	}
+
+	switch (desc->pkt_type & atl_rx_pkt_type_l4_msk) {
+	case atl_rx_pkt_type_tcp:
+		tcp = (struct tcphdr *) &skb->data[ip_header_offset +
+						  l4_header_offset];
+
+		if (tcp->check == 0xFFFF)
+			return true;
+		break;
+	case atl_rx_pkt_type_udp:
+		udp = (struct udphdr *) &skb->data[ip_header_offset +
+						  l4_header_offset];
+		if (udp->check == 0xFFFF)
+			return true;
+		break;
+	default:
+		return false;
+	}
+
+	return false;
+}
+
 static bool atl_rx_checksum(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 	struct atl_desc_ring *ring)
 {
 	struct atl_nic *nic = ring->qvec->nic;
 	struct net_device *ndev = nic->ndev;
-	int csum_ok = 1, recheck = 0;
+	int csum_ok = 1;
 
 	skb_checksum_none_assert(skb);
 
@@ -426,7 +489,6 @@ static bool atl_rx_checksum(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 	switch (desc->pkt_type & atl_rx_pkt_type_l4_msk) {
 	case atl_rx_pkt_type_tcp:
 	case atl_rx_pkt_type_udp:
-		recheck = desc->pkt_len <= 60;
 		csum_ok &= !(desc->rx_stat & atl_rx_stat_l4_err);
 		break;
 	default:
@@ -436,8 +498,10 @@ static bool atl_rx_checksum(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 	if (csum_ok) {
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 		return true;
-	} else if (recheck)
-		return true;
+	} else {
+		if (atl_checksum_workaround(skb, desc))
+			return true;
+	}
 
 	atl_update_ring_stat(ring, rx.csum_err, 1);
 
