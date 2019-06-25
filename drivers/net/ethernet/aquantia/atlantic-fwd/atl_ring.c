@@ -1702,6 +1702,9 @@ void atl_update_global_stats(struct atl_nic *nic)
 	int i;
 	struct atl_ring_stats stats;
 
+	if (!test_bit(ATL_ST_ENABLED, &nic->state))
+		return;
+
 	memset(&stats, 0, sizeof(stats));
 	atl_update_eth_stats(nic);
 
