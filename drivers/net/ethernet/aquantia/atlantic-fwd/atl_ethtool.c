@@ -394,7 +394,7 @@ static void atl_get_pauseparam(struct net_device *ndev,
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_fc_state *fc = &nic->hw.link_state.fc;
 
-	pause->autoneg = 1;
+	pause->autoneg = 0;
 	pause->rx_pause = !!(fc->cur & atl_fc_rx);
 	pause->tx_pause = !!(fc->cur & atl_fc_tx);
 }
@@ -410,7 +410,7 @@ static int atl_set_pauseparam(struct net_device *ndev,
 	if (atl_fw_major(hw) < 2)
 		return -EOPNOTSUPP;
 
-	if (pause->autoneg && !lstate->autoneg)
+	if (pause->autoneg)
 		return -EINVAL;
 
 	fc->req = (!!pause->rx_pause << atl_fc_rx_shift) |
