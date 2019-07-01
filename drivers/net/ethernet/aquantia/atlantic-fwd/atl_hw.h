@@ -51,10 +51,18 @@ struct atl_thermal {
 
 extern struct atl_thermal atl_def_thermal;
 
+enum atl_nic_state {
+	ATL_ST_ENABLED,
+	ATL_ST_CONFIGURED,
+	ATL_ST_UP,
+	ATL_ST_WORK_SCHED,
+};
+
 #define ATL_WAKE_SUPPORTED (WAKE_MAGIC | WAKE_PHY)
 struct atl_hw {
 	uint8_t __iomem *regs;
 	struct pci_dev *pdev;
+	unsigned long state;
 	struct atl_link_state link_state;
 	unsigned wol_mode;
 	struct atl_mcp mcp;

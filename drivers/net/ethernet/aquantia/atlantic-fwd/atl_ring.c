@@ -384,7 +384,7 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 
 		smp_mb();
 		if (__netif_subqueue_stopped(ndev, ring->qvec->idx) &&
-			test_bit(ATL_ST_UP, &nic->state)) {
+			test_bit(ATL_ST_UP, &nic->hw.state)) {
 			atl_nic_dbg("restarting tx queue\n");
 			netif_wake_subqueue(ndev, ring->qvec->idx);
 			atl_update_ring_stat(ring, tx.tx_restart, 1);
@@ -1135,7 +1135,7 @@ void atl_clear_datapath(struct atl_nic *nic)
 	 * pci_ops->remove(), without an intervening
 	 * atl_setup_datapath().
 	 */
-	if (!test_and_clear_bit(ATL_ST_CONFIGURED, &nic->state))
+	if (!test_and_clear_bit(ATL_ST_CONFIGURED, &nic->hw.state))
 		return;
 
 	atl_free_link_intr(nic);
@@ -1229,7 +1229,7 @@ int atl_setup_datapath(struct atl_nic *nic)
 
 	nic->max_mtu = atl_rx_linear ? ATL_MAX_RX_LINEAR_MTU : ATL_MAX_MTU;
 
-	set_bit(ATL_ST_CONFIGURED, &nic->state);
+	set_bit(ATL_ST_CONFIGURED, &nic->hw.state);
 	return 0;
 
 err_link_intr:
@@ -1702,7 +1702,7 @@ void atl_update_global_stats(struct atl_nic *nic)
 	int i;
 	struct atl_ring_stats stats;
 
-	if (!test_bit(ATL_ST_ENABLED, &nic->state))
+	if (!test_bit(ATL_ST_ENABLED, &nic->hw.state))
 		return;
 
 	memset(&stats, 0, sizeof(stats));

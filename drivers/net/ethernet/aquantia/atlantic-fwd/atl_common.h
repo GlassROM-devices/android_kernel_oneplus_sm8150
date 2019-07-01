@@ -220,7 +220,6 @@ struct atl_nic {
 	int nvecs;
 	struct atl_hw hw;
 	unsigned flags;
-	unsigned long state;
 	uint32_t priv_flags;
 	struct timer_list link_timer;
 	int max_mtu;
@@ -247,13 +246,6 @@ struct atl_nic {
 enum atl_nic_flags {
 	ATL_FL_MULTIPLE_VECTORS = BIT(0),
 	ATL_FL_WOL = BIT(1),
-};
-
-enum atl_nic_state {
-	ATL_ST_UP,
-	ATL_ST_CONFIGURED,
-	ATL_ST_ENABLED,
-	ATL_ST_WORK_SCHED,
 };
 
 #define ATL_PF(_name) ATL_PF_ ## _name

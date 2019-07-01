@@ -55,7 +55,7 @@ static int atl_open(struct net_device *ndev)
 	struct atl_nic *nic = netdev_priv(ndev);
 	int ret;
 
-	if (!test_bit(ATL_ST_CONFIGURED, &nic->state)) {
+	if (!test_bit(ATL_ST_CONFIGURED, &nic->hw.state)) {
 		/* A previous atl_reconfigure() had failed. Try once more. */
 		ret = atl_setup_datapath(nic);
 		if (ret)
@@ -79,7 +79,7 @@ static int atl_open(struct net_device *ndev)
 
 	netif_tx_start_all_queues(ndev);
 
-	set_bit(ATL_ST_UP, &nic->state);
+	set_bit(ATL_ST_UP, &nic->hw.state);
 	return 0;
 
 free_rings:
@@ -113,7 +113,7 @@ static int atl_close(struct net_device *ndev)
 	/* atl_close() can be called a second time if
 	 * atl_reconfigure() fails. Just return
 	 */
-	if (!test_and_clear_bit(ATL_ST_UP, &nic->state))
+	if (!test_and_clear_bit(ATL_ST_UP, &nic->hw.state))
 		return 0;
 
 	netif_tx_stop_all_queues(ndev);
@@ -218,15 +218,16 @@ static struct workqueue_struct *atl_wq;
 
 void atl_schedule_work(struct atl_nic *nic)
 {
-	if (!test_and_set_bit(ATL_ST_WORK_SCHED, &nic->state))
+	if (!test_and_set_bit(ATL_ST_WORK_SCHED, &nic->hw.state))
 		queue_work(atl_wq, &nic->work);
 }
 
 static void atl_work(struct work_struct *work)
 {
 	struct atl_nic *nic = container_of(work, struct atl_nic, work);
+	struct atl_hw *hw = &nic->hw;
 
-	clear_bit(ATL_ST_WORK_SCHED, &nic->state);
+	clear_bit(ATL_ST_WORK_SCHED, &hw->state);
 
 	atl_refresh_link(nic);
 }
@@ -327,9 +328,9 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	spin_lock_init(&nic->stats_lock);
 	INIT_WORK(&nic->work, atl_work);
 	mutex_init(&nic->hw.mcp.lock);
-	__set_bit(ATL_ST_ENABLED, &nic->state);
 
 	hw = &nic->hw;
+	__set_bit(ATL_ST_ENABLED, &hw->state);
 	hw->regs = ioremap(pci_resource_start(pdev, 0),
 				pci_resource_len(pdev, 0));
 	if (!hw->regs) {
@@ -423,7 +424,7 @@ err_datapath:
 err_hwinit:
 	iounmap(hw->regs);
 err_ioremap:
-	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &nic->state);
+	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &hw->state);
 	free_netdev(ndev);
 err_alloc_ndev:
 	pci_release_regions(pdev);
@@ -443,6 +444,7 @@ static void atl_remove(struct pci_dev *pdev)
 		return;
 
 	netif_carrier_off(nic->ndev);
+	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &nic->hw.state);
 	atl_intr_disable_all(&nic->hw);
 	/* atl_hw_reset(&nic->hw); */
 	unregister_netdev(nic->ndev);
@@ -453,7 +455,6 @@ static void atl_remove(struct pci_dev *pdev)
 
 	atl_clear_datapath(nic);
 	iounmap(nic->hw.regs);
-	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &nic->state);
 	cancel_work_sync(&nic->work);
 	free_netdev(nic->ndev);
 	pci_release_regions(pdev);
@@ -485,11 +486,10 @@ static int atl_suspend_common(struct device *dev, bool deep)
 			atl_dev_err("Enable WoL failed: %d\n", -ret);
 	}
 
+	clear_bit(ATL_ST_ENABLED, &hw->state);
 	pci_disable_device(pdev);
 	pci_save_state(pdev);
 	pci_prepare_to_sleep(pdev);
-
-	__clear_bit(ATL_ST_ENABLED, &nic->state);
 
 	rtnl_unlock();
 
@@ -521,8 +521,8 @@ static int atl_resume_common(struct device *dev, bool deep)
 	if (ret)
 		goto exit;
 
+	set_bit(ATL_ST_ENABLED, &nic->hw.state);
 	pci_set_master(pdev);
-	__set_bit(ATL_ST_ENABLED, &nic->state);
 
 	if (deep) {
 		ret = atl_hw_reset(&nic->hw);
