@@ -442,6 +442,9 @@ static int __atl_fw2_get_phy_temperature(struct atl_hw *hw, int *temp)
 	uint32_t req, res;
 	int ret = 0;
 
+	if (test_bit(ATL_ST_RESETTING, &hw->state))
+		return 0;
+
 	hw->mcp.req_high ^= atl_fw2_phy_temp;
 	req = hw->mcp.req_high;
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), req);
@@ -677,6 +680,11 @@ int atl_update_thermal(struct atl_hw *hw)
 	if (ret)
 		return ret;
 
+	if (test_bit(ATL_ST_RESETTING, &hw->state))
+		/* After reset, atl_fw_init() will apply the settings
+		 * skipped here */
+		return 0;
+
 	atl_lock_fw(hw);
 	ret = __atl_fw2_update_thermal(hw);
 	atl_unlock_fw(hw);
@@ -727,6 +735,11 @@ int atl_update_thermal_flag(struct atl_hw *hw, int bit, bool val)
 
 	changed = flags ^ thermal->flags;
 	thermal->flags = flags;
+
+	if (test_bit(ATL_ST_RESETTING, &hw->state))
+		/* After reset, atl_fw_init() will apply the settings
+		 * skipped here */
+		goto unlock;
 
 	if (changed & atl_thermal_monitor)
 		ret = __atl_fw2_update_thermal(hw);

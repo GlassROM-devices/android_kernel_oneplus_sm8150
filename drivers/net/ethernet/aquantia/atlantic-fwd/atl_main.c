@@ -65,6 +65,8 @@ static int atl_start(struct atl_nic *nic)
 	/* ret = atl_fwd_resume_rings(nic); */
 
 /* out: */
+	if (ret)
+		set_bit(ATL_ST_START_NEEDED, &nic->hw.state);
 	return ret;
 }
 
@@ -229,15 +231,68 @@ void atl_schedule_work(struct atl_nic *nic)
 		queue_work(atl_wq, &nic->work);
 }
 
+static int atl_do_reset(struct atl_nic *nic)
+{
+	struct atl_hw *hw = &nic->hw;
+	int ret;
+	bool reset, start;
+
+	if (!test_bit(ATL_ST_ENABLED, &hw->state))
+		/* We're suspending, postpone resets till resume */
+		return 0;
+
+	reset = test_and_clear_bit(ATL_ST_RESET_NEEDED, &hw->state);
+	start = test_and_clear_bit(ATL_ST_START_NEEDED, &hw->state);
+
+	if (!reset && !start)
+		return 0;
+
+	if (reset)
+		set_bit(ATL_ST_RESETTING, &hw->state);
+	rtnl_lock();
+
+	if (reset) {
+		atl_stop(nic, true);
+
+		ret = atl_hw_reset(hw);
+		if (ret) {
+			atl_nic_err("HW reset failed, re-trying\n");
+			if (!test_and_set_bit(ATL_ST_DETACHED, &hw->state))
+				netif_device_detach(nic->ndev);
+			goto out;
+		}
+		start = true;
+		clear_bit(ATL_ST_RESETTING, &hw->state);
+	}
+
+	if (start) {
+		ret = atl_start(nic);
+		if (ret)
+			goto out;
+	}
+
+	if (test_and_clear_bit(ATL_ST_DETACHED, &hw->state))
+		netif_device_attach(nic->ndev);
+
+out:
+	rtnl_unlock();
+	return ret;
+}
+
 static void atl_work(struct work_struct *work)
 {
 	struct atl_nic *nic = container_of(work, struct atl_nic, work);
 	struct atl_hw *hw = &nic->hw;
+	int ret;
 
 	clear_bit(ATL_ST_WORK_SCHED, &hw->state);
 
+	ret = atl_do_reset(nic);
+	if (ret)
+		goto out;
 	atl_refresh_link(nic);
 
+out:
 	if (test_bit(ATL_ST_ENABLED, &hw->state))
 	    mod_timer(&nic->work_timer, jiffies + HZ);
 }
@@ -485,8 +540,9 @@ static int atl_suspend_common(struct device *dev, bool deep)
 	int ret;
 
 	rtnl_lock();
-	netif_device_detach(nic->ndev);
 
+	if (!test_and_set_bit(ATL_ST_DETACHED, &hw->state))
+		netif_device_detach(nic->ndev);
 
 	atl_stop(nic, true);
 
@@ -552,7 +608,8 @@ static int atl_resume_common(struct device *dev, bool deep)
 	if (ret)
 		goto exit;
 
-	netif_device_attach(nic->ndev);
+	if (test_and_clear_bit(ATL_ST_DETACHED, &nic->hw.state))
+		netif_device_attach(nic->ndev);
 
 exit:
 	rtnl_unlock();

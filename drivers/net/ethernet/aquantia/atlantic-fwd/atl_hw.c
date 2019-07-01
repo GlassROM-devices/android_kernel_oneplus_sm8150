@@ -312,7 +312,8 @@ void atl_refresh_link(struct atl_nic *nic)
 	struct atl_hw *hw = &nic->hw;
 	struct atl_link_type *link, *prev_link = hw->link_state.link;
 
-	if (!test_bit(ATL_ST_ENABLED, &hw->state) ||
+	if (test_bit(ATL_ST_RESETTING, &hw->state) ||
+	    !test_bit(ATL_ST_ENABLED, &hw->state) ||
 	    !test_and_clear_bit(ATL_ST_UPDATE_LINK, &hw->state))
 		return;
 

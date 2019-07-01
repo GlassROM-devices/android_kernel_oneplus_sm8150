@@ -1715,7 +1715,8 @@ void atl_update_global_stats(struct atl_nic *nic)
 	int i;
 	struct atl_ring_stats stats;
 
-	if (!test_bit(ATL_ST_ENABLED, &nic->hw.state))
+	if (!test_bit(ATL_ST_ENABLED, &nic->hw.state) ||
+	    test_bit(ATL_ST_RESETTING, &nic->hw.state))
 		return;
 
 	memset(&stats, 0, sizeof(stats));
