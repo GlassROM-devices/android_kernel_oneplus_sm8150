@@ -23,6 +23,9 @@ struct atl_mcp {
 	uint32_t caps_low;
 	uint32_t caps_high;
 	struct mutex lock;
+	unsigned long next_wdog;
+	bool wdog_disabled;
+	uint16_t phy_hbeat;
 };
 
 struct atl_link_type {
@@ -65,6 +68,7 @@ enum atl_fw2_opts {
 };
 
 enum atl_fw2_stat_offt {
+	atl_fw2_stat_phy_hbeat = 0x4c,
 	atl_fw2_stat_temp = 0x50,
 	atl_fw2_stat_lcaps = 0x84,
 	atl_fw2_stat_settings_addr = 0x110,

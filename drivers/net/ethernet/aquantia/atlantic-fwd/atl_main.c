@@ -287,6 +287,7 @@ static void atl_work(struct work_struct *work)
 
 	clear_bit(ATL_ST_WORK_SCHED, &hw->state);
 
+	atl_fw_watchdog(hw);
 	ret = atl_do_reset(nic);
 	if (ret)
 		goto out;

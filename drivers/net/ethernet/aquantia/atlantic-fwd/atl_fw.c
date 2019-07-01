@@ -757,6 +757,25 @@ unlock:
 	return ret;
 }
 
+/* fw lock must be held */
+static int __atl_fw2_get_hbeat(struct atl_hw *hw, uint16_t *hbeat)
+{
+	int ret;
+	uint32_t val;
+
+	ret = atl_read_fwstat_word(hw, atl_fw2_stat_phy_hbeat, &val);
+	if (ret)
+		atl_dev_err("FW watchdog: failure reading PHY heartbeat: %d\n",
+			-ret);
+	else
+		*hbeat = val & 0xffff;
+
+	return ret;
+}
+
+static unsigned int atl_wdog_period = 1100;
+module_param_named(wdog_period, atl_wdog_period, uint, 0644);
+
 int atl_fw_init(struct atl_hw *hw)
 {
 	uint32_t tries, reg, major;
@@ -785,6 +804,11 @@ int atl_fw_init(struct atl_hw *hw)
 		return ret;
 
 	mcp->fw_stat_addr = atl_read(hw, ATL_MCP_SCRATCH(FW_STAT_STRUCT));
+
+	ret = __atl_fw2_get_hbeat(hw, &mcp->phy_hbeat);
+	if (ret)
+		return ret;
+	mcp->next_wdog = jiffies + 2 * HZ;
 
 	if (major > 1) {
 		mcp->req_high = 0;
@@ -815,4 +839,44 @@ int atl_fw_init(struct atl_hw *hw)
 
 
 	return ret;
+}
+
+void atl_fw_watchdog(struct atl_hw *hw)
+{
+	struct atl_mcp *mcp = &hw->mcp;
+	int ret;
+	uint16_t hbeat;
+
+	if (mcp->wdog_disabled || !time_after(jiffies, mcp->next_wdog))
+		return;
+
+	if (test_bit(ATL_ST_RESETTING, &hw->state) ||
+	    !test_bit(ATL_ST_ENABLED, &hw->state))
+		return;
+
+	atl_lock_fw(hw);
+
+	ret = __atl_fw2_get_hbeat(hw, &hbeat);
+	if (ret) {
+		atl_dev_err("FW watchdog: failure reading PHY heartbeat: %d\n",
+			-ret);
+		goto out;
+	}
+
+	if (hbeat == 0 && mcp->phy_hbeat == 0) {
+		atl_dev_warn("FW heartbeat stuck at 0, probably not provisioned. Disabling watchdog.\n");
+		mcp->wdog_disabled = true;
+		goto out;
+	}
+
+	if (hbeat == mcp->phy_hbeat) {
+		atl_dev_err("FW watchdog: FW hang (PHY heartbeat stuck at %hd), resetting\n", hbeat);
+		set_bit(ATL_ST_RESET_NEEDED, &hw->state);
+	}
+
+	mcp->phy_hbeat = hbeat;
+
+out:
+	mcp->next_wdog = jiffies + atl_wdog_period * HZ / 1000;
+	atl_unlock_fw(hw);
 }
