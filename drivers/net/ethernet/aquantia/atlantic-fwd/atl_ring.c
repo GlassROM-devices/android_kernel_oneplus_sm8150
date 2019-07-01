@@ -384,7 +384,7 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 
 		smp_mb();
 		if (__netif_subqueue_stopped(ndev, ring->qvec->idx) &&
-			test_bit(ATL_ST_UP, &nic->hw.state)) {
+			test_bit(ATL_ST_RINGS_RUNNING, &nic->hw.state)) {
 			atl_nic_dbg("restarting tx queue\n");
 			netif_wake_subqueue(ndev, ring->qvec->idx);
 			atl_update_ring_stat(ring, tx.tx_restart, 1);
@@ -1620,6 +1620,9 @@ int atl_start_rings(struct atl_nic *nic)
 	struct atl_queue_vec *qvec;
 	int ret;
 
+	if (test_bit(ATL_ST_RINGS_RUNNING, &hw->state))
+		return 0;
+
 	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
 		mask = BIT(nic->nvecs + ATL_NUM_NON_RING_IRQS) -
 			BIT(ATL_NUM_NON_RING_IRQS);
@@ -1637,6 +1640,9 @@ int atl_start_rings(struct atl_nic *nic)
 		if (ret)
 			goto stop;
 	}
+
+	set_bit(ATL_ST_RINGS_RUNNING, &hw->state);
+	netif_tx_start_all_queues(nic->ndev);
 
 	return 0;
 
@@ -1660,8 +1666,15 @@ void atl_stop_rings(struct atl_nic *nic)
 {
 	struct atl_queue_vec *qvec;
 
+	if (!test_and_clear_bit(ATL_ST_RINGS_RUNNING, &nic->hw.state))
+		return;
+
+	netif_tx_stop_all_queues(nic->ndev);
+
 	atl_for_each_qvec(nic, qvec)
 		atl_stop_qvec(qvec);
+
+	atl_clear_rdm_cache(nic);
 }
 
 int atl_set_features(struct net_device *ndev, netdev_features_t features)

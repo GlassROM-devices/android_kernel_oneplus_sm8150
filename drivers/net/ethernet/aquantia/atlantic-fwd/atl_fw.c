@@ -36,17 +36,8 @@ struct atl_link_type atl_link_types[] = {
 
 const int atl_num_rates = ARRAY_SIZE(atl_link_types);
 
-static inline void atl_lock_fw(struct atl_hw *hw)
-{
-	mutex_lock(&hw->mcp.lock);
-}
-
-static inline void atl_unlock_fw(struct atl_hw *hw)
-{
-	mutex_unlock(&hw->mcp.lock);
-}
-
-static int atl_fw1_wait_fw_init(struct atl_hw *hw)
+/* fw lock must be held */
+static int __atl_fw1_wait_fw_init(struct atl_hw *hw)
 {
 	uint32_t hostData_addr;
 	uint32_t id, new_id;
@@ -79,7 +70,8 @@ static int atl_fw1_wait_fw_init(struct atl_hw *hw)
 	return 0;
 }
 
-static int atl_fw2_wait_fw_init(struct atl_hw *hw)
+/* fw lock must be held */
+static int __atl_fw2_wait_fw_init(struct atl_hw *hw)
 {
 	uint32_t reg;
 
@@ -183,12 +175,14 @@ static struct atl_link_type *atl_fw2_check_link(struct atl_hw *hw)
 	return link;
 }
 
-static int atl_fw1_get_link_caps(struct atl_hw *hw)
+/* fw lock must be held */
+static int __atl_fw1_get_link_caps(struct atl_hw *hw)
 {
 	return 0;
 }
 
-static int atl_fw2_get_link_caps(struct atl_hw *hw)
+/* fw lock must be held */
+static int __atl_fw2_get_link_caps(struct atl_hw *hw)
 {
 	struct atl_mcp *mcp = &hw->mcp;
 	uint32_t fw_stat_addr = mcp->fw_stat_addr;
@@ -197,13 +191,11 @@ static int atl_fw2_get_link_caps(struct atl_hw *hw)
 	uint32_t caps[2], mask = atl_fw2_pause_mask | atl_fw2_link_drop;
 	int i, ret;
 
-	atl_lock_fw(hw);
-
 	atl_dev_dbg("Host data struct addr: %#x\n", fw_stat_addr);
 	ret = atl_read_mcp_mem(hw, fw_stat_addr + atl_fw2_stat_lcaps,
 		caps, 8);
 	if (ret)
-		goto unlock;
+		return ret;
 
 	mcp->caps_low = caps[0];
 	mcp->caps_high = caps[1];
@@ -225,8 +217,6 @@ static int atl_fw2_get_link_caps(struct atl_hw *hw)
 	hw->link_state.supported = supported;
 	hw->link_state.lp_lowest = fls(supported) - 1;
 
-unlock:
-	atl_unlock_fw(hw);
 	return ret;
 }
 
@@ -546,10 +536,10 @@ relink:
 
 static struct atl_fw_ops atl_fw_ops[2] = {
 	[0] = {
-		.wait_fw_init = atl_fw1_wait_fw_init,
+		.__wait_fw_init = __atl_fw1_wait_fw_init,
 		.set_link = atl_fw1_set_link,
 		.check_link = atl_fw1_check_link,
-		.get_link_caps = atl_fw1_get_link_caps,
+		.__get_link_caps = __atl_fw1_get_link_caps,
 		.restart_aneg = atl_fw1_unsupported,
 		.set_default_link = atl_fw1_set_default_link,
 		.enable_wol = atl_fw1_unsupported,
@@ -557,10 +547,10 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW),
 	},
 	[1] = {
-		.wait_fw_init = atl_fw2_wait_fw_init,
+		.__wait_fw_init = __atl_fw2_wait_fw_init,
 		.set_link = atl_fw2_set_link,
 		.check_link = atl_fw2_check_link,
-		.get_link_caps = atl_fw2_get_link_caps,
+		.__get_link_caps = __atl_fw2_get_link_caps,
 		.restart_aneg = atl_fw2_restart_aneg,
 		.set_default_link = atl_fw2_set_default_link,
 		.enable_wol = atl_fw2_enable_wol,
@@ -775,10 +765,9 @@ int atl_fw_init(struct atl_hw *hw)
 	if (major > 2)
 		major--;
 	mcp->ops = &atl_fw_ops[major - 1];
-	mcp->poll_link = major == 1;
 	mcp->fw_rev = reg;
 
-	ret = mcp->ops->wait_fw_init(hw);
+	ret = mcp->ops->__wait_fw_init(hw);
 	if (ret)
 		return ret;
 
@@ -799,7 +788,7 @@ int atl_fw_init(struct atl_hw *hw)
 
 	}
 
-	ret = mcp->ops->get_link_caps(hw);
+	ret = mcp->ops->__get_link_caps(hw);
 	if (ret)
 		return ret;
 
@@ -809,7 +798,7 @@ int atl_fw_init(struct atl_hw *hw)
 		hw->thermal.flags &=
 			~(atl_thermal_monitor | atl_thermal_throttle);
 	} else
-		ret = atl_update_thermal(hw);
+		ret = __atl_fw2_update_thermal(hw);
 
 
 	return ret;

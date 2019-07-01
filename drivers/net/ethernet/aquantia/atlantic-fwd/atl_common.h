@@ -221,7 +221,7 @@ struct atl_nic {
 	struct atl_hw hw;
 	unsigned flags;
 	uint32_t priv_flags;
-	struct timer_list link_timer;
+	struct timer_list work_timer;
 	int max_mtu;
 	int requested_nvecs;
 	int requested_rx_size;
@@ -349,12 +349,15 @@ do {									\
 static inline void atl_intr_enable_non_ring(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
-	uint32_t mask = hw->intr_mask;
 
-#ifdef CONFIG_ATLFWD_FWD
-	mask |= (uint32_t)(nic->fwd.msi_map);
-#endif
-	atl_intr_enable(hw, mask);
+	atl_intr_enable(hw, hw->non_ring_intr_mask);
+}
+
+static inline void atl_intr_disable_non_ring(struct atl_nic *nic)
+{
+	struct atl_hw *hw = &nic->hw;
+
+	atl_intr_enable(hw, hw->non_ring_intr_mask);
 }
 
 netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev);

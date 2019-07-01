@@ -14,7 +14,6 @@ struct atl_hw;
 
 struct atl_mcp {
 	uint32_t fw_rev;
-	bool poll_link;
 	struct atl_fw_ops *ops;
 	uint32_t fw_stat_addr;
 	uint32_t fw_settings_addr;
@@ -125,8 +124,8 @@ struct atl_link_state{
 struct atl_fw_ops {
 	void (*set_link)(struct atl_hw *hw, bool force);
 	struct atl_link_type *(*check_link)(struct atl_hw *hw);
-	int (*wait_fw_init)(struct atl_hw *hw);
-	int (*get_link_caps)(struct atl_hw *hw);
+	int (*__wait_fw_init)(struct atl_hw *hw);
+	int (*__get_link_caps)(struct atl_hw *hw);
 	int (*restart_aneg)(struct atl_hw *hw);
 	void (*set_default_link)(struct atl_hw *hw);
 	int (*enable_wol)(struct atl_hw *hw);
