@@ -617,6 +617,7 @@ static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(TX_LPI_PHY, LPI_TX_PHY),
 	ATL_PRIV_FLAG(ResetStatistics, STATS_RESET),
 	ATL_PRIV_FLAG(StripEtherPadding, STRIP_PAD),
+	ATL_PRIV_FLAG(MediaDetect, MEDIA_DETECT),
 };
 
 static int atl_get_sset_count(struct net_device *ndev, int sset)
@@ -821,6 +822,23 @@ static int atl_set_pad_stripping(struct atl_nic *nic, bool on)
 	return 0;
 }
 
+static int atl_set_media_detect(struct atl_nic *nic, bool on)
+{
+	struct atl_hw *hw = &nic->hw;
+	int ret;
+
+	if (hw->mcp.fw_rev < 0x0301005a)
+		return -EOPNOTSUPP;
+
+	ret = atl_write_fwsettings_word(hw, atl_fw2_setings_media_detect, on);
+	if (ret)
+		return ret;
+
+	/* Restart aneg to make FW apply the new settings */
+	hw->mcp.ops->restart_aneg(hw);
+	return 0;
+}
+
 static uint32_t atl_get_priv_flags(struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
@@ -850,6 +868,13 @@ static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 	if (diff & ATL_PF_BIT(STRIP_PAD)) {
 		ret = atl_set_pad_stripping(nic,
 			!!(flags & ATL_PF_BIT(STRIP_PAD)));
+		if (ret)
+			return ret;
+	}
+
+	if (diff & ATL_PF_BIT(MEDIA_DETECT)) {
+		ret = atl_set_media_detect(nic,
+			!!(flags & ATL_PF_BIT(MEDIA_DETECT)));
 		if (ret)
 			return ret;
 	}
