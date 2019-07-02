@@ -357,7 +357,7 @@ static inline void atl_intr_disable_non_ring(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
 
-	atl_intr_enable(hw, hw->non_ring_intr_mask);
+	atl_intr_disable(hw, hw->non_ring_intr_mask);
 }
 
 netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev);
