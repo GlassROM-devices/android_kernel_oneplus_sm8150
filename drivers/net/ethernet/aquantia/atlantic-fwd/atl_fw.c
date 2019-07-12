@@ -374,7 +374,11 @@ static void atl_fw2_set_default_link(struct atl_hw *hw)
 	lstate->eee_enabled = 1;
 }
 
-static int atl_fw2_enable_wol(struct atl_hw *hw)
+static int atl_fw1_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
+{
+	return -EOPNOTSUPP;
+}
+static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 {
 	int ret;
 	struct offloadInfo *info;
@@ -383,16 +387,16 @@ static int atl_fw2_enable_wol(struct atl_hw *hw)
 
 	atl_lock_fw(hw);
 
-	if (hw->wol_mode & WAKE_PHY)
+	if (wol_mode & WAKE_PHY)
 		wol_bits |= atl_fw2_wake_on_link;
 
-	if (hw->wol_mode & WAKE_MAGIC) {
+	if (wol_mode & WAKE_MAGIC) {
 		wol_bits |= atl_fw2_nic_proxy | atl_fw2_wol;
 
 		ret = -ENOMEM;
 		msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 		if (!msg)
-			goto unlock_free;
+			goto unlock;
 
 		info = &msg->fw2xOffloads;
 		info->version = 0;
@@ -419,8 +423,9 @@ static int atl_fw2_enable_wol(struct atl_hw *hw)
 		atl_dev_err("Timeout waiting for WoL enable\n");
 
 unlock_free:
-	atl_unlock_fw(hw);
 	kfree(msg);
+unlock:
+	atl_unlock_fw(hw);
 	return ret;
 }
 
@@ -545,7 +550,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.__get_link_caps = __atl_fw1_get_link_caps,
 		.restart_aneg = atl_fw1_unsupported,
 		.set_default_link = atl_fw1_set_default_link,
-		.enable_wol = atl_fw1_unsupported,
+		.enable_wol = atl_fw1_enable_wol,
 		.get_phy_temperature = (void *)atl_fw1_unsupported,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW),
 	},
