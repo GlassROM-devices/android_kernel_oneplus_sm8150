@@ -495,16 +495,6 @@ void atl_fwd_release_rings(struct atl_nic *nic)
 			atl_fwd_release_ring(rings[i]);
 }
 
-static void atl_fwd_reset_ring(struct atl_fwd_ring *fwd_ring)
-{
-	struct atl_hw *hw = &fwd_ring->nic->hw;
-	struct atl_hw_ring *ring = &fwd_ring->hw;
-
-	atl_write(hw, ATL_RING_CTL(ring), BIT(19));
-	udelay(10);
-	atl_write(hw, ATL_RING_CTL(ring), 0);
-}
-
 int atl_fwd_enable_ring(struct atl_fwd_ring *ring)
 {
 	struct atl_hw *hw = &ring->nic->hw;
@@ -521,8 +511,7 @@ void atl_fwd_disable_ring(struct atl_fwd_ring *ring)
 	if (!(ring->state & ATL_FWR_ST_ENABLED))
 		return;
 
-	atl_fwd_reset_ring(ring);
-	atl_fwd_init_ring(ring);
+	atl_clear_bits(hw, ATL_RING_CTL(&ring->hw), BIT(31));
 	ring->state &= ~ATL_FWR_ST_ENABLED;
 }
 EXPORT_SYMBOL(atl_fwd_disable_ring);
