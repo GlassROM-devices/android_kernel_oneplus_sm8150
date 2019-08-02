@@ -33,6 +33,7 @@ struct atl_link_type atl_link_types[] = {
 	LINK_TYPE("10GBaseT-FD", 10000, ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
 		1, 1 << 11)
 };
+#define ATL_FW2_LINK_MSK (BIT(5) | BIT(8) | BIT(10) | BIT(11))
 
 const int atl_num_rates = ARRAY_SIZE(atl_link_types);
 
@@ -328,7 +329,8 @@ static void __atl_fw2_set_link(struct atl_hw *hw)
 
 
 	hw->mcp.req_high = hi_bits;
-	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), bits);
+	atl_write_mask_bits(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW),
+			    ATL_FW2_LINK_MSK, bits);
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), hi_bits);
 }
 
@@ -384,13 +386,24 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 	struct offloadInfo *info;
 	struct drvIface *msg = NULL;
 	uint32_t val, wol_bits = 0;
+	uint32_t low_req;
 
 	atl_lock_fw(hw);
 
-	if (wol_mode & WAKE_PHY)
-		wol_bits |= atl_fw2_wake_on_link;
+	low_req = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
+	low_req &= ~ATL_FW2_LINK_MSK;
 
-	if (wol_mode & WAKE_MAGIC) {
+	if (wol_mode & atl_fw_wake_on_link) {
+		wol_bits |= atl_fw2_wake_on_link;
+		low_req &= ~BIT(17);
+	}
+
+	if (wol_mode & atl_fw_wake_on_link_rtpm) {
+		wol_bits |= atl_fw2_wake_on_link;
+		low_req |= BIT(17);
+	}
+
+	if (wol_mode & atl_fw_wake_on_magic) {
 		wol_bits |= atl_fw2_nic_proxy | atl_fw2_wol;
 
 		ret = -ENOMEM;
@@ -412,7 +425,7 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 		}
 	}
 
-	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), 0);
+	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), low_req);
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), wol_bits);
 	busy_wait(100, mdelay(1), val,
 		atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH)),

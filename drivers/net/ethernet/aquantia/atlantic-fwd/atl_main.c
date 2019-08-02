@@ -703,7 +703,7 @@ static int atl_pm_runtime_resume(struct device *dev)
 
 static int atl_pm_runtime_suspend(struct device *dev)
 {
-	return atl_suspend_common(dev, WAKE_PHY);
+	return atl_suspend_common(dev, atl_fw_wake_on_link_rtpm);
 }
 
 static int atl_pm_runtime_idle(struct device *dev)

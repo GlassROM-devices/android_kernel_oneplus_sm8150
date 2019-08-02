@@ -103,6 +103,12 @@ struct atl_fc_state {
 	enum atl_fc_mode cur;
 };
 
+enum atl_wake_flags {
+	atl_fw_wake_on_link = WAKE_PHY,
+	atl_fw_wake_on_magic = WAKE_MAGIC,
+	atl_fw_wake_on_link_rtpm = BIT(10),
+};
+
 #define ATL_EEE_BIT_OFFT 16
 #define ATL_EEE_MASK ~(BIT(ATL_EEE_BIT_OFFT) - 1)
 

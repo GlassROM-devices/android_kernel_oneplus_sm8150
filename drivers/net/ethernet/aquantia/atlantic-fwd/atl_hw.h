@@ -134,6 +134,14 @@ static inline void atl_write(struct atl_hw *hw, uint32_t addr, uint32_t val)
 	writel(val, base + addr);
 }
 
+
+static inline void atl_write_mask_bits(struct atl_hw *hw, uint32_t addr,
+			     uint32_t mask, uint32_t val)
+{
+	atl_write(hw, addr,
+		  (atl_read(hw, addr) & ~mask) | (val & mask));
+}
+
 static inline void atl_write_bits(struct atl_hw *hw, uint32_t addr,
 			     uint32_t shift, uint32_t width, uint32_t val)
 {
