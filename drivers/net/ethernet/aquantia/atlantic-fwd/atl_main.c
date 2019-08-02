@@ -382,7 +382,6 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_forbid(&pdev->dev);
-	pm_runtime_enable(&pdev->dev);
 
 	ret = pci_enable_device_mem(pdev);
 	if (ret)
@@ -430,6 +429,9 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ret = atl_hwinit(hw, id->driver_data);
 	if (ret)
 		goto err_hwinit;
+
+	if ((hw->mcp.caps_low & BIT(17)) == 0)
+		__pm_runtime_disable(&pdev->dev, false);
 
 	hw->mcp.ops->set_default_link(hw);
 	hw->link_state.force_off = 1;
