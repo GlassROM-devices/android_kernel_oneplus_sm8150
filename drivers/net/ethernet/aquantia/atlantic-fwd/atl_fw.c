@@ -395,12 +395,12 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 
 	if (wol_mode & atl_fw_wake_on_link) {
 		wol_bits |= atl_fw2_wake_on_link;
-		low_req &= ~BIT(17);
+		low_req &= ~atl_fw2_wake_on_link_force;
 	}
 
 	if (wol_mode & atl_fw_wake_on_link_rtpm) {
 		wol_bits |= atl_fw2_wake_on_link;
-		low_req |= BIT(17);
+		low_req |= atl_fw2_wake_on_link_force;
 	}
 
 	if (wol_mode & atl_fw_wake_on_magic) {

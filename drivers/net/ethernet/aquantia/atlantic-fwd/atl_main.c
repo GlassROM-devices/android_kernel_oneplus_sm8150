@@ -430,7 +430,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_hwinit;
 
-	if ((hw->mcp.caps_low & BIT(17)) == 0)
+	if ((hw->mcp.caps_low & atl_fw2_wake_on_link_force) == 0)
 		__pm_runtime_disable(&pdev->dev, false);
 
 	hw->mcp.ops->set_default_link(hw);

@@ -59,6 +59,7 @@ enum atl_fw2_opts {
 	atl_define_bit(atl_fw2_asym_pause, 4)
 	atl_fw2_pause_mask = atl_fw2_pause | atl_fw2_asym_pause,
 	atl_define_bit(atl_fw2_wake_on_link, 16)
+	atl_define_bit(atl_fw2_wake_on_link_force, 17)
 	atl_define_bit(atl_fw2_phy_temp, 18)
 	atl_define_bit(atl_fw2_set_thermal, 21)
 	atl_define_bit(atl_fw2_link_drop, 22)
