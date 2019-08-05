@@ -611,7 +611,9 @@ static const struct atl_stat_desc eth_stat_descs[] = {
 static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(PKTSystemLoopback, LPB_SYS_PB),
 	ATL_PRIV_FLAG(DMASystemLoopback, LPB_SYS_DMA),
-	/* ATL_PRIV_FLAG(DMANetworkLoopback, LPB_NET_DMA), */
+	ATL_PRIV_FLAG(DMANetworkLoopback, LPB_NET_DMA),
+	ATL_PRIV_FLAG(PHYInternalLoopback, LPB_INT_PHY),
+	ATL_PRIV_FLAG(PHYExternalLoopback, LPB_EXT_PHY),
 	ATL_PRIV_FLAG(RX_LPI_MAC, LPI_RX_MAC),
 	ATL_PRIV_FLAG(TX_LPI_MAC, LPI_TX_MAC),
 	ATL_PRIV_FLAG(RX_LPI_PHY, LPI_RX_PHY),
@@ -891,13 +893,14 @@ static int atl_set_priv_flags(struct net_device *ndev, uint32_t flags)
 		return -EINVAL;
 	}
 
+	nic->priv_flags = flags;
+
 	if (curr)
 		atl_set_loopback(nic, ffs(curr) - 1, false);
 
 	if (lpb)
 		atl_set_loopback(nic, ffs(lpb) - 1, true);
 
-	nic->priv_flags = flags;
 	return 0;
 }
 

@@ -156,6 +156,7 @@ struct atl_fw_ops {
 	int (*get_phy_temperature)(struct atl_hw *hw, int *temp);
 	int (*dump_cfg)(struct atl_hw *hw);
 	int (*restore_cfg)(struct atl_hw *hw);
+	int (*set_phy_loopback)(struct atl_nic *nic, u32 mode);
 	unsigned efuse_shadow_addr_reg;
 };
 

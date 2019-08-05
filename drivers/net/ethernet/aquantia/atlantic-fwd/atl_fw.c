@@ -581,6 +581,27 @@ static int atl_fw2_restore_cfg(struct atl_hw *hw)
 	return 0;
 }
 
+static int atl_fw2_set_phy_loopback(struct atl_nic *nic, u32 mode)
+{
+	bool on = !!(nic->priv_flags & BIT(mode));
+	struct atl_hw *hw = &nic->hw;
+
+	atl_lock_fw(hw);
+
+	switch (mode) {
+	case ATL_PF_LPB_INT_PHY:
+		atl_write_bit(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), 27, on);
+		break;
+	case ATL_PF_LPB_EXT_PHY:
+		atl_write_bit(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), 26, on);
+		break;
+	}
+
+	atl_unlock_fw(hw);
+
+	return 0;
+}
+
 static struct atl_fw_ops atl_fw_ops[2] = {
 	[0] = {
 		.__wait_fw_init = __atl_fw1_wait_fw_init,
@@ -593,6 +614,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.get_phy_temperature = (void *)atl_fw1_unsupported,
 		.dump_cfg = atl_fw1_unsupported,
 		.restore_cfg = atl_fw1_unsupported,
+		.set_phy_loopback = (void *)atl_fw1_unsupported,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW),
 	},
 	[1] = {
@@ -606,6 +628,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.get_phy_temperature = atl_fw2_get_phy_temperature,
 		.dump_cfg = atl_fw2_dump_cfg,
 		.restore_cfg = atl_fw2_restore_cfg,
+		.set_phy_loopback = atl_fw2_set_phy_loopback,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW2_EFUSE_SHADOW),
 	},
 };
