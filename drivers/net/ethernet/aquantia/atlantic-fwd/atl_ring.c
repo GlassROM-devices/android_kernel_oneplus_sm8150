@@ -1784,7 +1784,6 @@ void atl_update_global_stats(struct atl_nic *nic)
 		return;
 
 	memset(&stats, 0, sizeof(stats));
-	atl_update_eth_stats(nic);
 
 	spin_lock(&nic->stats_lock);
 

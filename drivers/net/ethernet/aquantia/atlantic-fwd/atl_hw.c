@@ -979,6 +979,9 @@ int atl_update_eth_stats(struct atl_nic *nic)
 	uint32_t reg = 0, reg2 = 0;
 	int ret;
 
+	if (!test_bit(ATL_ST_ENABLED, &nic->hw.state) ||
+	    test_bit(ATL_ST_RESETTING, &nic->hw.state))
+
 	atl_lock_fw(hw);
 
 	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);

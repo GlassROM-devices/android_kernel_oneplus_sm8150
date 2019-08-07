@@ -701,6 +701,7 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	struct atl_nic *nic = netdev_priv(ndev);
 	int i;
 
+	atl_update_eth_stats(nic);
 	atl_update_global_stats(nic);
 
 	atl_write_stats(&nic->stats.tx, tx_stat_descs, data, uint64_t);
