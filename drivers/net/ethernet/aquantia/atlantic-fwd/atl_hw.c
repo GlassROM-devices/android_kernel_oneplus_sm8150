@@ -981,6 +981,7 @@ int atl_update_eth_stats(struct atl_nic *nic)
 
 	if (!test_bit(ATL_ST_ENABLED, &nic->hw.state) ||
 	    test_bit(ATL_ST_RESETTING, &nic->hw.state))
+		return 0;
 
 	atl_lock_fw(hw);
 
