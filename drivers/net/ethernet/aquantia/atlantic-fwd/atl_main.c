@@ -195,6 +195,12 @@ int atl_reconfigure(struct atl_nic *nic)
 
 	atl_clear_datapath(nic);
 
+	ret = atl_hw_reset(&nic->hw);
+	if (ret) {
+		atl_nic_err("HW reset failed, re-trying\n");
+		goto err;
+	}
+
 	ret = atl_setup_datapath(nic);
 	if (ret)
 		goto err;
