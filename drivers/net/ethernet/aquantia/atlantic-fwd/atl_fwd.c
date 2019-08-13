@@ -301,6 +301,8 @@ void atl_fwd_release_ring(struct atl_fwd_ring *ring)
 		atl_fwd_release_event(ring->evt);
 	}
 
+	atl_do_reset(nic);
+
 	__clear_bit(idx, map);
 	rings[idx - ATL_FWD_RING_BASE] = NULL;
 	atl_fwd_free_bufs(ring);
