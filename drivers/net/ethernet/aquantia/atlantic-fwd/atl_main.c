@@ -231,36 +231,24 @@ void atl_schedule_work(struct atl_nic *nic)
 
 static int atl_do_reset(struct atl_nic *nic)
 {
+	bool was_up = netif_running(nic->ndev);
 	struct atl_hw *hw = &nic->hw;
 	int ret;
-	bool reset;
-	bool was_up = netif_running(nic->ndev);
 
-	if (!test_bit(ATL_ST_ENABLED, &hw->state))
-		/* We're suspending, postpone resets till resume */
-		return 0;
+	set_bit(ATL_ST_RESETTING, &hw->state);
 
-	reset = test_and_clear_bit(ATL_ST_RESET_NEEDED, &hw->state);
-
-	if (!reset)
-		return 0;
-
-	if (reset)
-		set_bit(ATL_ST_RESETTING, &hw->state);
 	rtnl_lock();
 
-	if (reset) {
-		atl_stop(nic, true);
+	atl_stop(nic, true);
 
-		ret = atl_hw_reset(hw);
-		if (ret) {
-			atl_nic_err("HW reset failed, re-trying\n");
-			if (!test_and_set_bit(ATL_ST_DETACHED, &hw->state))
-				netif_device_detach(nic->ndev);
-			goto out;
-		}
-		clear_bit(ATL_ST_RESETTING, &hw->state);
+	ret = atl_hw_reset(hw);
+	if (ret) {
+		atl_nic_err("HW reset failed, re-trying\n");
+		if (!test_and_set_bit(ATL_ST_DETACHED, &hw->state))
+			netif_device_detach(nic->ndev);
+		goto out;
 	}
+	clear_bit(ATL_ST_RESETTING, &hw->state);
 
 	if (was_up) {
 		ret = atl_start(nic);
@@ -276,6 +264,23 @@ out:
 	return ret;
 }
 
+static int atl_check_reset(struct atl_nic *nic)
+{
+	struct atl_hw *hw = &nic->hw;
+	bool reset;
+
+	if (!test_bit(ATL_ST_ENABLED, &hw->state))
+		/* We're suspending, postpone resets till resume */
+		return 0;
+
+	reset = test_and_clear_bit(ATL_ST_RESET_NEEDED, &hw->state);
+
+	if (!reset)
+		return 0;
+
+	return atl_do_reset(nic);
+}
+
 static void atl_work(struct work_struct *work)
 {
 	struct atl_nic *nic = container_of(work, struct atl_nic, work);
@@ -285,7 +290,7 @@ static void atl_work(struct work_struct *work)
 	clear_bit(ATL_ST_WORK_SCHED, &hw->state);
 
 	atl_fw_watchdog(hw);
-	ret = atl_do_reset(nic);
+	ret = atl_check_reset(nic);
 	if (ret)
 		goto out;
 	atl_refresh_link(nic);
