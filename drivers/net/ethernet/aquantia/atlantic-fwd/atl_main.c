@@ -65,8 +65,6 @@ static int atl_start(struct atl_nic *nic)
 	/* ret = atl_fwd_resume_rings(nic); */
 
 /* out: */
-	if (ret)
-		set_bit(ATL_ST_START_NEEDED, &nic->hw.state);
 	return ret;
 }
 
@@ -235,16 +233,16 @@ static int atl_do_reset(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
 	int ret;
-	bool reset, start;
+	bool reset;
+	bool was_up = netif_running(nic->ndev);
 
 	if (!test_bit(ATL_ST_ENABLED, &hw->state))
 		/* We're suspending, postpone resets till resume */
 		return 0;
 
 	reset = test_and_clear_bit(ATL_ST_RESET_NEEDED, &hw->state);
-	start = test_and_clear_bit(ATL_ST_START_NEEDED, &hw->state);
 
-	if (!reset && !start)
+	if (!reset)
 		return 0;
 
 	if (reset)
@@ -261,11 +259,10 @@ static int atl_do_reset(struct atl_nic *nic)
 				netif_device_detach(nic->ndev);
 			goto out;
 		}
-		start = true;
 		clear_bit(ATL_ST_RESETTING, &hw->state);
 	}
 
-	if (start) {
+	if (was_up) {
 		ret = atl_start(nic);
 		if (ret)
 			goto out;
