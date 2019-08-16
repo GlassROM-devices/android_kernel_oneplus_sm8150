@@ -1,3 +1,7 @@
+Version 1.0.22
+==============
+fix build of fwd api
+
 Version 1.0.21
 ==============
 [ATLDRV-871] - pause frame does not turn off

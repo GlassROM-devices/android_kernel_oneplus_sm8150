@@ -229,7 +229,7 @@ void atl_schedule_work(struct atl_nic *nic)
 		queue_work(atl_wq, &nic->work);
 }
 
-static int atl_do_reset(struct atl_nic *nic)
+int atl_do_reset(struct atl_nic *nic)
 {
 	bool was_up = netif_running(nic->ndev);
 	struct atl_hw *hw = &nic->hw;

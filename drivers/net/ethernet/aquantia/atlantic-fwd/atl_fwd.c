@@ -510,6 +510,8 @@ EXPORT_SYMBOL(atl_fwd_enable_ring);
 
 void atl_fwd_disable_ring(struct atl_fwd_ring *ring)
 {
+	struct atl_hw *hw = &ring->nic->hw;
+
 	if (!(ring->state & ATL_FWR_ST_ENABLED))
 		return;
 

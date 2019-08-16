@@ -18,7 +18,7 @@
 #include <linux/netdevice.h>
 #include <linux/moduleparam.h>
 
-#define ATL_VERSION "1.0.21"
+#define ATL_VERSION "1.0.22"
 
 struct atl_nic;
 
@@ -421,5 +421,6 @@ int atl_hwmon_init(struct atl_nic *nic);
 int atl_update_thermal(struct atl_hw *hw);
 int atl_update_thermal_flag(struct atl_hw *hw, int bit, bool val);
 int atl_verify_thermal_limits(struct atl_hw *hw, struct atl_thermal *thermal);
+int atl_do_reset(struct atl_nic *nic);
 
 #endif
