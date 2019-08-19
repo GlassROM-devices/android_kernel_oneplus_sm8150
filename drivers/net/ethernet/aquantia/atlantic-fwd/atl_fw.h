@@ -69,6 +69,15 @@ enum atl_fw2_opts {
 	atl_define_bit(atl_fw2_thermal_alarm, 29)
 };
 
+enum atl_fw2_ex_caps {
+	atl_define_bit(atl_fw2_ex_caps_wol_ex, 23)
+};
+
+enum atl_fw2_wol_ex {
+	atl_define_bit(atl_fw2_wol_ex_wake_on_link_keep_rate, 0)
+	atl_define_bit(atl_fw2_wol_ex_wake_on_magic_keep_rate, 1)
+};
+
 enum atl_fw2_stat_offt {
 	atl_fw2_stat_phy_hbeat = 0x4c,
 	atl_fw2_stat_temp = 0x50,
@@ -81,6 +90,7 @@ enum atl_fw2_stat_offt {
 enum atl_fw2_settings_offt {
 	atl_fw2_setings_msm_opts = 0x90,
 	atl_fw2_setings_media_detect = 0x98,
+	atl_fw2_setings_wol_ex = 0x9c,
 };
 
 enum atl_fw2_msm_opts {

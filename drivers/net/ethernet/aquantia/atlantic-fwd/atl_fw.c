@@ -389,13 +389,20 @@ static int atl_fw1_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 }
 static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 {
-	int ret;
+	int ret = 0;
 	struct offloadInfo *info;
 	struct drvIface *msg = NULL;
 	uint32_t val, wol_bits = 0;
 	uint32_t low_req;
 
 	atl_lock_fw(hw);
+
+	if (hw->mcp.caps_ex & atl_fw2_ex_caps_wol_ex)
+		ret = atl_write_fwsettings_word(hw, atl_fw2_setings_wol_ex, 
+			atl_fw2_wol_ex_wake_on_link_keep_rate | 
+			atl_fw2_wol_ex_wake_on_magic_keep_rate);
+	if (ret)
+		return ret;
 
 	low_req = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
 	low_req &= ~ATL_FW2_LINK_MSK;
