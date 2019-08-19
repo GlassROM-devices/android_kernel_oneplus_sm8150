@@ -22,6 +22,7 @@ struct atl_mcp {
 	uint32_t req_high_mask;	/* Clears link rate-dependend bits */
 	uint32_t caps_low;
 	uint32_t caps_high;
+	uint32_t caps_ex;
 	struct mutex lock;
 	unsigned long next_wdog;
 	bool wdog_disabled;
@@ -74,6 +75,7 @@ enum atl_fw2_stat_offt {
 	atl_fw2_stat_lcaps = 0x84,
 	atl_fw2_stat_settings_addr = 0x110,
 	atl_fw2_stat_settings_len = 0x114,
+	atl_fw2_stat_caps_ex = 0x118,
 };
 
 enum atl_fw2_settings_offt {

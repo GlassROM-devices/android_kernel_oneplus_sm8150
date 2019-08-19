@@ -189,7 +189,8 @@ static int __atl_fw2_get_link_caps(struct atl_hw *hw)
 	uint32_t fw_stat_addr = mcp->fw_stat_addr;
 	struct atl_link_type *rate;
 	unsigned int supported = 0;
-	uint32_t caps[2], mask = atl_fw2_pause_mask | atl_fw2_link_drop;
+	uint32_t caps[2], caps_ex;
+	uint32_t mask = atl_fw2_pause_mask | atl_fw2_link_drop;
 	int i, ret;
 
 	atl_dev_dbg("Host data struct addr: %#x\n", fw_stat_addr);
@@ -201,6 +202,12 @@ static int __atl_fw2_get_link_caps(struct atl_hw *hw)
 	mcp->caps_low = caps[0];
 	mcp->caps_high = caps[1];
 	atl_dev_dbg("Got link caps: %#x %#x\n", caps[0], caps[1]);
+
+	ret = atl_read_mcp_mem(hw, fw_stat_addr + atl_fw2_stat_caps_ex,
+		&caps_ex, 4);
+	if (ret)
+		return ret;
+	mcp->caps_ex = caps_ex;
 
 	atl_for_each_rate(i, rate) {
 		uint32_t bit = rate->fw_bits[1];
