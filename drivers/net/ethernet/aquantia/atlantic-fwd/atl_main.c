@@ -75,15 +75,15 @@ static int atl_start(struct atl_nic *nic)
 	return ret;
 }
 
-static void atl_stop(struct atl_nic *nic, bool full)
+static void atl_stop(struct atl_nic *nic, bool drop_link)
 {
 	atl_stop_rings(nic);
 
-	/* if (full) { */
+	/* if (drop_link) { */
 	/*	atl_stop_fwd_rings(nic); */
 	/* } */
 
-	if (!atl_keep_link || full)
+	if (drop_link)
 		atl_stop_link(nic);
 }
 
@@ -129,10 +129,8 @@ out:
 	return ret;
 }
 
-static int atl_close(struct net_device *ndev)
+static int atl_close(struct atl_nic *nic, bool drop_link)
 {
-	struct atl_nic *nic = netdev_priv(ndev);
-
 	/* atl_close() can be called a second time if
 	 * atl_reconfigure() fails. Just return
 	 */
@@ -141,12 +139,19 @@ static int atl_close(struct net_device *ndev)
 
 	pm_runtime_get_sync(&nic->ndev->dev);
 
-	atl_stop(nic, false);
+	atl_stop(nic, drop_link);
 	atl_free_rings(nic);
 
 	pm_runtime_put_sync(&nic->ndev->dev);
 
 	return 0;
+}
+
+static int atl_ndo_close(struct net_device *ndev)
+{
+	struct atl_nic *nic = netdev_priv(ndev);
+
+	return atl_close(nic, !atl_keep_link);
 }
 
 #ifndef ATL_HAVE_MINMAX_MTU
@@ -184,7 +189,7 @@ static int atl_set_mac_address(struct net_device *ndev, void *priv)
 
 static const struct net_device_ops atl_ndev_ops = {
 	.ndo_open = atl_open,
-	.ndo_stop = atl_close,
+	.ndo_stop = atl_ndo_close,
 	.ndo_start_xmit = atl_start_xmit,
 	.ndo_vlan_rx_add_vid = atl_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid = atl_vlan_rx_kill_vid,
@@ -209,7 +214,7 @@ int atl_reconfigure(struct atl_nic *nic)
 	int ret = 0;
 
 	if (was_up)
-		atl_close(ndev);
+		atl_close(nic, false);
 
 	atl_clear_datapath(nic);
 
