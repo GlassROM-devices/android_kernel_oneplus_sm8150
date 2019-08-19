@@ -154,6 +154,8 @@ struct atl_fw_ops {
 	void (*set_default_link)(struct atl_hw *hw);
 	int (*enable_wol)(struct atl_hw *hw, unsigned int wol_mode);
 	int (*get_phy_temperature)(struct atl_hw *hw, int *temp);
+	int (*dump_cfg)(struct atl_hw *hw);
+	int (*push_cfg)(struct atl_hw *hw);
 	unsigned efuse_shadow_addr_reg;
 };
 

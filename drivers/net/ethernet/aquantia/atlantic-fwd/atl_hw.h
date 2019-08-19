@@ -81,6 +81,8 @@ struct atl_hw {
 #define ATL_RSS_TBL_SIZE (1 << 6)
 	uint8_t rss_tbl[ATL_RSS_TBL_SIZE];
 	struct atl_thermal thermal;
+#define ATL_FW_CFG_DUMP_SIZE 2
+	uint32_t fw_cfg_dump[ATL_FW_CFG_DUMP_SIZE];
 };
 
 union atl_desc;

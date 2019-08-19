@@ -107,7 +107,6 @@ static int atl_hw_reset_nonrbl(struct atl_hw *hw)
 {
 	uint32_t tries;
 	uint32_t reg = atl_read(hw, ATL_GLOBAL_DAISY_CHAIN_STS1);
-	uint32_t r368, r36c;
 	int ret;
 
 	bool daisychain_running = (reg & 0x30) != 0x30;
@@ -115,10 +114,6 @@ static int atl_hw_reset_nonrbl(struct atl_hw *hw)
 	if (daisychain_running)
 		atl_dev_dbg("AQDBG: daisychain running (0x18: %#x)\n",
 			    atl_read(hw, ATL_GLOBAL_FW_IMAGE_ID));
-
-	/* save link configuration */
-	r368 = atl_read(hw, 0x368);
-	r36c = atl_read(hw, 0x36c);
 
 	atl_write(hw, 0x404, 0x40e1);
 	mdelay(50);
@@ -151,9 +146,8 @@ static int atl_hw_reset_nonrbl(struct atl_hw *hw)
 
 	atl_glb_soft_reset_full(hw, false);
 
-	/* restore link configuration */
-	atl_write(hw, 0x368, r368);
-	atl_write(hw, 0x36c, r36c);
+	if (hw->mcp.ops)
+		hw->mcp.ops->push_cfg(hw);
 
 	/* unstall FW*/
 	atl_write(hw, 0x404, 0x40e0);

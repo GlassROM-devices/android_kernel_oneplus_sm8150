@@ -213,6 +213,8 @@ int atl_reconfigure(struct atl_nic *nic)
 	int was_up = netif_running(ndev);
 	int ret = 0;
 
+	nic->hw.mcp.ops->dump_cfg(&nic->hw);
+
 	if (was_up)
 		atl_close(nic, false);
 
@@ -267,6 +269,8 @@ int atl_do_reset(struct atl_nic *nic)
 	set_bit(ATL_ST_RESETTING, &hw->state);
 
 	rtnl_lock();
+
+	hw->mcp.ops->dump_cfg(hw);
 
 	atl_stop(nic, true);
 
@@ -584,6 +588,7 @@ static int atl_suspend_common(struct device *dev, unsigned int wol_mode)
 	int ret;
 
 	rtnlocked = rtnl_trylock();
+	hw->mcp.ops->dump_cfg(hw);
 
 	atl_stop(nic, true);
 
