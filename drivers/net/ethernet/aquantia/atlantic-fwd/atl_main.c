@@ -603,6 +603,7 @@ static int atl_suspend_common(struct device *dev, unsigned int wol_mode)
 
 	clear_bit(ATL_ST_ENABLED, &hw->state);
 	cancel_work_sync(&nic->work);
+	clear_bit(ATL_ST_WORK_SCHED, &hw->state);
 
 	pci_disable_device(pdev);
 	pci_save_state(pdev);
