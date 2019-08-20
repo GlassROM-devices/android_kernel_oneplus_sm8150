@@ -232,9 +232,6 @@ static inline unsigned int atl_link_adv(struct atl_link_state *lstate)
 {
 	struct atl_hw *hw = container_of(lstate, struct atl_hw, link_state);
 
-	if (lstate->force_off)
-		return 0;
-
 	if (lstate->thermal_throttled
 		&& hw->thermal.flags & atl_thermal_throttle)
 		/* FW doesn't provide raw LP's advertized rates, only
@@ -327,13 +324,10 @@ static void __atl_fw2_set_link(struct atl_hw *hw)
 		hi_bits ^= atl_fw2_asym_pause;
 
 	bits = atl_set_fw_bits(hw, 1);
+	hi_bits |= bits >> 32;
 
-	/* If no modes are advertized, put PHY into low-power */
-	if (!bits)
+	if (lstate->force_off)
 		hi_bits |= atl_fw2_link_drop;
-	else
-		hi_bits |= bits >> 32;
-
 
 	hw->mcp.req_high = hi_bits;
 	atl_write_mask_bits(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW),
@@ -392,7 +386,7 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 	int ret = 0;
 	struct offloadInfo *info;
 	struct drvIface *msg = NULL;
-	uint32_t val, wol_bits = 0;
+	uint32_t val, wol_bits = 0, req_high = hw->mcp.req_high;
 	uint32_t low_req;
 
 	atl_lock_fw(hw);
@@ -405,7 +399,6 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 		return ret;
 
 	low_req = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
-	low_req &= ~ATL_FW2_LINK_MSK;
 
 	if (wol_mode & atl_fw_wake_on_link) {
 		wol_bits |= atl_fw2_wake_on_link;
@@ -439,8 +432,10 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 		}
 	}
 
+	req_high |= wol_bits;
+	req_high &= ~atl_fw2_link_drop;
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), low_req);
-	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), wol_bits);
+	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), req_high);
 	busy_wait(100, mdelay(1), val,
 		atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH)),
 		(val & wol_bits) != wol_bits);
@@ -573,7 +568,7 @@ static int atl_fw2_dump_cfg(struct atl_hw *hw)
 {
 	/* save link configuration */
 	hw->fw_cfg_dump[0] = atl_read(hw, 0x368);
-	hw->fw_cfg_dump[1] = atl_read(hw, 0x36c);
+	hw->fw_cfg_dump[1] = atl_read(hw, 0x36c) & 0xF18;
 
 	return 0;
 }
@@ -865,7 +860,8 @@ int atl_fw_init(struct atl_hw *hw)
 	mcp->next_wdog = jiffies + 2 * HZ;
 
 	if (major > 1) {
-		mcp->req_high = 0;
+		mcp->req_high = atl_read(hw,
+					 ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH));
 
 		ret = atl_read_fwstat_word(hw, atl_fw2_stat_settings_addr,
 			&mcp->fw_settings_addr);
