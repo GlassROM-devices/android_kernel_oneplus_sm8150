@@ -21,6 +21,7 @@
 #include <uapi/linux/udp.h>
 
 #include "atl_trace.h"
+#include "atl_fwdnl.h"
 
 #define atl_update_ring_stat(ring, stat, delta)			\
 do {								\
@@ -262,6 +263,11 @@ netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	if (nic->priv_flags & ATL_PF_BIT(LPB_NET_DMA))
 		return NETDEV_TX_BUSY;
+
+#ifdef CONFIG_ATLFWD_FWD_NETLINK
+	if (atlfwd_nl_is_redirected(skb, ndev))
+		return atlfwd_nl_xmit(skb, ndev);
+#endif
 
 	if (tx_full(ring, skb_shinfo(skb)->nr_frags + 4)) {
 		atl_update_ring_stat(ring, tx.tx_busy, 1);

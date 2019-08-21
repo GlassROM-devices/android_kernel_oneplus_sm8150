@@ -39,5 +39,6 @@ atlantic-fwd-objs := atl_fw.o \
 		     atl_hwmon.o
 
 atlantic-fwd-$(CONFIG_ATLFWD_FWD) += atl_fwd.o
+atlantic-fwd-$(CONFIG_ATLFWD_FWD_NETLINK) += atl_fwdnl.o
 
 CFLAGS_atl_trace.o := -I$(src)

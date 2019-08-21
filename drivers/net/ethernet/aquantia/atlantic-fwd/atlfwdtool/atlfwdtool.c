@@ -1,0 +1,239 @@
+/*
+ * aQuantia Corporation Network Driver
+ * Copyright (C) 2019 aQuantia Corporation. All rights reserved
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ */
+
+#include <errno.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "atlfwd_args.h"
+#include "atlfwd_ctx.h"
+#include "atlfwd_msg.h"
+#include "atlfwd_reply.h"
+
+/* get atl_fwd family id */
+static int atlnl_family_cb(const struct nlmsghdr *nlhdr, void *data)
+{
+	struct nl_context *ctx = (struct nl_context *)data;
+	const struct nlattr *attr;
+
+	ctx->family_id = 0;
+	mnl_attr_for_each(attr, nlhdr, GENL_HDRLEN)
+	{
+		if (mnl_attr_get_type(attr) == CTRL_ATTR_FAMILY_ID) {
+			ctx->family_id = mnl_attr_get_u16(attr);
+			break;
+		}
+	}
+
+	return (ctx->family_id ? MNL_CB_OK : MNL_CB_ERROR);
+}
+
+static int atlnl_get_family_id(struct nl_context *ctx)
+{
+	int ret = atlnl_msg_alloc(ctx, GENL_ID_CTRL, CTRL_CMD_GETFAMILY,
+				  NLM_F_REQUEST | NLM_F_ACK, 1);
+	if (ctx->verbose)
+		printf("calling %s\n", "CTRL_CMD_GETFAMILY");
+	if (ret != 0)
+		goto err_msgfree;
+
+	mnl_attr_put_strz(ctx->nlhdr, CTRL_ATTR_FAMILY_NAME, ATL_FWD_GENL_NAME);
+
+	if (mnl_socket_sendto(ctx->sock, ctx->nlhdr, ctx->nlhdr->nlmsg_len) < 0)
+		goto err_msgfree;
+
+	atlnl_process_reply(ctx, atlnl_family_cb);
+
+	ret = ctx->family_id ? 0 : -EADDRNOTAVAIL;
+
+	if (ctx->verbose)
+		printf("family id: %d\n", ctx->family_id);
+
+err_msgfree:
+	atlnl_msg_free(ctx);
+	return ret;
+}
+
+static int atlnl_reqring_cb(const struct nlmsghdr *nlhdr, void *data)
+{
+	const struct nlattr *attr;
+	int ring_index = -1;
+
+	mnl_attr_for_each(attr, nlhdr, GENL_HDRLEN)
+	{
+		if (mnl_attr_get_type(attr) == ATL_FWD_ATTR_RING_INDEX) {
+			ring_index = (int)mnl_attr_get_u32(attr);
+			break;
+		}
+	}
+
+	if (ring_index == -1) {
+		fprintf(stderr, "Error: %s\n",
+			"RING_INDEX attribute is missing in reply");
+		return MNL_CB_ERROR;
+	}
+
+	printf("Ring index: %d\n", ring_index);
+	return MNL_CB_OK;
+}
+
+#define ATL_FWD_CMD_STR(cmd)\
+[cmd] = #cmd
+static const char *cmd_str[NUM_ATL_FWD_CMD] = {
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_REQUEST_RING),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_RELEASE_RING),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_ENABLE_RING),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_DISABLE_RING),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_DISABLE_REDIRECTIONS),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_FORCE_ICMP_TX_VIA),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_FORCE_TX_VIA),
+};
+#define ATL_FWD_ATTR_STR(attr)\
+[attr] = #attr
+static const char *attr_str[NUM_ATL_FWD_ATTR] = {
+	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_FLAGS),
+	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_RING_SIZE),
+	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_BUF_SIZE),
+	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_PAGE_ORDER),
+	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_RING_INDEX),
+};
+
+static int atlnl_cmd_generic_u32_args(struct nl_context *ctx,
+				      const enum atlfwd_nl_command cmd,
+				      mnl_cb_t reply_cb, const int attr_count,
+				      ...)
+{
+	va_list args;
+	int ret = atlnl_msg_alloc(ctx, ctx->family_id, cmd,
+				  NLM_F_REQUEST | NLM_F_ACK, 1);
+
+	if (ret != 0) {
+		fprintf(stderr, "Error: %s\n", "message allocation failed.");
+		goto err_msgfree;
+	}
+
+	if (ctx->verbose)
+		printf("calling %s\n",
+		       cmd_str[cmd] ? cmd_str[cmd] : "unknown command");
+
+	if (ctx->devname != NULL)
+		mnl_attr_put_strz(ctx->nlhdr, ATL_FWD_ATTR_IFNAME,
+				  ctx->devname);
+
+	va_start(args, attr_count);
+	for (int i = 0; i != attr_count; i++) {
+		const enum atlfwd_nl_attribute attr =
+			va_arg(args, enum atlfwd_nl_attribute);
+		const uint32_t value = va_arg(args, uint32_t);
+
+		mnl_attr_put_u32(ctx->nlhdr, attr, value);
+
+		if (ctx->verbose)
+			printf("\t(%s: %u)\n",
+			       attr_str[attr] ? attr_str[attr] :
+						"unknown attribute",
+			       value);
+	}
+	va_end(args);
+
+	if (mnl_socket_sendto(ctx->sock, ctx->nlhdr, ctx->nlhdr->nlmsg_len) < 0)
+		goto err_msgfree;
+
+	atlnl_process_reply(ctx, reply_cb);
+
+err_msgfree:
+	atlnl_msg_free(ctx);
+	return ret;
+}
+
+int main(int argc, char **argv)
+{
+	int result = EINVAL;
+	static struct nl_context nlctx;
+	struct atlfwd_args *args = parse_args(argc, argv);
+
+	if (!args)
+		return result;
+
+	nlctx.devname = args->devname;
+	nlctx.verbose = args->verbose;
+
+	result = ECONNREFUSED;
+
+	/* open socket */
+	nlctx.sock = mnl_socket_open(NETLINK_GENERIC);
+	if (!nlctx.sock)
+		return result;
+
+	/* request extended acknowledgment */
+	unsigned int true_val = 1;
+	int ret = mnl_socket_setsockopt(nlctx.sock, NETLINK_EXT_ACK, &true_val,
+					sizeof(true_val));
+
+	if (ret < 0)
+		goto err_sockclose;
+	/* bind and get the port id */
+	ret = mnl_socket_bind(nlctx.sock, 0, MNL_SOCKET_AUTOPID);
+	if (ret < 0) {
+		result = -ret;
+		goto err_sockclose;
+	}
+	nlctx.port = mnl_socket_get_portid(nlctx.sock);
+
+	/* parse command line options */
+	result = EINVAL;
+
+	/* obtain family id by name */
+	ret = atlnl_get_family_id(&nlctx);
+	if (ret < 0)
+		goto err_sockclose;
+
+	/* process command(s) */
+	switch (args->cmd) {
+	case ATL_FWD_CMD_REQUEST_RING:
+		ret = atlnl_cmd_generic_u32_args(
+			&nlctx, args->cmd, atlnl_reqring_cb, 4,
+			ATL_FWD_ATTR_FLAGS, args->flags, ATL_FWD_ATTR_RING_SIZE,
+			args->ring_size, ATL_FWD_ATTR_BUF_SIZE, args->buf_size,
+			ATL_FWD_ATTR_PAGE_ORDER, args->page_order);
+		break;
+	case ATL_FWD_CMD_RELEASE_RING:
+		/* fall through */
+	case ATL_FWD_CMD_ENABLE_RING:
+		/* fall through */
+	case ATL_FWD_CMD_DISABLE_RING:
+		/* fall through */
+	case ATL_FWD_CMD_FORCE_ICMP_TX_VIA:
+		/* fall through */
+	case ATL_FWD_CMD_FORCE_TX_VIA:
+		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd, NULL, 1,
+						 ATL_FWD_ATTR_RING_INDEX,
+						 args->ring_index);
+		break;
+	case ATL_FWD_CMD_DISABLE_REDIRECTIONS:
+		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd, NULL, 0);
+		break;
+	default:
+		fprintf(stderr, "Unknown command %d\n", args->cmd);
+		goto err_sockclose;
+	}
+
+	result = 0;
+	if (ret < 0) {
+		result = -ret;
+		perror("cmd error");
+	}
+
+err_sockclose:
+	mnl_socket_close(nlctx.sock);
+	return result;
+}

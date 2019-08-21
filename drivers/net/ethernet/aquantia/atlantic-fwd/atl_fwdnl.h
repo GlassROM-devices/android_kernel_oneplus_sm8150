@@ -1,0 +1,67 @@
+/*
+ * aQuantia Corporation Network Driver
+ * Copyright (C) 2019 aQuantia Corporation. All rights reserved
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ */
+
+#ifndef _ATL_FWDNL_H_
+#define _ATL_FWDNL_H_
+
+/* family name */
+#define ATL_FWD_GENL_NAME "atl_fwd"
+
+/* commands */
+enum atlfwd_nl_command {
+	ATL_FWD_CMD_UNSPEC,
+
+	ATL_FWD_CMD_REQUEST_RING,
+	ATL_FWD_CMD_RELEASE_RING,
+	ATL_FWD_CMD_ENABLE_RING,
+	ATL_FWD_CMD_DISABLE_RING,
+
+	ATL_FWD_CMD_DISABLE_REDIRECTIONS,
+	ATL_FWD_CMD_FORCE_ICMP_TX_VIA,
+	ATL_FWD_CMD_FORCE_TX_VIA,
+
+	/* keep last */
+	NUM_ATL_FWD_CMD,
+	ATL_FWD_CMD_MAX = NUM_ATL_FWD_CMD - 1
+};
+
+enum atlfwd_nl_attribute {
+	ATL_FWD_ATTR_INVALID,
+
+	ATL_FWD_ATTR_IFNAME,
+
+	/* REQUEST_RING attributes */
+	ATL_FWD_ATTR_FLAGS,
+	ATL_FWD_ATTR_RING_SIZE,
+	ATL_FWD_ATTR_BUF_SIZE,
+	ATL_FWD_ATTR_PAGE_ORDER,
+
+	/* RELEASE_RING attributes */
+	ATL_FWD_ATTR_RING_INDEX,
+	/* ENABLE_RING / DISABLE_RING use RING_INDEX attribute above */
+
+	/* keep last */
+	NUM_ATL_FWD_ATTR,
+	ATL_FWD_ATTR_MAX = NUM_ATL_FWD_ATTR - 1
+};
+
+#ifdef __KERNEL__
+#include <linux/netdevice.h>
+
+int atlfwd_nl_init(void);
+void atlfwd_nl_on_probe(const struct net_device *ndev);
+void atlfwd_nl_on_remove(const struct net_device *ndev);
+void atlfwd_nl_exit(void);
+
+bool atlfwd_nl_is_redirected(const struct sk_buff *skb,
+			     struct net_device *ndev);
+netdev_tx_t atlfwd_nl_xmit(struct sk_buff *skb, struct net_device *ndev);
+#endif
+
+#endif
