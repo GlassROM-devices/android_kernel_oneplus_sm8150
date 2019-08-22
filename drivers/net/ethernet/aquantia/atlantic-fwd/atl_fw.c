@@ -566,8 +566,8 @@ relink:
 static int atl_fw2_dump_cfg(struct atl_hw *hw)
 {
 	/* save link configuration */
-	hw->fw_cfg_dump[0] = atl_read(hw, 0x368);
-	hw->fw_cfg_dump[1] = atl_read(hw, 0x36c) & 0xF18;
+	hw->fw_cfg_dump[0] = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
+	hw->fw_cfg_dump[1] = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH)) & 0xF18;
 
 	return 0;
 }
@@ -575,8 +575,8 @@ static int atl_fw2_dump_cfg(struct atl_hw *hw)
 static int atl_fw2_push_cfg(struct atl_hw *hw)
 {
 	/* restore link configuration */
-	atl_write(hw, 0x368, hw->fw_cfg_dump[0]);
-	atl_write(hw, 0x36c, hw->fw_cfg_dump[1]);
+	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), hw->fw_cfg_dump[0]);
+	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), hw->fw_cfg_dump[1]);
 
 	return 0;
 }
