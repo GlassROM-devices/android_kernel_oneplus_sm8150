@@ -150,7 +150,7 @@ static int atl_hw_reset_nonrbl(struct atl_hw *hw)
 		hw->mcp.ops->push_cfg(hw);
 
 	/* unstall FW*/
-	atl_write(hw, 0x404, 0x40e0);
+	atl_write(hw, 0x404, 0x000000e0);
 
 	ret = atl_fw_init(hw);
 
