@@ -572,7 +572,7 @@ static int atl_fw2_dump_cfg(struct atl_hw *hw)
 	return 0;
 }
 
-static int atl_fw2_push_cfg(struct atl_hw *hw)
+static int atl_fw2_restore_cfg(struct atl_hw *hw)
 {
 	/* restore link configuration */
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), hw->fw_cfg_dump[0]);
@@ -592,7 +592,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.enable_wol = atl_fw1_enable_wol,
 		.get_phy_temperature = (void *)atl_fw1_unsupported,
 		.dump_cfg = atl_fw1_unsupported,
-		.push_cfg = atl_fw1_unsupported,
+		.restore_cfg = atl_fw1_unsupported,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW),
 	},
 	[1] = {
@@ -605,7 +605,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.enable_wol = atl_fw2_enable_wol,
 		.get_phy_temperature = atl_fw2_get_phy_temperature,
 		.dump_cfg = atl_fw2_dump_cfg,
-		.push_cfg = atl_fw2_push_cfg,
+		.restore_cfg = atl_fw2_restore_cfg,
 		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW2_EFUSE_SHADOW),
 	},
 };
