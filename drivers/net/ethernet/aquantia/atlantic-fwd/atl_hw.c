@@ -204,6 +204,9 @@ int atl_hw_reset(struct atl_hw *hw)
 
 	atl_glb_soft_reset_full(hw);
 
+	if (hw->mcp.ops)
+		hw->mcp.ops->push_cfg(hw);
+
 	atl_write(hw, ATL_GLOBAL_CTRL2, 0x40e0);
 
 	for (tries = 0; tries < 10000; mdelay(1)) {
