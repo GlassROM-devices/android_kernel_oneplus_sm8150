@@ -78,12 +78,15 @@ static void atl_fwd_free_bufs(struct atl_fwd_ring *ring)
 	struct atl_fwd_bufs *bufs = ring->bufs;
 	struct atl_fwd_mem_ops *ops = ring->mem_ops;
 	int ring_size = ring->hw.size;
-	int order = bufs->order;
-	size_t frag_size = bufs->frag_size;
+	int order;
+	size_t frag_size;
 	int i;
 
 	if (!bufs)
 		return;
+
+	order = bufs->order;
+	frag_size = bufs->frag_size;
 
 	if (bufs->daddr_vec)
 		dma_free_coherent(dev, ring_size * sizeof(dma_addr_t),
@@ -489,12 +492,14 @@ EXPORT_SYMBOL(atl_fwd_set_ring_intr_mod);
 
 void atl_fwd_release_rings(struct atl_nic *nic)
 {
-	struct atl_fwd_ring **rings = nic->fwd.rings[0];
+	struct atl_fwd_ring *ring;
 	int i;
 
-	for (i = 0; i < ATL_NUM_FWD_RINGS * 2; i++)
-		if (rings[i])
-			atl_fwd_release_ring(rings[i]);
+	for (i = 0; i < ATL_NUM_FWD_RINGS * ATL_FWDIR_NUM; i++) {
+		ring = nic->fwd.rings[i % ATL_FWDIR_NUM][i / ATL_FWDIR_NUM];
+		if (ring)
+			atl_fwd_release_ring(ring);
+	}
 }
 
 int atl_fwd_enable_ring(struct atl_fwd_ring *ring)
@@ -744,12 +749,12 @@ EXPORT_SYMBOL(atl_fwd_transmit_skb);
 
 int atl_fwd_resume_rings(struct atl_nic *nic)
 {
-	struct atl_fwd_ring **rings = nic->fwd.rings[0];
+	struct atl_fwd_ring *ring;
 	int i;
 	int ret;
 
-	for (i = 0; i < ATL_NUM_FWD_RINGS * 2; i++) {
-		struct atl_fwd_ring *ring = rings[i];
+	for (i = 0; i < ATL_NUM_FWD_RINGS * ATL_FWDIR_NUM; i++) {
+		ring = nic->fwd.rings[i % ATL_FWDIR_NUM][i / ATL_FWDIR_NUM];
 
 		if (!ring)
 			continue;

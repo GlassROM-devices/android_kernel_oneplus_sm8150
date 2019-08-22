@@ -224,21 +224,8 @@ int atl_hw_reset(struct atl_hw *hw)
 		tries++;
 		reg = atl_read(hw, ATL_MCP_SCRATCH(RBL_STS)) & 0xffff;
 
-		if (!reg || reg == 0xdead)
-			continue;
-
-		/* if (reg != 0xf1a7) */
+		if (reg && reg != 0xdead)
 			break;
-
-		/* if (host_load_done) */
-		/* 	continue; */
-
-		/* ret = atl_load_mac_fw(hw); */
-		/* if (ret) { */
-		/* 	atl_dev_err("MAC FW host load failed\n"); */
-		/* 	return ret; */
-		/* } */
-		/* host_load_done = true; */
 	}
 
 	if (reg == 0xf1a7) {

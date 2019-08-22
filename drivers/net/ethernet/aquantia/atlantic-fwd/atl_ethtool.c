@@ -1291,7 +1291,7 @@ static uint32_t atl_rxf_find_vid(struct atl_nic *nic, uint16_t vid,
 		if (!(cmd & ATL_RXF_EN)) {
 			if (free == ATL_RXF_VLAN_MAX) {
 				free = idx;
-				if (vid == -1)
+				if (vid == 0xffff)
 					break;
 			}
 			continue;
@@ -1324,7 +1324,7 @@ static uint16_t atl_rxf_vid(struct atl_rxf_vlan *vlan, int idx)
 {
 	uint32_t cmd = vlan->cmd[idx];
 
-	return cmd & ATL_RXF_EN ? cmd & ATL_VLAN_VID_MASK : -1;
+	return cmd & ATL_RXF_EN ? cmd & ATL_VLAN_VID_MASK : 0xffff;
 }
 
 static int atl_rxf_dup_vid(struct atl_rxf_vlan *vlan, int idx, uint16_t vid)
@@ -1364,7 +1364,7 @@ static int atl_rxf_set_vlan(const struct atl_rxf_flt_desc *desc,
 		}
 
 		old_vid = atl_rxf_vid(vlan, idx);
-		if (old_vid != -1 && vid != old_vid &&
+		if (old_vid != 0xffff && vid != old_vid &&
 			test_bit(old_vid, vlan->map)) {
 			atl_nic_err("Can't overwrite Linux VLAN filter @%d VID %hd with a different VID %hd\n",
 				idx, old_vid, vid);
