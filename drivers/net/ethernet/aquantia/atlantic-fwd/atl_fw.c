@@ -198,16 +198,14 @@ static int __atl_fw2_get_link_caps(struct atl_hw *hw)
 		caps, 8);
 	if (ret)
 		return ret;
+	ret = atl_read_fwstat_word(hw, atl_fw2_stat_caps_ex, &caps_ex);
+	if (ret)
+		return ret;
 
 	mcp->caps_low = caps[0];
 	mcp->caps_high = caps[1];
-	atl_dev_dbg("Got link caps: %#x %#x\n", caps[0], caps[1]);
-
-	ret = atl_read_mcp_mem(hw, fw_stat_addr + atl_fw2_stat_caps_ex,
-		&caps_ex, 4);
-	if (ret)
-		return ret;
 	mcp->caps_ex = caps_ex;
+	atl_dev_dbg("Got link caps: %#x %#x %#x\n", caps[0], caps[1], caps_ex);
 
 	atl_for_each_rate(i, rate) {
 		uint32_t bit = rate->fw_bits[1];
@@ -391,12 +389,13 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 
 	atl_lock_fw(hw);
 
-	if (hw->mcp.caps_ex & atl_fw2_ex_caps_wol_ex)
+	if (hw->mcp.caps_ex & atl_fw2_ex_caps_wol_ex) {
 		ret = atl_write_fwsettings_word(hw, atl_fw2_setings_wol_ex, 
 			atl_fw2_wol_ex_wake_on_link_keep_rate | 
 			atl_fw2_wol_ex_wake_on_magic_keep_rate);
-	if (ret)
-		return ret;
+		if (ret)
+			return ret;
+	}
 
 	low_req = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
 

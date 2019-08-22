@@ -82,9 +82,9 @@ enum atl_fw2_stat_offt {
 	atl_fw2_stat_phy_hbeat = 0x4c,
 	atl_fw2_stat_temp = 0x50,
 	atl_fw2_stat_lcaps = 0x84,
-	atl_fw2_stat_settings_addr = 0x110,
-	atl_fw2_stat_settings_len = 0x114,
-	atl_fw2_stat_caps_ex = 0x118,
+	atl_fw2_stat_settings_addr = 0x10c,
+	atl_fw2_stat_settings_len = 0x110,
+	atl_fw2_stat_caps_ex = 0x114,
 };
 
 enum atl_fw2_settings_offt {
