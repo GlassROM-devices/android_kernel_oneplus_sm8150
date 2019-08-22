@@ -86,20 +86,19 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 }
 
 
-static inline void atl_glb_soft_reset(struct atl_hw *hw, bool first)
+static inline void atl_glb_soft_reset(struct atl_hw *hw)
 {
-	if (first)
-		atl_write_bit(hw, ATL_GLOBAL_STD_CTRL, 14, 0);
+	atl_write_bit(hw, ATL_GLOBAL_STD_CTRL, 14, 0);
 	atl_write_bit(hw, ATL_GLOBAL_STD_CTRL, 15, 1);
 }
 
-static inline void atl_glb_soft_reset_full(struct atl_hw *hw, bool first)
+static inline void atl_glb_soft_reset_full(struct atl_hw *hw)
 {
 	atl_write_bit(hw, ATL_TX_CTRL1, 29, 0);
 	atl_write_bit(hw, ATL_RX_CTRL1, 29, 0);
 	atl_write_bit(hw, ATL_INTR_CTRL, 29, 0);
 	atl_write_bit(hw, ATL_MPI_CTRL1, 29, 0);
-	atl_glb_soft_reset(hw, first);
+	atl_glb_soft_reset(hw);
 }
 
 /* entered with fw lock held */
@@ -123,7 +122,7 @@ static int atl_hw_reset_nonrbl(struct atl_hw *hw)
 	atl_write(hw, 0x100, 0x809f);
 	mdelay(50);
 
-	atl_glb_soft_reset(hw, true);
+	atl_glb_soft_reset(hw);
 
 	atl_write(hw, 0x404, 0x80e0);
 	atl_write(hw, 0x32a8, 0);
@@ -144,13 +143,13 @@ static int atl_hw_reset_nonrbl(struct atl_hw *hw)
 	mdelay(50);
 	atl_write(hw, 0x3a0, 1);
 
-	atl_glb_soft_reset_full(hw, false);
+	atl_glb_soft_reset_full(hw);
 
 	if (hw->mcp.ops)
 		hw->mcp.ops->push_cfg(hw);
 
 	/* unstall FW*/
-	atl_write(hw, 0x404, 0x000000e0);
+	atl_write(hw, 0x404, 0x40e0);
 
 	ret = atl_fw_init(hw);
 
@@ -203,7 +202,7 @@ int atl_hw_reset(struct atl_hw *hw)
 
 	atl_write(hw, ATL_MCP_SCRATCH(RBL_STS), 0xdead);
 
-	atl_glb_soft_reset_full(hw, true);
+	atl_glb_soft_reset_full(hw);
 
 	atl_write(hw, ATL_GLOBAL_CTRL2, 0x40e0);
 
