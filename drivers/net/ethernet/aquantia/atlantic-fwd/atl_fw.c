@@ -372,7 +372,8 @@ static void atl_fw2_set_default_link(struct atl_hw *hw)
 
 	atl_fw1_set_default_link(hw);
 	lstate->fc.req = atl_fc_full;
-	lstate->eee_enabled = 1;
+	lstate->eee_enabled = 0;
+	lstate->advertized &= ~ATL_EEE_MASK;
 }
 
 static int atl_fw1_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
