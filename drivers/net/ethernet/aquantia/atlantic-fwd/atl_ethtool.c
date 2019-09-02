@@ -169,8 +169,10 @@ static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed)
 {
 	struct atl_link_state *lstate = &hw->link_state;
 	struct atl_link_type *type;
+	unsigned long tmp;
 	int i;
 
+	lstate->advertized &= ~ATL_EEE_MASK;
 	atl_for_each_rate(i, type)
 		if (type->speed == speed) {
 			if (!(lstate->supported & BIT(i)))
@@ -179,6 +181,14 @@ static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed)
 			lstate->advertized = BIT(i);
 			break;
 		}
+
+	if (lstate->eee_enabled) {
+		atl_link_to_kernel(lstate->supported >> ATL_EEE_BIT_OFFT,
+				   &tmp, true);
+		/* advertize the supported links */
+		tmp = atl_kernel_to_link(&tmp, true);
+		lstate->advertized |= tmp << ATL_EEE_BIT_OFFT;
+	}
 
 	lstate->autoneg = false;
 	hw->mcp.ops->set_link(hw, false);
@@ -207,7 +217,6 @@ do {									\
 	}								\
 									\
 	lstate->autoneg = true;						\
-	(lstate)->advertized &= ATL_EEE_MASK;				\
 	(lstate)->advertized |= atl_kernel_to_link(advertise, legacy);	\
 									\
 	fc->req = 0;							\
