@@ -71,6 +71,7 @@ enum atl_fw2_opts {
 
 enum atl_fw2_ex_caps {
 	atl_define_bit(atl_fw2_ex_caps_wol_ex, 23)
+	atl_define_bit(atl_fw2_ex_caps_mac_heartbeat, 25)
 };
 
 enum atl_fw2_wol_ex {

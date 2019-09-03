@@ -205,6 +205,7 @@ static int __atl_fw2_get_link_caps(struct atl_hw *hw)
 	mcp->caps_low = caps[0];
 	mcp->caps_high = caps[1];
 	mcp->caps_ex = caps_ex;
+	mcp->wdog_disabled = !(mcp->caps_ex & atl_fw2_ex_caps_mac_heartbeat);
 	atl_dev_dbg("Got link caps: %#x %#x %#x\n", caps[0], caps[1], caps_ex);
 
 	atl_for_each_rate(i, rate) {
@@ -933,12 +934,6 @@ void atl_fw_watchdog(struct atl_hw *hw)
 	if (ret) {
 		atl_dev_err("FW watchdog: failure reading PHY heartbeat: %d\n",
 			-ret);
-		goto out;
-	}
-
-	if (hbeat == 0 && mcp->phy_hbeat == 0) {
-		atl_dev_warn("FW heartbeat stuck at 0, probably not provisioned. Disabling watchdog.\n");
-		mcp->wdog_disabled = true;
 		goto out;
 	}
 
