@@ -220,6 +220,8 @@ int atl_reconfigure(struct atl_nic *nic)
 
 	atl_clear_datapath(nic);
 
+	atl_fwd_suspend_rings(nic);
+
 	ret = atl_hw_reset(&nic->hw);
 	if (ret) {
 		atl_nic_err("HW reset failed, re-trying\n");
@@ -243,6 +245,10 @@ int atl_reconfigure(struct atl_nic *nic)
 		if (ret)
 			goto err;
 	}
+
+	ret = atl_fwd_resume_rings(nic);
+	if (ret)
+		goto err;
 
 	return 0;
 
@@ -274,6 +280,8 @@ int atl_do_reset(struct atl_nic *nic)
 
 	atl_stop(nic, true);
 
+	atl_fwd_suspend_rings(nic);
+
 	ret = atl_hw_reset(hw);
 	if (ret) {
 		atl_nic_err("HW reset failed, re-trying\n");
@@ -288,6 +296,10 @@ int atl_do_reset(struct atl_nic *nic)
 		if (ret)
 			goto out;
 	}
+
+	ret = atl_fwd_resume_rings(nic);
+	if (ret)
+		goto out;
 
 	if (test_and_clear_bit(ATL_ST_DETACHED, &hw->state))
 		netif_device_attach(nic->ndev);
@@ -425,6 +437,10 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	spin_lock_init(&nic->stats_lock);
 	INIT_WORK(&nic->work, atl_work);
 	mutex_init(&nic->hw.mcp.lock);
+
+#ifdef CONFIG_ATLFWD_FWD
+	BLOCKING_INIT_NOTIFIER_HEAD(&nic->fwd.nh_clients);
+#endif
 
 	hw = &nic->hw;
 	__set_bit(ATL_ST_ENABLED, &hw->state);
@@ -655,14 +671,15 @@ static int atl_resume_common(struct device *dev, bool deep)
 	if (ret)
 		goto exit;
 
-	set_bit(ATL_ST_ENABLED, &nic->hw.state);
-	pci_set_master(pdev);
-
 	if (deep) {
+		atl_fwd_suspend_rings(nic);
 		ret = atl_hw_reset(&nic->hw);
 		if (ret)
 			goto exit;
 	}
+
+	set_bit(ATL_ST_ENABLED, &nic->hw.state);
+	pci_set_master(pdev);
 
 	if (test_bit(ATL_ST_UP, &nic->hw.state)) {
 		ret = atl_start(nic);
@@ -670,9 +687,11 @@ static int atl_resume_common(struct device *dev, bool deep)
 			goto exit;
 	}
 
-	ret = atl_fwd_resume_rings(nic);
-	if (ret)
-		goto exit;
+	if (deep) {
+		ret = atl_fwd_resume_rings(nic);
+		if (ret)
+			goto exit;
+	}
 
 exit:
 	if (rtnlocked)

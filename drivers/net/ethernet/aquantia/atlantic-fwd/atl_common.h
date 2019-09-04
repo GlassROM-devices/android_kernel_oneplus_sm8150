@@ -21,6 +21,7 @@
 #define ATL_VERSION "1.0.23"
 
 struct atl_nic;
+enum atl_fwd_notify;
 
 #include "atl_compat.h"
 #include "atl_hw.h"
@@ -210,7 +211,7 @@ struct atl_fwd {
 	unsigned long ring_map[ATL_FWDIR_NUM];
 	struct atl_fwd_ring *rings[ATL_FWDIR_NUM][ATL_NUM_FWD_RINGS];
 	unsigned long msi_map;
-	void *private;
+	struct blocking_notifier_head nh_clients;
 };
 
 struct atl_nic {
@@ -405,8 +406,10 @@ void atl_adjust_eth_stats(struct atl_ether_stats *stats,
 	struct atl_ether_stats *base, bool add);
 void atl_fwd_release_rings(struct atl_nic *nic);
 #ifdef CONFIG_ATLFWD_FWD
+int atl_fwd_suspend_rings(struct atl_nic *nic);
 int atl_fwd_resume_rings(struct atl_nic *nic);
 #else
+static inline int atl_fwd_suspend_rings(struct atl_nic *nic) { return 0; }
 static inline int atl_fwd_resume_rings(struct atl_nic *nic) { return 0; }
 #endif
 int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay);
