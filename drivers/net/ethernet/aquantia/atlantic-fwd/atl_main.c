@@ -92,7 +92,7 @@ static int atl_open(struct net_device *ndev)
 	struct atl_nic *nic = netdev_priv(ndev);
 	int ret;
 
-	pm_runtime_get_sync(&nic->ndev->dev);
+	pm_runtime_get_sync(&nic->hw.pdev->dev);
 
 	if (!test_bit(ATL_ST_CONFIGURED, &nic->hw.state)) {
 		/* A previous atl_reconfigure() had failed. Try once more. */
@@ -118,14 +118,14 @@ static int atl_open(struct net_device *ndev)
 
 	set_bit(ATL_ST_UP, &nic->hw.state);
 
-	pm_runtime_put_sync(&nic->ndev->dev);
+	pm_runtime_put_sync(&nic->hw.pdev->dev);
 
 	return 0;
 
 free_rings:
 	atl_free_rings(nic);
 out:
-	pm_runtime_put_noidle(&nic->ndev->dev);
+	pm_runtime_put_noidle(&nic->hw.pdev->dev);
 	return ret;
 }
 
@@ -137,12 +137,12 @@ static int atl_close(struct atl_nic *nic, bool drop_link)
 	if (!test_and_clear_bit(ATL_ST_UP, &nic->hw.state))
 		return 0;
 
-	pm_runtime_get_sync(&nic->ndev->dev);
+	pm_runtime_get_sync(&nic->hw.pdev->dev);
 
 	atl_stop(nic, drop_link);
 	atl_free_rings(nic);
 
-	pm_runtime_put_sync(&nic->ndev->dev);
+	pm_runtime_put_sync(&nic->hw.pdev->dev);
 
 	return 0;
 }
@@ -439,9 +439,6 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_hwinit;
 
-	if ((hw->mcp.caps_low & atl_fw2_wake_on_link_force) == 0)
-		__pm_runtime_disable(&pdev->dev, false);
-
 	hw->mcp.ops->set_default_link(hw);
 	hw->link_state.force_off = 1;
 
@@ -521,7 +518,9 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_hwmon_init;
 
-	pm_runtime_put_noidle(&pdev->dev);
+	if (hw->mcp.caps_low & atl_fw2_wake_on_link_force)
+		pm_runtime_put_noidle(&pdev->dev);
+
 
 	atl_intr_enable_non_ring(nic);
 	mod_timer(&nic->work_timer, jiffies + HZ);
@@ -543,7 +542,6 @@ err_alloc_ndev:
 	pci_release_regions(pdev);
 err_pci_reg:
 err_dma:
-	pm_runtime_disable(&pdev->dev);
 
 	if (!nic || disable_needed)
 		pci_disable_device(pdev);
@@ -574,7 +572,9 @@ static void atl_remove(struct pci_dev *pdev)
 	free_netdev(nic->ndev);
 	pci_release_regions(pdev);
 
-	pm_runtime_disable(&pdev->dev);
+	if (nic->hw.mcp.caps_low & atl_fw2_wake_on_link_force)
+		pm_runtime_get_sync(&pdev->dev);
+
 	if (disable_needed)
 		pci_disable_device(pdev);
 }
@@ -664,9 +664,11 @@ static int atl_resume_common(struct device *dev, bool deep)
 			goto exit;
 	}
 
-	ret = atl_start(nic);
-	if (ret)
-		goto exit;
+	if (test_bit(ATL_ST_UP, &nic->hw.state)) {
+		ret = atl_start(nic);
+		if (ret)
+			goto exit;
+	}
 
 	ret = atl_fwd_resume_rings(nic);
 	if (ret)

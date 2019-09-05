@@ -387,22 +387,15 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 	struct offloadInfo *info;
 	struct drvIface *msg = NULL;
 	uint32_t val, wol_bits = 0, req_high = hw->mcp.req_high;
-	uint32_t low_req;
+	uint32_t low_req, wol_ex_flags = 0;
 
 	atl_lock_fw(hw);
-
-	if (hw->mcp.caps_ex & atl_fw2_ex_caps_wol_ex) {
-		ret = atl_write_fwsettings_word(hw, atl_fw2_setings_wol_ex, 
-			atl_fw2_wol_ex_wake_on_link_keep_rate | 
-			atl_fw2_wol_ex_wake_on_magic_keep_rate);
-		if (ret)
-			return ret;
-	}
 
 	low_req = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
 
 	if (wol_mode & atl_fw_wake_on_link) {
 		wol_bits |= atl_fw2_wake_on_link;
+		wol_ex_flags |= atl_fw2_wol_ex_wake_on_link_keep_rate;
 		low_req &= ~atl_fw2_wake_on_link_force;
 	}
 
@@ -413,6 +406,7 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 
 	if (wol_mode & atl_fw_wake_on_magic) {
 		wol_bits |= atl_fw2_nic_proxy | atl_fw2_wol;
+		wol_ex_flags |= atl_fw2_wol_ex_wake_on_magic_keep_rate;
 
 		ret = -ENOMEM;
 		msg = kzalloc(sizeof(*msg), GFP_KERNEL);
@@ -431,6 +425,13 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 			atl_dev_err("Failed to upload sleep proxy info to FW\n");
 			goto unlock_free;
 		}
+	}
+
+	if (hw->mcp.caps_ex & atl_fw2_ex_caps_wol_ex) {
+		ret = atl_write_fwsettings_word(hw, atl_fw2_setings_wol_ex, 
+						wol_ex_flags);
+		if (ret)
+			return ret;
 	}
 
 	req_high |= wol_bits;
