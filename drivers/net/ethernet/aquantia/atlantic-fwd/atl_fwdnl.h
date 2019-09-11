@@ -74,8 +74,8 @@ enum atlfwd_nl_ring_status {
 #include <linux/netdevice.h>
 
 int atlfwd_nl_init(void);
-void atlfwd_nl_on_probe(const struct net_device *ndev);
-void atlfwd_nl_on_remove(const struct net_device *ndev);
+void atlfwd_nl_on_probe(struct net_device *ndev);
+void atlfwd_nl_on_remove(struct net_device *ndev);
 void atlfwd_nl_exit(void);
 
 bool atlfwd_nl_is_redirected(const struct sk_buff *skb,

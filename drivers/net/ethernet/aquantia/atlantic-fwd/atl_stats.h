@@ -61,9 +61,17 @@ struct atl_global_stats {
 
 	/* MSM counters can't be reset without full HW reset, so
 	 * store them in relative form:
-	 * eth[i] == HW_counter - eth_base[i] */
+	 * eth[i] == HW_counter - eth_base[i]
+	 */
 	struct atl_ether_stats eth;
 	struct atl_ether_stats eth_base;
 };
+
+struct atl_fwd_ring;
+
+#ifdef CONFIG_ATLFWD_FWD_NETLINK
+void atl_fwd_get_ring_stats(struct atl_fwd_ring *ring,
+			    struct atl_ring_stats *stats);
+#endif
 
 #endif /* _ATL_STATS_H_ */

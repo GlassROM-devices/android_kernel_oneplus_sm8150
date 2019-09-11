@@ -639,8 +639,12 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 	switch (sset) {
 	case ETH_SS_STATS:
 		return ARRAY_SIZE(tx_stat_descs) * (nic->nvecs + 1) +
-			ARRAY_SIZE(rx_stat_descs) * (nic->nvecs + 1) +
-			ARRAY_SIZE(eth_stat_descs);
+		       ARRAY_SIZE(rx_stat_descs) * (nic->nvecs + 1) +
+		       ARRAY_SIZE(eth_stat_descs)
+#ifdef CONFIG_ATLFWD_FWD_NETLINK
+		       + ARRAY_SIZE(tx_stat_descs) * ATL_NUM_FWD_RINGS
+#endif
+			;
 
 	case ETH_SS_PRIV_FLAGS:
 		return ARRAY_SIZE(atl_priv_flags);
@@ -689,6 +693,14 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 			snprintf(prefix, sizeof(prefix), "ring_%d_", i);
 			atl_copy_stats_string_set(&p, prefix);
 		}
+
+#ifdef CONFIG_ATLFWD_FWD_NETLINK
+		for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
+			snprintf(prefix, sizeof(prefix), "fwd_ring_%d_", i);
+			atl_copy_stats_strings(&p, prefix, tx_stat_descs,
+					       ARRAY_SIZE(tx_stat_descs));
+		}
+#endif
 		return;
 
 	case ETH_SS_PRIV_FLAGS:
@@ -730,6 +742,15 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 		atl_get_ring_stats(&qvec->rx, &tmp);
 		atl_write_stats(&tmp.rx, rx_stat_descs, data, uint64_t);
 	}
+
+#ifdef CONFIG_ATLFWD_FWD_NETLINK
+	for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
+		struct atl_ring_stats tmp;
+
+		atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_TX][i], &tmp);
+		atl_write_stats(&tmp.tx, tx_stat_descs, data, uint64_t);
+	}
+#endif
 }
 
 static int atl_update_eee_pflags(struct atl_nic *nic)
