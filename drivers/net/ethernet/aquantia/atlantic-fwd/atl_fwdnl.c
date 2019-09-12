@@ -25,7 +25,8 @@
 static struct genl_family atlfwd_nl_family;
 static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 					 const int ring_index,
-					 struct genl_info *info);
+					 struct genl_info *info,
+					 const bool err_if_released);
 static unsigned int atlfwd_nl_dev_cache_index(const struct net_device *netdev);
 static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 				       struct sk_buff *skb);
@@ -144,6 +145,7 @@ bool atlfwd_nl_is_redirected(const struct sk_buff *skb, struct net_device *ndev)
 netdev_tx_t atlfwd_nl_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	const unsigned int idx = atlfwd_nl_dev_cache_index(ndev);
+	const bool err_if_released = false;
 	struct atl_fwd_ring *ring = NULL;
 	int ring_index = S32_MIN;
 
@@ -161,7 +163,7 @@ netdev_tx_t atlfwd_nl_xmit(struct sk_buff *skb, struct net_device *ndev)
 	else
 		return -EFAULT;
 
-	ring = get_fwd_ring(ndev, ring_index, NULL);
+	ring = get_fwd_ring(ndev, ring_index, NULL, err_if_released);
 	if (unlikely(ring == NULL))
 		return -EFAULT;
 
@@ -346,6 +348,14 @@ static int nl_ring_index(const struct atl_fwd_ring *ring)
 	return idx;
 }
 
+/* Checks if a given ring index (obtained from user-mode => "normalized")
+ * is valid.
+ */
+static bool is_valid_ring_index(const int ring_index)
+{
+	return (ring_index >= 0 && ring_index < ATL_NUM_FWD_RINGS * 2);
+}
+
 static struct sk_buff *nl_reply_create(void)
 {
 	return nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
@@ -418,7 +428,8 @@ static int atlfwd_nl_send_reply(struct genl_info *info,
  */
 static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 					 const int ring_index,
-					 struct genl_info *info)
+					 struct genl_info *info,
+					 const bool err_if_released)
 {
 	const int dir_tx = is_tx_ring(ring_index);
 	const int norm_index = (dir_tx ? ring_index - 1 : ring_index) / 2;
@@ -434,7 +445,7 @@ static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 		return NULL;
 	}
 
-	if (unlikely(ring == NULL && info))
+	if (unlikely(ring == NULL && info && err_if_released))
 		ATLFWD_NL_SET_ERR_MSG(info,
 				      "Requested ring is NULL / released");
 
@@ -643,6 +654,7 @@ err_netdev:
 /* ATL_FWD_CMD_RELEASE_RING handler */
 static int atlfwd_nl_release_ring(struct sk_buff *skb, struct genl_info *info)
 {
+	const bool err_if_released = true;
 	struct net_device *netdev = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	const char *ifname = NULL;
@@ -662,7 +674,7 @@ static int atlfwd_nl_release_ring(struct sk_buff *skb, struct genl_info *info)
 		goto err_netdev;
 	}
 
-	ring = get_fwd_ring(netdev, ring_index, info);
+	ring = get_fwd_ring(netdev, ring_index, info, err_if_released);
 	if (unlikely(ring == NULL)) {
 		result = -EINVAL;
 		goto err_netdev;
@@ -679,6 +691,7 @@ err_netdev:
 /* ATL_FWD_CMD_ENABLE_RING handler */
 static int atlfwd_nl_enable_ring(struct sk_buff *skb, struct genl_info *info)
 {
+	const bool err_if_released = true;
 	struct net_device *netdev = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	const char *ifname = NULL;
@@ -698,7 +711,7 @@ static int atlfwd_nl_enable_ring(struct sk_buff *skb, struct genl_info *info)
 		goto err_netdev;
 	}
 
-	ring = get_fwd_ring(netdev, ring_index, info);
+	ring = get_fwd_ring(netdev, ring_index, info, err_if_released);
 	if (unlikely(ring == NULL)) {
 		result = -EINVAL;
 		goto err_netdev;
@@ -715,6 +728,7 @@ err_netdev:
 /* ATL_FWD_CMD_DISABLE_RING handler */
 static int atlfwd_nl_disable_ring(struct sk_buff *skb, struct genl_info *info)
 {
+	const bool err_if_released = true;
 	struct net_device *netdev = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	const char *ifname = NULL;
@@ -734,7 +748,7 @@ static int atlfwd_nl_disable_ring(struct sk_buff *skb, struct genl_info *info)
 		goto err_netdev;
 	}
 
-	ring = get_fwd_ring(netdev, ring_index, info);
+	ring = get_fwd_ring(netdev, ring_index, info, err_if_released);
 	if (unlikely(ring == NULL)) {
 		result = -EINVAL;
 		goto err_netdev;
@@ -784,6 +798,7 @@ static int atlfwd_nl_force_icmp_tx_via(struct sk_buff *skb,
 				       struct genl_info *info)
 {
 	unsigned int idx = MAX_NUM_ATLFWD_DEVICES;
+	const bool err_if_released = true;
 	struct net_device *netdev = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	const char *ifname = NULL;
@@ -813,7 +828,7 @@ static int atlfwd_nl_force_icmp_tx_via(struct sk_buff *skb,
 		goto err_netdev;
 	}
 
-	ring = get_fwd_ring(netdev, ring_index, info);
+	ring = get_fwd_ring(netdev, ring_index, info, err_if_released);
 	if (unlikely(ring == NULL))
 		goto err_netdev;
 
@@ -832,6 +847,7 @@ err_netdev:
 static int atlfwd_nl_force_tx_via(struct sk_buff *skb, struct genl_info *info)
 {
 	unsigned int idx = MAX_NUM_ATLFWD_DEVICES;
+	const bool err_if_released = true;
 	struct net_device *netdev = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	const char *ifname = NULL;
@@ -861,7 +877,7 @@ static int atlfwd_nl_force_tx_via(struct sk_buff *skb, struct genl_info *info)
 		goto err_netdev;
 	}
 
-	ring = get_fwd_ring(netdev, ring_index, info);
+	ring = get_fwd_ring(netdev, ring_index, info, err_if_released);
 	if (unlikely(ring == NULL))
 		goto err_netdev;
 
@@ -870,6 +886,86 @@ static int atlfwd_nl_force_tx_via(struct sk_buff *skb, struct genl_info *info)
 		 "All egress traffic is now forced via ring %d (%p)\n",
 		 ring_index, ring);
 	s_atlfwd_devices[idx].force_tx_via = ring_index;
+
+err_netdev:
+	dev_put(netdev);
+	return result;
+}
+
+/* ATL_FWD_CMD_RING_STATUS processor */
+static int atlfwd_nl_add_ring_status(struct net_device *netdev, struct sk_buff *msg, void *hdr, struct genl_info *info, const int ring_index)
+{
+	const bool err_if_released = false;
+	const struct atl_fwd_ring *ring = get_fwd_ring(netdev, ring_index, info, err_if_released);
+
+	pr_debug(ATL_FWDNL_PREFIX "Ring %d (%p) status\n", ring_index, ring);
+
+	if (unlikely(!nl_reply_add_attr(msg, hdr, info, ATL_FWD_ATTR_RING_INDEX, ring_index)))
+		return -EMSGSIZE;
+
+	if (unlikely(!nl_reply_add_attr(msg, hdr, info, ATL_FWD_ATTR_RING_IS_TX, is_tx_ring(ring_index))))
+		return -EMSGSIZE;
+
+	if (ring != NULL) {
+		if (unlikely(!nl_reply_add_attr(msg, hdr, info, ATL_FWD_ATTR_RING_STATUS, (!(ring->state & ATL_FWR_ST_ENABLED) ? ATL_FWD_RING_STATUS_CREATED_DISABLED : ATL_FWD_RING_STATUS_ENABLED))))
+			return -EMSGSIZE;
+		if (unlikely(!nl_reply_add_attr(msg, hdr, info, ATL_FWD_ATTR_RING_SIZE, ring->hw.size)))
+			return -EMSGSIZE;
+		if (unlikely(!nl_reply_add_attr(msg, hdr, info, ATL_FWD_ATTR_RING_FLAGS, ring->flags)))
+			return -EMSGSIZE;
+	} else {
+		if (unlikely(!nl_reply_add_attr(msg, hdr, info, ATL_FWD_ATTR_RING_STATUS, ATL_FWD_RING_STATUS_RELEASED)))
+			return -EMSGSIZE;
+	}
+
+	return 0;
+}
+
+static int atlfwd_nl_ring_status(struct sk_buff *skb, struct genl_info *info)
+{
+	int first_idx = 0;
+	int last_idx = ATL_NUM_FWD_RINGS * 2;
+	struct sk_buff *msg = NULL;
+	void *hdr = NULL;
+	int result = 0;
+	// 1. get net_device
+	const char *ifname =
+		atlfwd_attr_to_str_or_null(info, ATL_FWD_ATTR_IFNAME);
+	struct net_device *netdev = atlfwd_nl_get_dev_by_name(ifname, info);
+
+	if (netdev == NULL)
+		return -ENODEV;
+	// attribute is optional for this command
+	int ring_index = atlfwd_attr_to_s32_optional(info, ATL_FWD_ATTR_RING_INDEX);
+
+	if (ring_index != S32_MIN) {
+		if (unlikely(!is_valid_ring_index(ring_index))) {
+			result = -EINVAL;
+			goto err_netdev;
+		}
+
+		first_idx = ring_index;
+		last_idx = ring_index + 1;
+	}
+
+	msg = nl_reply_create();
+	hdr = nl_reply_init(msg, info, ATL_FWD_CMD_RING_STATUS);
+	if (unlikely(msg == NULL)) {
+		result = -ENOBUFS;
+		goto err_netdev;
+	}
+	if (unlikely(hdr == NULL)) {
+		result = -EMSGSIZE;
+		goto err_netdev;
+	}
+
+	for (ring_index = first_idx; ring_index != last_idx; ring_index++) {
+		result = atlfwd_nl_add_ring_status(netdev, msg, hdr, info, ring_index);
+		if (unlikely(result < 0))
+			goto err_netdev;
+	}
+
+	result = nl_reply_send(msg, hdr, info);
 
 err_netdev:
 	dev_put(netdev);
@@ -906,6 +1002,9 @@ static int atlfwd_nl_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 	case ATL_FWD_CMD_FORCE_TX_VIA:
 		if (!info->attrs[ATL_FWD_ATTR_RING_INDEX])
 			missing_attr = ATL_FWD_ATTR_RING_INDEX;
+		break;
+	case ATL_FWD_CMD_RING_STATUS:
+		/* the only attribute is optional => nothing to check */
 		break;
 	case ATL_FWD_CMD_DISABLE_REDIRECTIONS:
 		/* no attributes => nothing to check */
@@ -961,6 +1060,9 @@ static const struct genl_ops atlfwd_nl_ops[] = {
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 	{ .cmd = ATL_FWD_CMD_FORCE_TX_VIA,
 	  .doit = atlfwd_nl_force_tx_via,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_RING_STATUS,
+	  .doit = atlfwd_nl_ring_status,
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 };
 

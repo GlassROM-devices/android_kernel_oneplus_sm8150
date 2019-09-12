@@ -37,6 +37,8 @@ static void print_usage(const char *binname)
 	fprintf(stderr, "\t%s\n", "force_icmp_tx_via <ring_index>");
 	fprintf(stderr, "\t%s\n", "force_tx_via <ring_index>");
 	fprintf(stderr, "\t%s\n", "disable_redirections");
+	fprintf(stderr, "%s\n", "");
+	fprintf(stderr, "\t%s\n", "ring_status [<ring_index>]");
 }
 
 static enum atlfwd_nl_command get_command(const char *str)
@@ -48,6 +50,7 @@ static enum atlfwd_nl_command get_command(const char *str)
 	static const char cmd_disable_redirections[] = "disable_redirections";
 	static const char cmd_force_icmp_tx_via[] = "force_icmp_tx_via";
 	static const char cmd_force_tx_via[] = "force_tx_via";
+	static const char cmd_ring_status[] = "ring_status";
 
 	if (strncmp(str, cmd_req_ring, MNL_ARRAY_SIZE(cmd_req_ring)) == 0)
 		return ATL_FWD_CMD_REQUEST_RING;
@@ -58,7 +61,8 @@ static enum atlfwd_nl_command get_command(const char *str)
 	if (strncmp(str, cmd_enable_ring, MNL_ARRAY_SIZE(cmd_enable_ring)) == 0)
 		return ATL_FWD_CMD_ENABLE_RING;
 
-	if (strncmp(str, cmd_disable_ring, MNL_ARRAY_SIZE(cmd_disable_ring)) == 0)
+	if (strncmp(str, cmd_disable_ring, MNL_ARRAY_SIZE(cmd_disable_ring)) ==
+	    0)
 		return ATL_FWD_CMD_DISABLE_RING;
 
 	if (strncmp(str, cmd_disable_redirections,
@@ -69,8 +73,12 @@ static enum atlfwd_nl_command get_command(const char *str)
 		    MNL_ARRAY_SIZE(cmd_force_icmp_tx_via)) == 0)
 		return ATL_FWD_CMD_FORCE_ICMP_TX_VIA;
 
-	if (strncmp(str, cmd_force_tx_via, MNL_ARRAY_SIZE(cmd_force_tx_via)) == 0)
+	if (strncmp(str, cmd_force_tx_via, MNL_ARRAY_SIZE(cmd_force_tx_via)) ==
+	    0)
 		return ATL_FWD_CMD_FORCE_TX_VIA;
+
+	if (strncmp(str, cmd_ring_status, MNL_ARRAY_SIZE(cmd_ring_status)) == 0)
+		return ATL_FWD_CMD_RING_STATUS;
 
 	return ATL_FWD_CMD_UNSPEC;
 }
@@ -128,6 +136,12 @@ struct atlfwd_args *parse_args(const int argc, char **argv)
 		parsed_args.page_order =
 			(uint32_t)atoi(get_last_arg(argc, argv));
 		break;
+	case ATL_FWD_CMD_RING_STATUS:
+		if (optind == argc) {
+			parsed_args.ring_index = -1;
+			break;
+		}
+		/* fall through */
 	case ATL_FWD_CMD_RELEASE_RING:
 		/* fall through */
 	case ATL_FWD_CMD_ENABLE_RING:
@@ -138,7 +152,7 @@ struct atlfwd_args *parse_args(const int argc, char **argv)
 		/* fall through */
 	case ATL_FWD_CMD_FORCE_TX_VIA:
 		parsed_args.ring_index =
-			(uint32_t)atoi(get_last_arg(argc, argv));
+			(int32_t)atoi(get_last_arg(argc, argv));
 		break;
 	case ATL_FWD_CMD_DISABLE_REDIRECTIONS:
 		break;

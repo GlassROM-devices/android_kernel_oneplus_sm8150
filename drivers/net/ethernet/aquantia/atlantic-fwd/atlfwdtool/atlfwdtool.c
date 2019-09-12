@@ -86,6 +86,107 @@ static int atlnl_reqring_cb(const struct nlmsghdr *nlhdr, void *data)
 	return MNL_CB_OK;
 }
 
+static bool is_ring_created(const enum atlfwd_nl_ring_status ring_status)
+{
+	switch (ring_status) {
+	case ATL_FWD_RING_STATUS_CREATED_DISABLED:
+	case ATL_FWD_RING_STATUS_ENABLED:
+		return true;
+	default:
+		return false;
+	}
+
+	return false;
+}
+
+static const char *
+ring_status_string(const enum atlfwd_nl_ring_status ring_status)
+{
+	static const char *status_str[NUM_ATL_FWD_RING_STATUS] = {
+		[ATL_FWD_RING_STATUS_INVALID] = "invalid status",
+		[ATL_FWD_RING_STATUS_RELEASED] = "released",
+		[ATL_FWD_RING_STATUS_CREATED_DISABLED] = "disabled",
+		[ATL_FWD_RING_STATUS_ENABLED] = "enabled",
+	};
+
+	return (ring_status < NUM_ATL_FWD_RING_STATUS ?
+			status_str[ring_status] :
+			status_str[ATL_FWD_RING_STATUS_INVALID]);
+}
+
+struct ring_status {
+	enum atlfwd_nl_ring_status status;
+	bool is_tx;
+	int size;
+	unsigned int flags;
+};
+
+static void print_ring_status(const int ring_index,
+			      const struct ring_status *status)
+{
+	char prefix[16];
+
+	snprintf(prefix, MNL_ARRAY_SIZE(prefix), "fwd_ring_%d_", ring_index);
+
+	printf("%sstatus:\t%s\n", prefix, ring_status_string(status->status));
+	printf("%sdirection:\t%s\n", prefix, status->is_tx ? "tx" : "rx");
+	if (is_ring_created(status->status)) {
+		printf("%sflags:\t%d\n", prefix, status->flags);
+		printf("%ssize:\t%d\n", prefix, status->size);
+	} else {
+		printf("%sflags:\t%s\n", prefix, "n/a");
+		printf("%ssize:\t%s\n", prefix, "n/a");
+	}
+}
+
+static int atlnl_ringstatus_cb(const struct nlmsghdr *nlhdr, void *data)
+{
+	const struct nlattr *attr;
+	int ring_index = -1;
+	struct ring_status status = {
+		.status = ATL_FWD_RING_STATUS_INVALID,
+		.is_tx = false,
+		.size = 0,
+		.flags = 0,
+	};
+
+	mnl_attr_for_each(attr, nlhdr, GENL_HDRLEN)
+	{
+		switch (mnl_attr_get_type(attr)) {
+		case ATL_FWD_ATTR_RING_INDEX:
+			if (ring_index >= 0)
+				print_ring_status(ring_index, &status);
+			ring_index = (int)mnl_attr_get_u32(attr);
+			break;
+		case ATL_FWD_ATTR_RING_STATUS:
+			status.status = (int)mnl_attr_get_u32(attr);
+			break;
+		case ATL_FWD_ATTR_RING_IS_TX:
+			status.is_tx = (bool)mnl_attr_get_u32(attr);
+			break;
+		case ATL_FWD_ATTR_RING_SIZE:
+			status.size = (int)mnl_attr_get_u32(attr);
+			break;
+		case ATL_FWD_ATTR_RING_FLAGS:
+			status.flags = (unsigned int)mnl_attr_get_u32(attr);
+			break;
+		default:
+			fprintf(stderr, "Error: %s\n",
+				"Unexpected attribute in reply");
+			break;
+		}
+	}
+
+	if (ring_index == -1) {
+		fprintf(stderr, "Error: %s\n", "Incorrect reply");
+		return MNL_CB_ERROR;
+	}
+
+	print_ring_status(ring_index, &status);
+
+	return MNL_CB_OK;
+}
+
 #define ATL_FWD_CMD_STR(cmd)\
 [cmd] = #cmd
 static const char *cmd_str[NUM_ATL_FWD_CMD] = {
@@ -96,6 +197,7 @@ static const char *cmd_str[NUM_ATL_FWD_CMD] = {
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_DISABLE_REDIRECTIONS),
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_FORCE_ICMP_TX_VIA),
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_FORCE_TX_VIA),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_RING_STATUS),
 };
 #define ATL_FWD_ATTR_STR(attr)\
 [attr] = #attr
@@ -217,7 +319,17 @@ int main(int argc, char **argv)
 	case ATL_FWD_CMD_FORCE_TX_VIA:
 		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd, NULL, 1,
 						 ATL_FWD_ATTR_RING_INDEX,
-						 args->ring_index);
+						 (uint32_t)args->ring_index);
+		break;
+	case ATL_FWD_CMD_RING_STATUS:
+		if (args->ring_index < 0)
+			ret = atlnl_cmd_generic_u32_args(
+				&nlctx, args->cmd, atlnl_ringstatus_cb, 0);
+		else
+			ret = atlnl_cmd_generic_u32_args(
+				&nlctx, args->cmd, atlnl_ringstatus_cb, 1,
+				ATL_FWD_ATTR_RING_INDEX,
+				(uint32_t)args->ring_index);
 		break;
 	case ATL_FWD_CMD_DISABLE_REDIRECTIONS:
 		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd, NULL, 0);

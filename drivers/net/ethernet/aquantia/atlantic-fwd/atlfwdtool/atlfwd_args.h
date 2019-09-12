@@ -26,7 +26,7 @@ struct atlfwd_args {
 			uint32_t buf_size;
 			uint32_t page_order;
 		};
-		uint32_t ring_index;
+		int32_t ring_index;
 	};
 };
 
