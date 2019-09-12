@@ -242,16 +242,22 @@ static void atl_fwd_update_im(struct atl_fwd_ring *ring)
 
 static void atl_fwd_init_descr(struct atl_fwd_ring *fwd_ring)
 {
-	struct atl_fwd_buf_frag *frag = &fwd_ring->bufs->frags[0];
-	size_t frag_size = fwd_ring->bufs->frag_size;
 	struct atl_hw_ring *ring = &fwd_ring->hw;
 	int dir_tx = atl_fwd_ring_tx(fwd_ring);
+	struct atl_fwd_buf_frag *frag = NULL;
 	int buf_size = fwd_ring->buf_size;
 	int ring_size = ring->size;
+	size_t frag_size = 0;
 	unsigned int pg_off;
 	int i;
 
 	memset(ring->descs, 0, ring_size * sizeof(*ring->descs));
+
+	if (!(fwd_ring->flags & ATL_FWR_ALLOC_BUFS))
+		return;
+
+	frag = &fwd_ring->bufs->frags[0];
+	frag_size = fwd_ring->bufs->frag_size;
 
 	if (!(fwd_ring->flags & ATL_FWR_DONT_DMA_MAP)) {
 		for (pg_off = 0, i = 0; i < ring_size; i++) {
