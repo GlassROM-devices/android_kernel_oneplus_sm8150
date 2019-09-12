@@ -15,7 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
+#include "libmnl/libmnl.h"
 
 static void print_usage(const char *binname)
 {
@@ -49,27 +49,27 @@ static enum atlfwd_nl_command get_command(const char *str)
 	static const char cmd_force_icmp_tx_via[] = "force_icmp_tx_via";
 	static const char cmd_force_tx_via[] = "force_tx_via";
 
-	if (strncmp(str, cmd_req_ring, ARRAY_SIZE(cmd_req_ring)) == 0)
+	if (strncmp(str, cmd_req_ring, MNL_ARRAY_SIZE(cmd_req_ring)) == 0)
 		return ATL_FWD_CMD_REQUEST_RING;
 
-	if (strncmp(str, cmd_rel_ring, ARRAY_SIZE(cmd_rel_ring)) == 0)
+	if (strncmp(str, cmd_rel_ring, MNL_ARRAY_SIZE(cmd_rel_ring)) == 0)
 		return ATL_FWD_CMD_RELEASE_RING;
 
-	if (strncmp(str, cmd_enable_ring, ARRAY_SIZE(cmd_enable_ring)) == 0)
+	if (strncmp(str, cmd_enable_ring, MNL_ARRAY_SIZE(cmd_enable_ring)) == 0)
 		return ATL_FWD_CMD_ENABLE_RING;
 
-	if (strncmp(str, cmd_disable_ring, ARRAY_SIZE(cmd_disable_ring)) == 0)
+	if (strncmp(str, cmd_disable_ring, MNL_ARRAY_SIZE(cmd_disable_ring)) == 0)
 		return ATL_FWD_CMD_DISABLE_RING;
 
 	if (strncmp(str, cmd_disable_redirections,
-		    ARRAY_SIZE(cmd_disable_redirections)) == 0)
+		    MNL_ARRAY_SIZE(cmd_disable_redirections)) == 0)
 		return ATL_FWD_CMD_DISABLE_REDIRECTIONS;
 
 	if (strncmp(str, cmd_force_icmp_tx_via,
-		    ARRAY_SIZE(cmd_force_icmp_tx_via)) == 0)
+		    MNL_ARRAY_SIZE(cmd_force_icmp_tx_via)) == 0)
 		return ATL_FWD_CMD_FORCE_ICMP_TX_VIA;
 
-	if (strncmp(str, cmd_force_tx_via, ARRAY_SIZE(cmd_force_tx_via)) == 0)
+	if (strncmp(str, cmd_force_tx_via, MNL_ARRAY_SIZE(cmd_force_tx_via)) == 0)
 		return ATL_FWD_CMD_FORCE_TX_VIA;
 
 	return ATL_FWD_CMD_UNSPEC;

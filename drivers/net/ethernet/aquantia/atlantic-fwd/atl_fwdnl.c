@@ -282,19 +282,36 @@ atlfwd_attr_to_str_or_null(struct genl_info *info,
 
 /* Helper function to obtain the netlink attribute s32 data
  *
- * Returns S32_MIN on error, actual attribute value otherwise.
+ * Returns S32_MIN, if attribute is missing. Actual attribute value otherwise.
  */
-static int atlfwd_attr_to_s32(struct genl_info *info,
-			      const enum atlfwd_nl_attribute attr)
+static int atlfwd_attr_to_s32_priv(struct genl_info *info,
+			      const enum atlfwd_nl_attribute attr, const bool optional)
 {
 	if (info->attrs[attr])
 		return nla_get_s32(info->attrs[attr]);
 
-	pr_warn(ATL_FWDNL_PREFIX "attribute %d check is missing in pre_doit\n",
-		attr);
-	ATLFWD_NL_SET_ERR_MSG(
-		info, "Required attribute is missing (and internal error)");
+	if (!optional) {
+		pr_warn(ATL_FWDNL_PREFIX "attribute %d check is missing in pre_doit\n",
+			attr);
+		ATLFWD_NL_SET_ERR_MSG(
+			info, "Required attribute is missing (and internal error)");
+	}
 	return S32_MIN;
+}
+
+static int atlfwd_attr_to_s32(struct genl_info *info,
+			      const enum atlfwd_nl_attribute attr)
+{
+	return atlfwd_attr_to_s32_priv(info, attr, false);
+}
+
+/* Similar to previous function, but doesn't produce warnings,
+ * because attribute is optional.
+ */
+static int atlfwd_attr_to_s32_optional(struct genl_info *info,
+			      const enum atlfwd_nl_attribute attr)
+{
+	return atlfwd_attr_to_s32_priv(info, attr, true);
 }
 
 static bool is_tx_ring(const int ring_index)
@@ -302,8 +319,12 @@ static bool is_tx_ring(const int ring_index)
 	return ring_index % 2;
 }
 
-static int nl_ring_index(const struct atl_fwd_ring *ring, const bool is_tx)
+/* Converts regular ring index to "normalized" internal representation.
+ * This "normalized" value is the only thing known to user-mode.
+ */
+static int nl_ring_index(const struct atl_fwd_ring *ring)
 {
+	const bool is_tx = !!(ring->flags & ATL_FWR_TX);
 	int idx = 0;
 
 	if (ring->idx < ATL_FWD_RING_BASE) {
@@ -325,34 +346,67 @@ static int nl_ring_index(const struct atl_fwd_ring *ring, const bool is_tx)
 	return idx;
 }
 
-static int send_nl_reply(struct genl_info *info,
-			 const enum atlfwd_nl_command reply_cmd,
-			 const enum atlfwd_nl_attribute attr, const int value)
+static struct sk_buff *nl_reply_create(void)
 {
-	struct sk_buff *msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	return nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+}
+
+static void *nl_reply_init(struct sk_buff *msg, struct genl_info *info,
+			 const enum atlfwd_nl_command reply_cmd)
+{
 	void *hdr = NULL;
 
-	if (msg == NULL)
-		return -ENOBUFS;
+	if (unlikely(msg == NULL))
+		return NULL;
 
 	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq,
 			  &atlfwd_nl_family, 0, reply_cmd);
 	if (hdr == NULL) {
 		ATLFWD_NL_SET_ERR_MSG(info, "Reply message creation failed");
 		nlmsg_free(msg);
-		return -EMSGSIZE;
 	}
+
+	return hdr;
+}
+
+static bool nl_reply_add_attr(struct sk_buff *msg, void *hdr, struct genl_info *info, const enum atlfwd_nl_attribute attr, const int value)
+{
+	if (unlikely(msg == NULL))
+		return false;
 
 	if (nla_put_s32(msg, attr, value) != 0) {
 		ATLFWD_NL_SET_ERR_MSG(info,
 				      "Failed to put the reply attribute");
 		genlmsg_cancel(msg, hdr);
 		nlmsg_free(msg);
-		return -EMSGSIZE;
+		return false;
 	}
 
+	return true;
+}
+
+static int nl_reply_send(struct sk_buff *msg, void *hdr, struct genl_info *info)
+{
 	genlmsg_end(msg, hdr);
 	return genlmsg_reply(msg, info);
+}
+
+static int atlfwd_nl_send_reply(struct genl_info *info,
+			 const enum atlfwd_nl_command reply_cmd,
+			 const enum atlfwd_nl_attribute attr, const int value)
+{
+	struct sk_buff *msg = nl_reply_create();
+	void *hdr = nl_reply_init(msg, info, reply_cmd);
+
+	if (unlikely(msg == NULL))
+		return -ENOBUFS;
+	if (unlikely(hdr == NULL))
+		return -EMSGSIZE;
+
+	if (unlikely(!nl_reply_add_attr(msg, hdr, info, attr, value)))
+		return -EMSGSIZE;
+
+	return nl_reply_send(msg, hdr, info);
 }
 
 /* Get the FWD ring by index.
@@ -387,13 +441,13 @@ static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 	return ring;
 }
 
-static int atlfwd_nl_tx_ring_head(struct atl_fwd_ring *ring)
+static uint32_t atlfwd_nl_tx_ring_head(struct atl_fwd_ring *ring)
 {
 	/* Assume there are no other users for now */
 	return atl_read(&ring->nic->hw, ATL_TX_RING_HEAD(ring)) & 0x1fff;
 }
 
-static int atlfwd_nl_tx_ring_tail(struct atl_fwd_ring *ring)
+static uint32_t atlfwd_nl_tx_ring_tail(struct atl_fwd_ring *ring)
 {
 	/* Assume there are no other users for now */
 	return atl_read(&ring->nic->hw, ATL_TX_RING_TAIL(ring));
@@ -464,7 +518,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 				       struct sk_buff *skb)
 {
 	unsigned int frags = skb_shinfo(skb)->nr_frags;
-	int idx = atlfwd_nl_tx_ring_tail(ring);
+	uint32_t idx = atlfwd_nl_tx_ring_tail(ring);
 	unsigned int len = skb_headlen(skb);
 	skb_frag_t *frag = NULL;
 	struct atl_hw *hw = &ring->nic->hw;
@@ -570,7 +624,7 @@ static int atlfwd_nl_request_ring(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	pr_debug(ATL_FWDNL_PREFIX "Got ring %d (%p)\n", ring->idx, ring);
-	ring_index = nl_ring_index(ring, !!(flags & ATL_FWR_TX));
+	ring_index = nl_ring_index(ring);
 	if (ring_index == S32_MIN) {
 		ATLFWD_NL_SET_ERR_MSG(info, "Internal error");
 		atl_fwd_release_ring(ring);
@@ -578,7 +632,7 @@ static int atlfwd_nl_request_ring(struct sk_buff *skb, struct genl_info *info)
 		goto err_netdev;
 	}
 
-	result = send_nl_reply(info, ATL_FWD_CMD_RELEASE_RING,
+	result = atlfwd_nl_send_reply(info, ATL_FWD_CMD_RELEASE_RING,
 			       ATL_FWD_ATTR_RING_INDEX, ring_index);
 
 err_netdev:
