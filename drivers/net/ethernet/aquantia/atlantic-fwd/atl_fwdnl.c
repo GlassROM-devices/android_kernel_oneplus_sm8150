@@ -76,6 +76,10 @@ static struct {
 	int force_tx_via;
 	/* Deferred TX head updates polling */
 	struct atlfwd_nl_tx_head_data tx_head_wq;
+	u32 tx_hw_head;
+	u32 tx_sw_tail;
+	struct atl_fwd_event tx_evt;
+	struct atl_fwd_event rx_evt;
 } s_atlfwd_devices[MAX_NUM_ATLFWD_DEVICES];
 static int s_atlfwd_devices_cnt; /* Total number of entries in cache */
 
@@ -1085,6 +1089,162 @@ err_netdev:
 	return result;
 }
 
+
+/* ATL_FWD_CMD_REQUEST_EVENT handler */
+static int atlfwd_nl_request_event(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net_device *netdev = NULL;
+	struct atl_fwd_ring *ring = NULL;
+	const char *ifname = NULL;
+	int ring_index = S32_MIN;
+	int idx;
+	int result = 0;
+
+	/* 1. get net_device */
+	ifname = atlfwd_attr_to_str_or_null(info, ATL_FWD_ATTR_IFNAME);
+	netdev = atlfwd_nl_get_dev_by_name(ifname, info);
+	if (netdev == NULL)
+		return -ENODEV;
+
+	/* 2. parse mandatory attributes */
+	ring_index = atlfwd_attr_to_s32(info, ATL_FWD_ATTR_RING_INDEX);
+	if (unlikely(ring_index == S32_MIN)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	ring = get_fwd_ring(netdev, ring_index, info);
+	if (unlikely(ring == NULL)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	idx = atlfwd_nl_dev_cache_index(netdev);
+
+	if (is_tx_ring(ring_index)) {
+		s_atlfwd_devices[idx].tx_evt.ring = ring;
+		s_atlfwd_devices[idx].tx_evt.flags =ATL_FWD_EVT_TXWB;
+		s_atlfwd_devices[idx].tx_evt.tx_head_wrb = (dma_addr_t) &s_atlfwd_devices[idx].tx_hw_head;
+	}
+	result = atl_fwd_request_event(&s_atlfwd_devices[idx].tx_evt);
+	if (result) {
+		goto err_netdev;
+	}
+
+
+err_netdev:
+	dev_put(netdev);
+	return result;
+}
+
+/* ATL_FWD_CMD_RELEASE_EVENT handler */
+static int atlfwd_nl_release_event(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net_device *netdev = NULL;
+	struct atl_fwd_ring *ring = NULL;
+	const char *ifname = NULL;
+	int ring_index = S32_MIN;
+	int result = 0;
+
+	/* 1. get net_device */
+	ifname = atlfwd_attr_to_str_or_null(info, ATL_FWD_ATTR_IFNAME);
+	netdev = atlfwd_nl_get_dev_by_name(ifname, info);
+	if (netdev == NULL)
+		return -ENODEV;
+
+	/* 2. parse mandatory attributes */
+	ring_index = atlfwd_attr_to_s32(info, ATL_FWD_ATTR_RING_INDEX);
+	if (unlikely(ring_index == S32_MIN)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	ring = get_fwd_ring(netdev, ring_index, info);
+	if (unlikely(ring == NULL)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	pr_debug(ATL_FWDNL_PREFIX "Releasing event for ring %d (%p)\n", ring_index, ring);
+	atl_fwd_release_event(ring->evt);
+
+err_netdev:
+	dev_put(netdev);
+	return result;
+}
+
+/* ATL_FWD_CMD_ENABLE_EVENT handler */
+static int atlfwd_nl_enable_event(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net_device *netdev = NULL;
+	struct atl_fwd_ring *ring = NULL;
+	const char *ifname = NULL;
+	int ring_index = S32_MIN;
+	int result = 0;
+
+	/* 1. get net_device */
+	ifname = atlfwd_attr_to_str_or_null(info, ATL_FWD_ATTR_IFNAME);
+	netdev = atlfwd_nl_get_dev_by_name(ifname, info);
+	if (netdev == NULL)
+		return -ENODEV;
+
+	/* 2. parse mandatory attributes */
+	ring_index = atlfwd_attr_to_s32(info, ATL_FWD_ATTR_RING_INDEX);
+	if (unlikely(ring_index == S32_MIN)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	ring = get_fwd_ring(netdev, ring_index, info);
+	if (unlikely(ring == NULL)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	pr_debug(ATL_FWDNL_PREFIX "Enabling event for ring %d (%p)\n", ring_index, ring);
+	atl_fwd_enable_event(ring->evt);
+
+err_netdev:
+	dev_put(netdev);
+	return result;
+}
+
+/* ATL_FWD_CMD_DISABLE_EVENT handler */
+static int atlfwd_nl_disable_event(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net_device *netdev = NULL;
+	struct atl_fwd_ring *ring = NULL;
+	const char *ifname = NULL;
+	int ring_index = S32_MIN;
+	int result = 0;
+
+	/* 1. get net_device */
+	ifname = atlfwd_attr_to_str_or_null(info, ATL_FWD_ATTR_IFNAME);
+	netdev = atlfwd_nl_get_dev_by_name(ifname, info);
+	if (netdev == NULL)
+		return -ENODEV;
+
+	/* 2. parse mandatory attributes */
+	ring_index = atlfwd_attr_to_s32(info, ATL_FWD_ATTR_RING_INDEX);
+	if (unlikely(ring_index == S32_MIN)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	ring = get_fwd_ring(netdev, ring_index, info);
+	if (unlikely(ring == NULL)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	pr_debug(ATL_FWDNL_PREFIX "Disabling event for ring %d (%p)\n", ring_index, ring);
+	atl_fwd_disable_event(ring->evt);
+
+err_netdev:
+	dev_put(netdev);
+	return result;
+}
+
 /* ATL_FWD_CMD_DISABLE_REDIRECTIONS handler */
 static int atlfwd_nl_disable_redirections(struct sk_buff *skb,
 					  struct genl_info *info)
@@ -1347,6 +1507,13 @@ static int atlfwd_nl_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 	case ATL_FWD_CMD_RING_STATUS:
 		/* the only attribute is optional => nothing to check */
 		break;
+	case ATL_FWD_CMD_REQUEST_EVENT:
+	case ATL_FWD_CMD_RELEASE_EVENT:
+	case ATL_FWD_CMD_ENABLE_EVENT:
+	case ATL_FWD_CMD_DISABLE_EVENT:
+		if (!info->attrs[ATL_FWD_ATTR_RING_INDEX])
+			missing_attr = ATL_FWD_ATTR_RING_INDEX;
+		break;
 	case ATL_FWD_CMD_DISABLE_REDIRECTIONS:
 		/* no attributes => nothing to check */
 		break;
@@ -1392,6 +1559,18 @@ static const struct genl_ops atlfwd_nl_ops[] = {
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 	{ .cmd = ATL_FWD_CMD_DISABLE_RING,
 	  .doit = atlfwd_nl_disable_ring,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_REQUEST_EVENT,
+	  .doit = atlfwd_nl_request_event,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_RELEASE_EVENT,
+	  .doit = atlfwd_nl_release_event,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_ENABLE_EVENT,
+	  .doit = atlfwd_nl_enable_event,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_DISABLE_EVENT,
+	  .doit = atlfwd_nl_disable_event,
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 	{ .cmd = ATL_FWD_CMD_DISABLE_REDIRECTIONS,
 	  .doit = atlfwd_nl_disable_redirections,
