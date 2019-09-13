@@ -203,6 +203,7 @@ static const char *cmd_str[NUM_ATL_FWD_CMD] = {
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_FORCE_ICMP_TX_VIA),
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_FORCE_TX_VIA),
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_RING_STATUS),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_SET_TX_BUNCH),
 };
 #define ATL_FWD_ATTR_STR(attr)\
 [attr] = #attr
@@ -212,6 +213,7 @@ static const char *attr_str[NUM_ATL_FWD_ATTR] = {
 	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_BUF_SIZE),
 	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_PAGE_ORDER),
 	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_RING_INDEX),
+	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_TX_BUNCH_SIZE),
 };
 
 static int atlnl_cmd_generic_u32_args(struct nl_context *ctx,
@@ -348,6 +350,11 @@ int main(int argc, char **argv)
 		break;
 	case ATL_FWD_CMD_DISABLE_REDIRECTIONS:
 		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd, NULL, 0);
+		break;
+	case ATL_FWD_CMD_SET_TX_BUNCH:
+		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd, NULL, 1,
+						 ATL_FWD_ATTR_TX_BUNCH_SIZE,
+						 args->tx_bunch);
 		break;
 	default:
 		fprintf(stderr, "Unknown command %d\n", args->cmd);

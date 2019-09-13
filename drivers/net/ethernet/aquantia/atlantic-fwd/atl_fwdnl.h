@@ -21,18 +21,20 @@ enum atlfwd_nl_command {
 	ATL_FWD_CMD_RELEASE_RING,
 	ATL_FWD_CMD_ENABLE_RING,
 	ATL_FWD_CMD_DISABLE_RING,
-	ATL_FWD_CMD_DUMP_RING,
-
-	ATL_FWD_CMD_REQUEST_EVENT,
-	ATL_FWD_CMD_RELEASE_EVENT,
-	ATL_FWD_CMD_ENABLE_EVENT,
-	ATL_FWD_CMD_DISABLE_EVENT,
 
 	ATL_FWD_CMD_DISABLE_REDIRECTIONS,
 	ATL_FWD_CMD_FORCE_ICMP_TX_VIA,
 	ATL_FWD_CMD_FORCE_TX_VIA,
 
 	ATL_FWD_CMD_RING_STATUS,
+
+	ATL_FWD_CMD_DUMP_RING,
+	ATL_FWD_CMD_SET_TX_BUNCH,
+
+	ATL_FWD_CMD_REQUEST_EVENT,
+	ATL_FWD_CMD_RELEASE_EVENT,
+	ATL_FWD_CMD_ENABLE_EVENT,
+	ATL_FWD_CMD_DISABLE_EVENT,
 
 	/* keep last */
 	NUM_ATL_FWD_CMD,
@@ -59,6 +61,8 @@ enum atlfwd_nl_attribute {
 	ATL_FWD_ATTR_RING_IS_TX,
 	ATL_FWD_ATTR_RING_FLAGS,
 
+	/* ATL_FWD_CMD_SET_TX_BUNCH atributes */
+	ATL_FWD_ATTR_TX_BUNCH_SIZE,
 	/* keep last */
 	NUM_ATL_FWD_ATTR,
 	ATL_FWD_ATTR_MAX = NUM_ATL_FWD_ATTR - 1
@@ -78,6 +82,7 @@ enum atlfwd_nl_ring_status {
 
 #ifdef __KERNEL__
 #include <linux/netdevice.h>
+struct atl_fwd_ring;
 
 int atlfwd_nl_init(void);
 void atlfwd_nl_on_probe(struct net_device *ndev);
@@ -90,6 +95,7 @@ netdev_tx_t atlfwd_nl_xmit(struct sk_buff *skb, struct net_device *ndev);
 
 bool atlfwd_nl_is_tx_fwd_ring_created(struct net_device *ndev,
 				      const int fwd_ring_index);
+void atl_fwd_dump_ring(struct atl_fwd_ring *ring);
 #endif
 
 #endif

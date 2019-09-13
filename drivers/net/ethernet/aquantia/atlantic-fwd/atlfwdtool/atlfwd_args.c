@@ -44,6 +44,7 @@ static void print_usage(const char *binname)
 	fprintf(stderr, "\t%s\n", "disable_redirections");
 	fprintf(stderr, "%s\n", "");
 	fprintf(stderr, "\t%s\n", "ring_status [<ring_index>]");
+	fprintf(stderr, "\t%s\n", "set_tx_bunch <bunch_size>");
 }
 
 static enum atlfwd_nl_command get_command(const char *str)
@@ -61,6 +62,7 @@ static enum atlfwd_nl_command get_command(const char *str)
 	static const char cmd_force_icmp_tx_via[] = "force_icmp_tx_via";
 	static const char cmd_force_tx_via[] = "force_tx_via";
 	static const char cmd_ring_status[] = "ring_status";
+	static const char cmd_set_tx_bunch[] = "set_tx_bunch";
 
 	if (strncmp(str, cmd_req_ring, MNL_ARRAY_SIZE(cmd_req_ring)) == 0)
 		return ATL_FWD_CMD_REQUEST_RING;
@@ -75,19 +77,19 @@ static enum atlfwd_nl_command get_command(const char *str)
 	    0)
 		return ATL_FWD_CMD_DISABLE_RING;
 
-	if (strncmp(str, cmd_dump_ring, ARRAY_SIZE(cmd_dump_ring)) == 0)
+	if (strncmp(str, cmd_dump_ring, MNL_ARRAY_SIZE(cmd_dump_ring)) == 0)
 		return ATL_FWD_CMD_DUMP_RING;
 
-	if (strncmp(str, cmd_req_event, ARRAY_SIZE(cmd_req_event)) == 0)
+	if (strncmp(str, cmd_req_event, MNL_ARRAY_SIZE(cmd_req_event)) == 0)
 		return ATL_FWD_CMD_REQUEST_EVENT;
 
-	if (strncmp(str, cmd_rel_event, ARRAY_SIZE(cmd_rel_event)) == 0)
+	if (strncmp(str, cmd_rel_event, MNL_ARRAY_SIZE(cmd_rel_event)) == 0)
 		return ATL_FWD_CMD_RELEASE_EVENT;
 
-	if (strncmp(str, cmd_enable_event, ARRAY_SIZE(cmd_enable_event)) == 0)
+	if (strncmp(str, cmd_enable_event, MNL_ARRAY_SIZE(cmd_enable_event)) == 0)
 		return ATL_FWD_CMD_ENABLE_EVENT;
 
-	if (strncmp(str, cmd_disable_event, ARRAY_SIZE(cmd_disable_event)) == 0)
+	if (strncmp(str, cmd_disable_event, MNL_ARRAY_SIZE(cmd_disable_event)) == 0)
 		return ATL_FWD_CMD_DISABLE_EVENT;
 
 	if (strncmp(str, cmd_disable_redirections,
@@ -104,6 +106,9 @@ static enum atlfwd_nl_command get_command(const char *str)
 
 	if (strncmp(str, cmd_ring_status, MNL_ARRAY_SIZE(cmd_ring_status)) == 0)
 		return ATL_FWD_CMD_RING_STATUS;
+
+	if (strncmp(str, cmd_set_tx_bunch, MNL_ARRAY_SIZE(cmd_set_tx_bunch)) == 0)
+		return ATL_FWD_CMD_SET_TX_BUNCH;
 
 	return ATL_FWD_CMD_UNSPEC;
 }
@@ -188,6 +193,10 @@ struct atlfwd_args *parse_args(const int argc, char **argv)
 	case ATL_FWD_CMD_FORCE_TX_VIA:
 		parsed_args.ring_index =
 			(int32_t)atoi(get_last_arg(argc, argv));
+		break;
+	case ATL_FWD_CMD_SET_TX_BUNCH:
+		parsed_args.tx_bunch =
+			(uint32_t)atoi(get_last_arg(argc, argv));
 		break;
 	case ATL_FWD_CMD_DISABLE_REDIRECTIONS:
 		break;
