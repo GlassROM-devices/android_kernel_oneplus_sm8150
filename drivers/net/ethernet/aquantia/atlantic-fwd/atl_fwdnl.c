@@ -31,7 +31,7 @@ static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 					 const bool err_if_released);
 static unsigned int atlfwd_nl_dev_cache_index(const struct net_device *netdev);
 static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
-				       struct sk_buff *skb);
+				       struct sk_buff *skb, u32 *tail);
 static void atlfwd_nl_tx_head_poll(struct work_struct *);
 
 /* FWD ring descriptor
@@ -224,7 +224,7 @@ netdev_tx_t atlfwd_nl_xmit(struct sk_buff *skb, struct net_device *ndev)
 	if (unlikely(ring == NULL))
 		return -EFAULT;
 
-	return atlfwd_nl_transmit_skb_ring(ring, skb);
+	return atlfwd_nl_transmit_skb_ring(ring, skb, &s_atlfwd_devices[idx].tx_sw_tail);
 }
 
 /* Returns true, if a given TX FWD ring is created/requested.
@@ -569,6 +569,16 @@ static uint32_t atlfwd_nl_ring_hw_tail(struct atl_fwd_ring *ring)
 	return atl_read(&ring->nic->hw, ATL_RX_RING_TAIL(ring)) & 0x1fff;
 }
 
+static int atlfwd_nl_ring_occupied(struct atl_fwd_ring *ring, u32 sw_tail)
+{
+	int busy = sw_tail - atlfwd_nl_tx_ring_head(ring);
+
+	if (busy < 0)
+		busy += ring->hw.size;
+
+	return busy;
+}
+
 /* Returns true if the space (number of free elements) is sufficient to store
  * 'needed' amount of elements.
  */
@@ -755,7 +765,7 @@ static void atl_fwd_txbuf_free(struct device *dev, struct atl_txbuf *txbuf)
 }
 
 static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
-				       struct sk_buff *skb)
+				       struct sk_buff *skb, u32 *tail)
 {
 	unsigned int atlfwd_dev_idx = MAX_NUM_ATLFWD_DEVICES;
 	unsigned int frags = skb_shinfo(skb)->nr_frags;
@@ -769,7 +779,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	struct atl_txbuf *txbuf = NULL;
 	dma_addr_t frag_daddr = 0;
 	struct atl_tx_desc desc;
-	uint32_t desc_idx = 0;
+	uint32_t desc_idx = *tail;
 
 	atlfwd_dev_idx = atlfwd_nl_dev_cache_index(ndev);
 	ring_desc = get_fwd_ring_desc(ring);
@@ -861,7 +871,12 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	ring_desc->tail = desc_idx;
 
 	wmb();
-	atl_write(hw, ATL_TX_RING_TAIL(ring), desc_idx);
+	if (atlfwd_nl_ring_occupied(ring, idx) > 64){
+		atl_write(hw, ATL_TX_RING_TAIL(ring), desc_idx);
+		atl_fwd_disable_ring(ring);
+		atl_fwd_disable_event(ring->evt);
+
+	}
 
 	if (likely(atlfwd_nl_tx_clean_threshold_msec != 0))
 		schedule_delayed_work(
@@ -1089,6 +1104,42 @@ err_netdev:
 	return result;
 }
 
+/* ATL_FWD_CMD_DUMP_RING handler */
+static int atlfwd_nl_dump_ring(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net_device *netdev = NULL;
+	struct atl_fwd_ring *ring = NULL;
+	const char *ifname = NULL;
+	int ring_index = S32_MIN;
+	int result = 0;
+	// 1. get net_device
+	ifname = atlfwd_attr_to_str_or_null(info, ATL_FWD_ATTR_IFNAME);
+	netdev = atlfwd_nl_get_dev_by_name(ifname, info);
+	if (netdev == NULL)
+		return -ENODEV;
+	// 2. parse mandatory attributes
+
+	ring_index = atlfwd_attr_to_s32(info, ATL_FWD_ATTR_RING_INDEX);
+	if (unlikely(ring_index == S32_MIN)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	ring = get_fwd_ring(netdev, ring_index, info);
+	if (unlikely(ring == NULL)) {
+		result = -EINVAL;
+		goto err_netdev;
+	}
+
+	pr_debug(ATL_FWDNL_PREFIX "Dumping ring %d (%p)\n",
+		 ring_index & 0x0000FFFF, ring);
+	atl_fwd_dump_ring(ring);
+
+err_netdev:
+	dev_put(netdev);
+	return result;
+}
+
 
 /* ATL_FWD_CMD_REQUEST_EVENT handler */
 static int atlfwd_nl_request_event(struct sk_buff *skb, struct genl_info *info)
@@ -1123,7 +1174,7 @@ static int atlfwd_nl_request_event(struct sk_buff *skb, struct genl_info *info)
 
 	if (is_tx_ring(ring_index)) {
 		s_atlfwd_devices[idx].tx_evt.ring = ring;
-		s_atlfwd_devices[idx].tx_evt.flags =ATL_FWD_EVT_TXWB;
+		s_atlfwd_devices[idx].tx_evt.flags = ATL_FWD_EVT_TXWB;
 		s_atlfwd_devices[idx].tx_evt.tx_head_wrb = (dma_addr_t) &s_atlfwd_devices[idx].tx_hw_head;
 	}
 	result = atl_fwd_request_event(&s_atlfwd_devices[idx].tx_evt);
@@ -1499,6 +1550,7 @@ static int atlfwd_nl_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 	case ATL_FWD_CMD_RELEASE_RING:
 	case ATL_FWD_CMD_ENABLE_RING:
 	case ATL_FWD_CMD_DISABLE_RING:
+	case ATL_FWD_CMD_DUMP_RING:
 	case ATL_FWD_CMD_FORCE_ICMP_TX_VIA:
 	case ATL_FWD_CMD_FORCE_TX_VIA:
 		if (!info->attrs[ATL_FWD_ATTR_RING_INDEX])
@@ -1559,6 +1611,9 @@ static const struct genl_ops atlfwd_nl_ops[] = {
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 	{ .cmd = ATL_FWD_CMD_DISABLE_RING,
 	  .doit = atlfwd_nl_disable_ring,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_DUMP_RING,
+	  .doit = atlfwd_nl_dump_ring,
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 	{ .cmd = ATL_FWD_CMD_REQUEST_EVENT,
 	  .doit = atlfwd_nl_request_event,

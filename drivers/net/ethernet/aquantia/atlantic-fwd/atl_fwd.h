@@ -360,6 +360,7 @@ int atl_fwd_disable_event(struct atl_fwd_event *evt);
 
 int atl_fwd_receive_skb(struct net_device *ndev, struct sk_buff *skb);
 int atl_fwd_transmit_skb(struct net_device *ndev, struct sk_buff *skb);
+void atl_fwd_dump_ring(struct atl_fwd_ring *ring);
 
 /**
  * atl_fwd_register_notifier() - Register notifier for reset of device

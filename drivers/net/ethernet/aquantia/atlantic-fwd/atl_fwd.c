@@ -10,6 +10,7 @@
 #include <linux/etherdevice.h>
 #include "atl_common.h"
 #include "atl_desc.h"
+#include "atl_trace.h"
 
 static const char *atl_fwd_dir_str(struct atl_fwd_ring *ring)
 {
@@ -809,6 +810,37 @@ int atl_fwd_unregister_notifier(struct net_device *ndev,
 	return blocking_notifier_chain_unregister(&fwd->nh_clients, n);
 }
 EXPORT_SYMBOL(atl_fwd_unregister_notifier);
+
+void atl_fwd_dump_ring(struct atl_fwd_ring *ring)
+{
+	struct atl_hw *hw = &ring->nic->hw;
+	bool dir_tx = atl_fwd_ring_tx(ring);
+	int j;
+
+	uint32_t head;
+	uint32_t tail;
+
+	if (dir_tx) {
+		head = atl_read(hw, ATL_TX_RING_HEAD(&ring->hw)) & 0x1fff;
+		tail = atl_read(hw, ATL_TX_RING_TAIL(&ring->hw)) & 0x1fff;
+	} else {
+		head = atl_read(hw, ATL_RX_RING_HEAD(&ring->hw)) & 0x1fff;
+		tail = atl_read(hw, ATL_RX_RING_TAIL(&ring->hw)) & 0x1fff;
+	}
+
+	pr_info("[%d] head=%d tail=%d", ring->idx, head, tail);
+
+	for (j = 0; j != ring->hw.size; j++ ) {
+		if (dir_tx) {
+			pr_info("[%d] [%d] 0x%llx, DD=%d", ring->idx, j, ring->hw.descs[j].tx.daddr, ring->hw.descs[j].tx.dd);
+			trace_atl_tx_descr(ring->idx, j, (u64*)ring->hw.descs[j].raw);
+		} else {
+			pr_info("[%d] [%d] 0x%llx, DD=%d", ring->idx, j, ring->hw.descs[j].rx.daddr, ring->hw.descs[j].rx.dd);
+			trace_atl_rx_descr(ring->idx, j, (u64*)ring->hw.descs[j].raw);
+		}
+	}
+}
+EXPORT_SYMBOL(atl_fwd_dump_ring);
 
 void atl_fwd_notify(struct atl_nic *nic, enum atl_fwd_notify notif)
 {

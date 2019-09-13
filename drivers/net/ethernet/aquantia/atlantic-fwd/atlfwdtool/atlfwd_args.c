@@ -33,6 +33,7 @@ static void print_usage(const char *binname)
 	fprintf(stderr, "\t%s\n", "release_ring <ring_index>");
 	fprintf(stderr, "\t%s\n", "enable_ring <ring_index>");
 	fprintf(stderr, "\t%s\n", "disable_ring <ring_index>");
+	fprintf(stderr, "\t%s\n", "dump_ring <ring_index>");
 	fprintf(stderr, "\t%s\n", "request_event <ring_index>");
 	fprintf(stderr, "\t%s\n", "release_event <ring_index>");
 	fprintf(stderr, "\t%s\n", "enable_event <ring_index>");
@@ -55,6 +56,7 @@ static enum atlfwd_nl_command get_command(const char *str)
 	static const char cmd_rel_event[] = "release_event";
 	static const char cmd_enable_event[] = "enable_event";
 	static const char cmd_disable_event[] = "disable_event";
+	static const char cmd_dump_ring[] = "dump_ring";
 	static const char cmd_disable_redirections[] = "disable_redirections";
 	static const char cmd_force_icmp_tx_via[] = "force_icmp_tx_via";
 	static const char cmd_force_tx_via[] = "force_tx_via";
@@ -72,6 +74,9 @@ static enum atlfwd_nl_command get_command(const char *str)
 	if (strncmp(str, cmd_disable_ring, MNL_ARRAY_SIZE(cmd_disable_ring)) ==
 	    0)
 		return ATL_FWD_CMD_DISABLE_RING;
+
+	if (strncmp(str, cmd_dump_ring, ARRAY_SIZE(cmd_dump_ring)) == 0)
+		return ATL_FWD_CMD_DUMP_RING;
 
 	if (strncmp(str, cmd_req_event, ARRAY_SIZE(cmd_req_event)) == 0)
 		return ATL_FWD_CMD_REQUEST_EVENT;
@@ -167,6 +172,8 @@ struct atlfwd_args *parse_args(const int argc, char **argv)
 	case ATL_FWD_CMD_ENABLE_RING:
 		/* fall through */
 	case ATL_FWD_CMD_DISABLE_RING:
+		/* fall through */
+	case ATL_FWD_CMD_DUMP_RING:
 		/* fall through */
 	case ATL_FWD_CMD_REQUEST_EVENT:
 		/* fall through */
