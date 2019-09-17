@@ -606,29 +606,53 @@ static int atlfwd_nl_num_txd_for_skb(struct sk_buff *skb)
 	return num_txd;
 }
 
+static unsigned int atlfwd_nl_tx_clean_budget = 256;
+
 /* Returns true, if HW has completed processing (head is equal to tail).
  * Returns false, if there some work is still pending.
  */
 static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 {
+	uint32_t budget = atlfwd_nl_tx_clean_budget;
 	struct atl_fwd_desc_ring *desc = NULL;
+	struct device *dev = NULL;
+	unsigned int packets = 0;
+	unsigned int bytes = 0;
 	uint32_t hw_head = 0;
 	uint32_t hw_tail = 0;
-	int i = 0;
 
 	desc = get_fwd_ring_desc(ring);
 	if (unlikely(ring == NULL || desc == NULL))
 		return true;
 
+	dev = &ring->nic->hw.pdev->dev;
 	hw_head = atlfwd_nl_tx_ring_head(ring);
 	hw_tail = atlfwd_nl_tx_ring_tail(ring);
 
+	do {
+		struct atl_txbuf *txbuf = &desc->txbufs[desc->sw_head];
+
+		if (desc->sw_head == hw_head)
+			break;
+
+		bytes += txbuf->bytes;
+		packets += txbuf->packets;
+
+		if (dma_unmap_len(txbuf, len)) {
+			dma_unmap_single(dev, dma_unmap_addr(txbuf, daddr),
+					 dma_unmap_len(txbuf, len), DMA_TO_DEVICE);
+			dma_unmap_len_set(txbuf, len, 0);
+		}
+
+		if (txbuf->skb)
+			napi_consume_skb(txbuf->skb, budget);
+
+		bump_ptr(desc->sw_head, ring, 1);
+	} while (budget--);
+
 	u64_stats_update_begin(&desc->syncp);
-	for (i = desc->sw_head; i != hw_head; bump_ptr(i, ring, 1)) {
-		desc->stats.tx.bytes += desc->txbufs[i].bytes;
-		desc->stats.tx.packets += desc->txbufs[i].packets;
-	}
-	desc->sw_head = hw_head;
+	desc->stats.tx.bytes += bytes;
+	desc->stats.tx.packets += packets;
 	u64_stats_update_end(&desc->syncp);
 
 	return (hw_head == hw_tail);
@@ -667,6 +691,17 @@ static void atlfwd_nl_tx_head_poll(struct work_struct *work)
 				      msecs_to_jiffies(200));
 }
 
+static void atl_fwd_txbuf_free(struct device *dev, struct atl_txbuf *txbuf)
+{
+	if (dma_unmap_len(txbuf, len)) {
+		dma_unmap_single(dev, dma_unmap_addr(txbuf, daddr),
+				 dma_unmap_len(txbuf, len),
+				 DMA_TO_DEVICE);
+	}
+
+	memset(txbuf, 0, sizeof(*txbuf));
+}
+
 static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 				       struct sk_buff *skb)
 {
@@ -675,12 +710,14 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	uint32_t desc_idx = atlfwd_nl_tx_ring_tail(ring);
 	struct atl_fwd_desc_ring *ring_desc = NULL;
 	struct net_device *ndev = ring->nic->ndev;
-	unsigned int len = skb_headlen(skb);
+	unsigned int frag_len = skb_headlen(skb);
 	skb_frag_t *frag = NULL;
 	struct atl_hw *hw = &ring->nic->hw;
 	struct device *dev = &hw->pdev->dev;
+	struct atl_txbuf *first_buf = NULL;
+	struct atl_txbuf *txbuf = NULL;
+	dma_addr_t frag_daddr = 0;
 	struct atl_tx_desc desc;
-	dma_addr_t daddr = 0;
 
 	ring_desc = get_fwd_ring_desc(ring);
 	if (unlikely(ring_desc == NULL))
@@ -700,31 +737,45 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	desc.type = tx_desc_type_desc;
 	desc.pay_len = skb->len;
 
-	daddr = dma_map_single(dev, skb->data, len, DMA_TO_DEVICE);
+	first_buf = &ring_desc->txbufs[desc_idx];
+	txbuf = first_buf;
+	memset(txbuf, 0, sizeof(*txbuf));
+
+	frag_daddr = dma_map_single(dev, skb->data, frag_len, DMA_TO_DEVICE);
 	for (frag = &skb_shinfo(skb)->frags[0];; frag++) {
+		dma_addr_t daddr = frag_daddr;
+		unsigned int len = frag_len;
+
 		if (dma_mapping_error(dev, daddr))
 			goto err_dma;
 
 		desc.daddr = cpu_to_le64(daddr);
 		while (len > ATL_DATA_PER_TXD) {
 			desc.len = cpu_to_le16(ATL_DATA_PER_TXD);
-			ring_desc->txbufs[desc_idx].bytes = ATL_DATA_PER_TXD;
-			ring_desc->txbufs[desc_idx].packets = 0;
+			txbuf->bytes = ATL_DATA_PER_TXD;	/* populate bytes for each descriptor */
 			WRITE_ONCE(ring->hw.descs[desc_idx].tx, desc);
 			bump_ptr(desc_idx, ring, 1);
+			txbuf = &ring_desc->txbufs[desc_idx];
+			memset(txbuf, 0, sizeof(*txbuf));
 			daddr += ATL_DATA_PER_TXD;
 			len -= ATL_DATA_PER_TXD;
 			desc.daddr = cpu_to_le64(daddr);
 		}
 		desc.len = cpu_to_le16(len);
-		ring_desc->txbufs[desc_idx].bytes = len;
-		ring_desc->txbufs[desc_idx].packets = 0;
+		txbuf->bytes = len;	/* populate bytes for each descriptor */
+		/* populate DMA addr/len for last descriptor of the fragment
+		 * (it's safe to unmap once HW processes this descriptor)
+		 */
+		dma_unmap_len_set(txbuf, len, frag_len);
+		dma_unmap_addr_set(txbuf, daddr, frag_daddr);
 
 		if (!frags)
 			break;
 
 		WRITE_ONCE(ring->hw.descs[desc_idx].tx, desc);
 		bump_ptr(desc_idx, ring, 1);
+		txbuf = &ring_desc->txbufs[desc_idx];
+		memset(txbuf, 0, sizeof(*txbuf));
 		len = skb_frag_size(frag);
 		daddr = skb_frag_dma_map(dev, frag, 0, len, DMA_TO_DEVICE);
 
@@ -736,7 +787,11 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 #if defined(ATL_TX_DESC_WB) || defined(ATL_TX_HEAD_WB)
 	desc.cmd |= tx_desc_cmd_wb;
 #endif
-	ring_desc->txbufs[desc_idx].packets = 1;
+	/* populate skb for each packet
+	 * (it's safe to consume skb once HW processes this descriptor)
+	 */
+	txbuf->packets = 1;
+	txbuf->skb = skb;
 	WRITE_ONCE(ring->hw.descs[desc_idx].tx, desc);
 	bump_ptr(desc_idx, ring, 1);
 
@@ -753,6 +808,13 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 
 err_dma:
 	dev_err(dev, "%s failed\n", __func__);
+	for (;;) {
+		atl_fwd_txbuf_free(dev, txbuf);
+		if (txbuf == first_buf)
+			break;
+		bump_ptr(desc_idx, ring, -1);
+		txbuf = &ring_desc->txbufs[desc_idx];
+	}
 	u64_stats_update_begin(&ring_desc->syncp);
 	ring_desc->stats.tx.dma_map_failed++;
 	u64_stats_update_end(&ring_desc->syncp);
