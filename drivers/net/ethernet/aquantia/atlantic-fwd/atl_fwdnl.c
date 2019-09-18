@@ -538,7 +538,8 @@ static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 static uint32_t atlfwd_nl_ring_hw_head(struct atl_fwd_ring *ring)
 {
 	if (!!(ring->flags & ATL_FWR_TX))
-		return atl_read(&ring->nic->hw, ATL_TX_RING_HEAD(ring)) & 0x1fff;
+		return atl_read(&ring->nic->hw, ATL_TX_RING_HEAD(ring)) &
+		       0x1fff;
 
 	return atl_read(&ring->nic->hw, ATL_RX_RING_HEAD(ring)) & 0x1fff;
 }
@@ -546,7 +547,8 @@ static uint32_t atlfwd_nl_ring_hw_head(struct atl_fwd_ring *ring)
 static uint32_t atlfwd_nl_ring_hw_tail(struct atl_fwd_ring *ring)
 {
 	if (!!(ring->flags & ATL_FWR_TX))
-		return atl_read(&ring->nic->hw, ATL_TX_RING_TAIL(ring)) & 0x1fff;
+		return atl_read(&ring->nic->hw, ATL_TX_RING_TAIL(ring)) &
+		       0x1fff;
 
 	return atl_read(&ring->nic->hw, ATL_RX_RING_TAIL(ring)) & 0x1fff;
 }
@@ -564,17 +566,19 @@ static bool atlfwd_nl_tx_full(struct atl_fwd_desc_ring *ring, const int needed)
 	return true;
 }
 
-/* Returns true, if the number of occupied elements is above the given threshold.
+/* Returns true, if the number of occupied elements is above a given threshold.
  *
  * E.g. if threshold is 4, then we'll return true here, if number of occupied
  * elements is greater than 1/4 of the total ring size.
  */
-static bool atlfwd_nl_tx_above_threshold(struct atl_fwd_desc_ring *ring, const unsigned int threshold_frac)
+static bool atlfwd_nl_tx_above_threshold(struct atl_fwd_desc_ring *ring,
+					 const unsigned int threshold_frac)
 {
 	if (unlikely(threshold_frac == 0))
 		return false;
 
-	return ring->hw.size - ring_space(ring) > ring->hw.size / threshold_frac;
+	return ring->hw.size - ring_space(ring) >
+	       ring->hw.size / threshold_frac;
 }
 
 /* Returns checksum offload flags for TX descriptor */
@@ -625,7 +629,8 @@ static int atlfwd_nl_num_txd_for_skb(struct sk_buff *skb)
 }
 
 static unsigned int atlfwd_nl_tx_clean_budget = 256;
-module_param_named(fwdnl_tx_clean_budget, atlfwd_nl_tx_clean_budget, uint, 0644);
+module_param_named(fwdnl_tx_clean_budget, atlfwd_nl_tx_clean_budget, uint,
+		   0644);
 
 /* Returns true, if HW has completed processing (head is equal to tail).
  * Returns false, if there some work is still pending.
@@ -659,7 +664,8 @@ static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 
 		if (dma_unmap_len(txbuf, len)) {
 			dma_unmap_single(dev, dma_unmap_addr(txbuf, daddr),
-					 dma_unmap_len(txbuf, len), DMA_TO_DEVICE);
+					 dma_unmap_len(txbuf, len),
+					 DMA_TO_DEVICE);
 			dma_unmap_len_set(txbuf, len, 0);
 		}
 
@@ -680,9 +686,11 @@ static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 }
 
 static unsigned int atlfwd_nl_tx_clean_threshold_msec = 200;
-module_param_named(fwdnl_tx_clean_threshold_msec, atlfwd_nl_tx_clean_threshold_msec, uint, 0644);
+module_param_named(fwdnl_tx_clean_threshold_msec,
+		   atlfwd_nl_tx_clean_threshold_msec, uint, 0644);
 static unsigned int atlfwd_nl_tx_clean_threshold_frac = 8;
-module_param_named(fwdnl_tx_clean_threshold_frac, atlfwd_nl_tx_clean_threshold_frac, uint, 0644);
+module_param_named(fwdnl_tx_clean_threshold_frac,
+		   atlfwd_nl_tx_clean_threshold_frac, uint, 0644);
 
 static void atlfwd_nl_tx_head_poll(struct work_struct *work)
 {
@@ -713,16 +721,16 @@ static void atlfwd_nl_tx_head_poll(struct work_struct *work)
 	}
 
 	if (!poll_finished && likely(atlfwd_nl_tx_clean_threshold_msec != 0))
-		schedule_delayed_work(&s_atlfwd_devices[idx].tx_head_wq.wrk,
-				      msecs_to_jiffies(atlfwd_nl_tx_clean_threshold_msec));
+		schedule_delayed_work(
+			&s_atlfwd_devices[idx].tx_head_wq.wrk,
+			msecs_to_jiffies(atlfwd_nl_tx_clean_threshold_msec));
 }
 
 static void atl_fwd_txbuf_free(struct device *dev, struct atl_txbuf *txbuf)
 {
 	if (dma_unmap_len(txbuf, len)) {
 		dma_unmap_single(dev, dma_unmap_addr(txbuf, daddr),
-				 dma_unmap_len(txbuf, len),
-				 DMA_TO_DEVICE);
+				 dma_unmap_len(txbuf, len), DMA_TO_DEVICE);
 	}
 
 	memset(txbuf, 0, sizeof(*txbuf));
@@ -747,14 +755,18 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 
 	atlfwd_dev_idx = atlfwd_nl_dev_cache_index(ndev);
 	ring_desc = get_fwd_ring_desc(ring);
-	if (unlikely(atlfwd_dev_idx == MAX_NUM_ATLFWD_DEVICES) || unlikely(ring_desc == NULL))
+	if (unlikely(atlfwd_dev_idx == MAX_NUM_ATLFWD_DEVICES) ||
+	    unlikely(ring_desc == NULL))
 		return -EFAULT;
 
 	desc_idx = ring_desc->tail;
 
-	if (atlfwd_nl_tx_above_threshold(ring_desc, atlfwd_nl_tx_clean_threshold_frac)) {
-		cancel_delayed_work_sync(&s_atlfwd_devices[atlfwd_dev_idx].tx_head_wq.wrk);
-		atlfwd_nl_tx_head_poll(&s_atlfwd_devices[atlfwd_dev_idx].tx_head_wq.wrk.work);
+	if (atlfwd_nl_tx_above_threshold(ring_desc,
+					 atlfwd_nl_tx_clean_threshold_frac)) {
+		cancel_delayed_work_sync(
+			&s_atlfwd_devices[atlfwd_dev_idx].tx_head_wq.wrk);
+		atlfwd_nl_tx_head_poll(
+			&s_atlfwd_devices[atlfwd_dev_idx].tx_head_wq.wrk.work);
 	}
 
 	if (atlfwd_nl_tx_full(ring_desc, atlfwd_nl_num_txd_for_skb(skb))) {
@@ -786,7 +798,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 		desc.daddr = cpu_to_le64(daddr);
 		while (len > ATL_DATA_PER_TXD) {
 			desc.len = cpu_to_le16(ATL_DATA_PER_TXD);
-			txbuf->bytes = ATL_DATA_PER_TXD;	/* populate bytes for each descriptor */
+			txbuf->bytes = ATL_DATA_PER_TXD;
 			WRITE_ONCE(ring->hw.descs[desc_idx].tx, desc);
 			bump_ptr(desc_idx, ring, 1);
 			txbuf = &ring_desc->txbufs[desc_idx];
@@ -796,7 +808,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 			desc.daddr = cpu_to_le64(daddr);
 		}
 		desc.len = cpu_to_le16(len);
-		txbuf->bytes = len;	/* populate bytes for each descriptor */
+		txbuf->bytes = len; /* populate bytes for each descriptor */
 		/* populate DMA addr/len for last descriptor of the fragment
 		 * (it's safe to unmap once HW processes this descriptor)
 		 */
