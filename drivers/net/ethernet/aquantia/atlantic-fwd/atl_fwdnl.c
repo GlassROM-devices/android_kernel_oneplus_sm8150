@@ -551,6 +551,9 @@ static uint32_t atlfwd_nl_ring_hw_tail(struct atl_fwd_ring *ring)
 	return atl_read(&ring->nic->hw, ATL_RX_RING_TAIL(ring)) & 0x1fff;
 }
 
+/* Returns true if the space (number of free elements) is sufficient to store
+ * 'needed' amount of elements.
+ */
 static bool atlfwd_nl_tx_full(struct atl_fwd_desc_ring *ring, const int needed)
 {
 	int space = ring_space(ring);
@@ -559,6 +562,19 @@ static bool atlfwd_nl_tx_full(struct atl_fwd_desc_ring *ring, const int needed)
 		return false;
 
 	return true;
+}
+
+/* Returns true, if the number of occupied elements is above the given threshold.
+ *
+ * E.g. if threshold is 4, then we'll return true here, if number of occupied
+ * elements is greater than 1/4 of the total ring size.
+ */
+static bool atlfwd_nl_tx_above_threshold(struct atl_fwd_desc_ring *ring, const unsigned int threshold_frac)
+{
+	if (unlikely(threshold_frac == 0))
+		return false;
+
+	return ring->hw.size - ring_space(ring) > ring->hw.size / threshold_frac;
 }
 
 /* Returns checksum offload flags for TX descriptor */
@@ -609,6 +625,7 @@ static int atlfwd_nl_num_txd_for_skb(struct sk_buff *skb)
 }
 
 static unsigned int atlfwd_nl_tx_clean_budget = 256;
+module_param_named(fwdnl_tx_clean_budget, atlfwd_nl_tx_clean_budget, uint, 0644);
 
 /* Returns true, if HW has completed processing (head is equal to tail).
  * Returns false, if there some work is still pending.
@@ -662,6 +679,11 @@ static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 	return (hw_head == READ_ONCE(desc->tail));
 }
 
+static unsigned int atlfwd_nl_tx_clean_threshold_msec = 200;
+module_param_named(fwdnl_tx_clean_threshold_msec, atlfwd_nl_tx_clean_threshold_msec, uint, 0644);
+static unsigned int atlfwd_nl_tx_clean_threshold_frac = 8;
+module_param_named(fwdnl_tx_clean_threshold_frac, atlfwd_nl_tx_clean_threshold_frac, uint, 0644);
+
 static void atlfwd_nl_tx_head_poll(struct work_struct *work)
 {
 	struct atlfwd_nl_tx_head_data *data =
@@ -690,9 +712,9 @@ static void atlfwd_nl_tx_head_poll(struct work_struct *work)
 		}
 	}
 
-	if (!poll_finished)
+	if (!poll_finished && likely(atlfwd_nl_tx_clean_threshold_msec != 0))
 		schedule_delayed_work(&s_atlfwd_devices[idx].tx_head_wq.wrk,
-				      msecs_to_jiffies(200));
+				      msecs_to_jiffies(atlfwd_nl_tx_clean_threshold_msec));
 }
 
 static void atl_fwd_txbuf_free(struct device *dev, struct atl_txbuf *txbuf)
@@ -723,11 +745,17 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	struct atl_tx_desc desc;
 	uint32_t desc_idx = 0;
 
+	atlfwd_dev_idx = atlfwd_nl_dev_cache_index(ndev);
 	ring_desc = get_fwd_ring_desc(ring);
-	if (unlikely(ring_desc == NULL))
+	if (unlikely(atlfwd_dev_idx == MAX_NUM_ATLFWD_DEVICES) || unlikely(ring_desc == NULL))
 		return -EFAULT;
 
 	desc_idx = ring_desc->tail;
+
+	if (atlfwd_nl_tx_above_threshold(ring_desc, atlfwd_nl_tx_clean_threshold_frac)) {
+		cancel_delayed_work_sync(&s_atlfwd_devices[atlfwd_dev_idx].tx_head_wq.wrk);
+		atlfwd_nl_tx_head_poll(&s_atlfwd_devices[atlfwd_dev_idx].tx_head_wq.wrk.work);
+	}
 
 	if (atlfwd_nl_tx_full(ring_desc, atlfwd_nl_num_txd_for_skb(skb))) {
 		u64_stats_update_begin(&ring_desc->syncp);
@@ -805,11 +833,10 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	wmb();
 	atl_write(hw, ATL_TX_RING_TAIL(ring), desc_idx);
 
-	atlfwd_dev_idx = atlfwd_nl_dev_cache_index(ndev);
-	if (likely(atlfwd_dev_idx != MAX_NUM_ATLFWD_DEVICES))
+	if (likely(atlfwd_nl_tx_clean_threshold_msec != 0))
 		schedule_delayed_work(
 			&s_atlfwd_devices[atlfwd_dev_idx].tx_head_wq.wrk,
-			msecs_to_jiffies(200));
+			msecs_to_jiffies(atlfwd_nl_tx_clean_threshold_msec));
 
 	return NETDEV_TX_OK;
 
