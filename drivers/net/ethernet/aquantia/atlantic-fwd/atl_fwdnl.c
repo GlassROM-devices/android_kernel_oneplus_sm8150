@@ -537,7 +537,7 @@ static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 
 static uint32_t atlfwd_nl_ring_hw_head(struct atl_fwd_ring *ring)
 {
-	if (!!(ring->flags & ATL_FWR_TX))
+	if (ring->flags & ATL_FWR_TX)
 		return atl_read(&ring->nic->hw, ATL_TX_RING_HEAD(ring)) &
 		       0x1fff;
 
@@ -546,7 +546,7 @@ static uint32_t atlfwd_nl_ring_hw_head(struct atl_fwd_ring *ring)
 
 static uint32_t atlfwd_nl_ring_hw_tail(struct atl_fwd_ring *ring)
 {
-	if (!!(ring->flags & ATL_FWR_TX))
+	if (ring->flags & ATL_FWR_TX)
 		return atl_read(&ring->nic->hw, ATL_TX_RING_TAIL(ring)) &
 		       0x1fff;
 
@@ -669,8 +669,10 @@ static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 			dma_unmap_len_set(txbuf, len, 0);
 		}
 
-		if (txbuf->skb)
+		if (txbuf->skb) {
 			napi_consume_skb(txbuf->skb, budget);
+			txbuf->skb = NULL;
+		}
 
 		bump_ptr(sw_head, ring, 1);
 	} while (budget--);
@@ -923,7 +925,7 @@ static int atlfwd_nl_request_ring(struct sk_buff *skb, struct genl_info *info)
 
 	memcpy(&ring_desc->hw, &ring->hw, sizeof(ring_desc->hw));
 
-	if (!!(ring->flags & ATL_FWR_TX)) {
+	if (ring->flags & ATL_FWR_TX) {
 		/* TX ring */
 		ring_desc->head = 0;
 		ring_desc->tail = 0;
