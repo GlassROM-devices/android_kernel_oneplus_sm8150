@@ -824,8 +824,8 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 		bump_ptr(desc_idx, ring, 1);
 		txbuf = &ring_desc->txbufs[desc_idx];
 		memset(txbuf, 0, sizeof(*txbuf));
-		len = skb_frag_size(frag);
-		daddr = skb_frag_dma_map(dev, frag, 0, len, DMA_TO_DEVICE);
+		frag_len = skb_frag_size(frag);
+		frag_daddr = skb_frag_dma_map(dev, frag, 0, frag_len, DMA_TO_DEVICE);
 
 		frags--;
 	}
