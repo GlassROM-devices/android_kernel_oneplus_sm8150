@@ -113,7 +113,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 	int idx = ring->tail;
 	struct device *dev = ring->qvec->dev;
 	struct atl_tx_desc *desc = &ring->desc.tx;
-	struct skb_frag_struct *frag;
+	skb_frag_t *frag;
 	/* Header's DMA mapping must be stored in the txbuf that has
 	 * ->skb set, even if it corresponds to the context
 	 * descriptor and not the first data descriptor

@@ -466,7 +466,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	unsigned int frags = skb_shinfo(skb)->nr_frags;
 	int idx = atlfwd_nl_tx_ring_tail(ring);
 	unsigned int len = skb_headlen(skb);
-	struct skb_frag_struct *frag = NULL;
+	skb_frag_t *frag = NULL;
 	struct atl_hw *hw = &ring->nic->hw;
 	struct device *dev = &hw->pdev->dev;
 	struct atl_tx_desc desc;
