@@ -12,6 +12,7 @@
 
 #include "atl_common.h"
 #include "atl_ring.h"
+#include "atl_fwdnl.h"
 
 static uint32_t atl_ethtool_get_link(struct net_device *ndev)
 {
@@ -642,7 +643,8 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 		       ARRAY_SIZE(rx_stat_descs) * (nic->nvecs + 1) +
 		       ARRAY_SIZE(eth_stat_descs)
 #ifdef CONFIG_ATLFWD_FWD_NETLINK
-		       + ARRAY_SIZE(tx_stat_descs) * ATL_NUM_FWD_RINGS
+		       + ARRAY_SIZE(tx_stat_descs) *
+				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_TX])
 #endif
 			;
 
@@ -696,6 +698,9 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 
 #ifdef CONFIG_ATLFWD_FWD_NETLINK
 		for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
+			if (!atlfwd_nl_is_tx_fwd_ring_created(ndev, i))
+				continue;
+
 			snprintf(prefix, sizeof(prefix), "fwd_ring_%d_", i);
 			atl_copy_stats_strings(&p, prefix, tx_stat_descs,
 					       ARRAY_SIZE(tx_stat_descs));
@@ -746,6 +751,9 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 #ifdef CONFIG_ATLFWD_FWD_NETLINK
 	for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
 		struct atl_ring_stats tmp;
+
+		if (!atlfwd_nl_is_tx_fwd_ring_created(ndev, i))
+			continue;
 
 		atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_TX][i], &tmp);
 		atl_write_stats(&tmp.tx, tx_stat_descs, data, uint64_t);

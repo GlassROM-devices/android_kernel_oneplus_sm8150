@@ -223,6 +223,18 @@ netdev_tx_t atlfwd_nl_xmit(struct sk_buff *skb, struct net_device *ndev)
 	return atlfwd_nl_transmit_skb_ring(ring, skb);
 }
 
+/* Returns true, if a given TX FWD ring is created/requested.
+ * Ring index argument is 0-based, ATL_FWD_RING_BASE is added automatically.
+ */
+bool atlfwd_nl_is_tx_fwd_ring_created(struct net_device *ndev,
+				      const int fwd_ring_index)
+{
+	const int ring_index = ATL_FWD_RING_BASE + fwd_ring_index;
+	struct atl_nic *nic = netdev_priv(ndev);
+
+	return test_bit(ring_index, &nic->fwd.ring_map[ATL_FWDIR_TX]);
+}
+
 /* Set the netlink error message
  *
  * Before Linux 4.12 we could only put it in kernel logs.

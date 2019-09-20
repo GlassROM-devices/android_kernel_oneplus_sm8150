@@ -81,6 +81,9 @@ void atlfwd_nl_exit(void);
 bool atlfwd_nl_is_redirected(const struct sk_buff *skb,
 			     struct net_device *ndev);
 netdev_tx_t atlfwd_nl_xmit(struct sk_buff *skb, struct net_device *ndev);
+
+bool atlfwd_nl_is_tx_fwd_ring_created(struct net_device *ndev,
+				      const int fwd_ring_index);
 #endif
 
 #endif
