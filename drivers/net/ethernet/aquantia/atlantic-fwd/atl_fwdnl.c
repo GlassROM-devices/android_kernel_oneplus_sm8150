@@ -49,6 +49,9 @@ struct atl_fwd_desc_ring {
 	};
 	struct u64_stats_sync syncp;
 	struct atl_ring_stats stats;
+	u32 tx_hw_head;
+	struct atl_fwd_event tx_evt;
+	struct atl_fwd_event rx_evt;
 };
 
 /* workqueue data to process tx head updates */
@@ -64,12 +67,6 @@ int __init atlfwd_nl_init(void)
 }
 
 #define MAX_NUM_ATLFWD_DEVICES 16 /* Maximum number of entries in cache */
-struct atl_fwdnl_ring {
-	u32 tx_hw_head;
-	u32 tx_sw_tail;
-	struct atl_fwd_event tx_evt;
-	struct atl_fwd_event rx_evt;
-};
 /* ATL devices cache
  *
  * To make sure we are trying to communicate with supported devices only.
@@ -84,7 +81,6 @@ static struct {
 	/* Deferred TX head updates polling */
 	struct atlfwd_nl_tx_head_data tx_head_wq;
 	u32 tx_bunch;
-	struct atl_fwdnl_ring rings[2 * ATL_NUM_FWD_RINGS];
 } s_atlfwd_devices[MAX_NUM_ATLFWD_DEVICES];
 static int s_atlfwd_devices_cnt; /* Total number of entries in cache */
 
@@ -109,8 +105,6 @@ void atlfwd_nl_on_probe(struct net_device *ndev)
 					  atlfwd_nl_tx_head_poll);
 			s_atlfwd_devices[i].tx_head_wq.atlfwd_dev_index = i;
 			s_atlfwd_devices[i].tx_bunch = 0;
-			memset(s_atlfwd_devices[i].rings, 0,
-			       sizeof(s_atlfwd_devices[i].rings));
 			s_atlfwd_devices_cnt++;
 			break;
 		}
@@ -566,15 +560,6 @@ static uint32_t atlfwd_nl_ring_hw_head(struct atl_fwd_ring *ring)
 		       0x1fff;
 
 	return atl_read(&ring->nic->hw, ATL_RX_RING_HEAD(ring)) & 0x1fff;
-}
-
-static uint32_t atlfwd_nl_ring_hw_tail(struct atl_fwd_ring *ring)
-{
-	if (ring->flags & ATL_FWR_TX)
-		return atl_read(&ring->nic->hw, ATL_TX_RING_TAIL(ring)) &
-		       0x1fff;
-
-	return atl_read(&ring->nic->hw, ATL_RX_RING_TAIL(ring)) & 0x1fff;
 }
 
 static int atlfwd_nl_ring_occupied(struct atl_fwd_ring *ring, u32 sw_tail)
@@ -1204,7 +1189,6 @@ static int atlfwd_nl_set_tx_bunch(struct sk_buff *skb, struct genl_info *info)
 	pr_debug(ATL_FWDNL_PREFIX "Set  TX bunch %d\n", bunch);
 	dev_idx = atlfwd_nl_dev_cache_index(netdev);
 	s_atlfwd_devices[dev_idx].tx_bunch = bunch;
-		
 
 err_netdev:
 	dev_put(netdev);
@@ -1214,14 +1198,13 @@ err_netdev:
 /* ATL_FWD_CMD_REQUEST_EVENT handler */
 static int atlfwd_nl_request_event(struct sk_buff *skb, struct genl_info *info)
 {
-	struct atl_fwdnl_ring *nl_ring = NULL;
+	struct atl_fwd_desc_ring *desc = NULL;
 	struct net_device *netdev = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	bool err_if_released = true;
 	const char *ifname = NULL;
 	int ring_index = S32_MIN;
 	int flags;
-	int idx;
 	int result = 0;
 
 	/* 1. get net_device */
@@ -1243,22 +1226,21 @@ static int atlfwd_nl_request_event(struct sk_buff *skb, struct genl_info *info)
 		goto err_netdev;
 	}
 
-	idx = atlfwd_nl_dev_cache_index(netdev);
-	nl_ring = &s_atlfwd_devices[idx].rings[ring_index];
+	desc = get_fwd_ring_desc(ring);
 
 	if (is_tx_ring(ring_index)) {
 		/* right now we support only head pointer writeback */
 		flags = ATL_FWD_EVT_TXWB;
-		nl_ring->tx_evt.ring = ring;
-		nl_ring->tx_evt.flags = flags;
-		if (nl_ring->tx_evt.flags & ATL_FWD_EVT_TXWB)
-			nl_ring->tx_evt.tx_head_wrb =
+		desc->tx_evt.ring = ring;
+		desc->tx_evt.flags = flags;
+		if (desc->tx_evt.flags & ATL_FWD_EVT_TXWB)
+			desc->tx_evt.tx_head_wrb =
 				  dma_map_single(&ring->nic->hw.pdev->dev,
-						 &nl_ring->tx_hw_head,
-						 sizeof(nl_ring->tx_hw_head),
+						 &desc->tx_hw_head,
+						 sizeof(desc->tx_hw_head),
 						 DMA_FROM_DEVICE);
 	}
-	result = atl_fwd_request_event(&nl_ring->tx_evt);
+	result = atl_fwd_request_event(&desc->tx_evt);
 	if (result) {
 		goto err_netdev;
 	}
@@ -1272,14 +1254,13 @@ err_netdev:
 /* ATL_FWD_CMD_RELEASE_EVENT handler */
 static int atlfwd_nl_release_event(struct sk_buff *skb, struct genl_info *info)
 {
-	struct atl_fwdnl_ring *nl_ring = NULL;
+	struct atl_fwd_desc_ring *desc = NULL;
 	struct net_device *netdev = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	bool err_if_released = true;
 	const char *ifname = NULL;
 	int ring_index = S32_MIN;
 	int result = 0;
-	int idx;
 
 	/* 1. get net_device */
 	ifname = atlfwd_attr_to_str_or_null(info, ATL_FWD_ATTR_IFNAME);
@@ -1303,12 +1284,12 @@ static int atlfwd_nl_release_event(struct sk_buff *skb, struct genl_info *info)
 	pr_debug(ATL_FWDNL_PREFIX "Releasing event for ring %d (%p)\n", ring_index, ring);
 	atl_fwd_release_event(ring->evt);
 
-	idx = atlfwd_nl_dev_cache_index(netdev);
-	nl_ring = &s_atlfwd_devices[idx].rings[ring_index];
-	if (nl_ring->tx_evt.flags & ATL_FWD_EVT_TXWB)
+	desc = get_fwd_ring_desc(ring);
+
+	if (desc->tx_evt.flags & ATL_FWD_EVT_TXWB)
 		dma_unmap_single(&ring->nic->hw.pdev->dev,
-				nl_ring->tx_evt.tx_head_wrb,
-				sizeof(nl_ring->tx_hw_head),
+				desc->tx_evt.tx_head_wrb,
+				sizeof(desc->tx_hw_head),
 				DMA_FROM_DEVICE);
 err_netdev:
 	dev_put(netdev);
