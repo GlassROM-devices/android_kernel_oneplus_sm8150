@@ -1777,7 +1777,8 @@ static void atl_refresh_rxf_desc(struct atl_nic *nic,
 	atl_for_each_rxf_idx(desc, idx)
 		desc->update_rxf(nic, idx);
 
-	atl_set_vlan_promisc(&nic->hw, nic->rxf_vlan.promisc_count);
+	atl_set_vlan_promisc(&nic->hw, (nic->ndev->flags & IFF_PROMISC) ||
+				       nic->rxf_vlan.promisc_count);
 }
 
 void atl_refresh_rxfs(struct atl_nic *nic)
@@ -1787,7 +1788,8 @@ void atl_refresh_rxfs(struct atl_nic *nic)
 	atl_for_each_rxf_desc(desc)
 		atl_refresh_rxf_desc(nic, desc);
 
-	atl_set_vlan_promisc(&nic->hw, nic->rxf_vlan.promisc_count);
+	atl_set_vlan_promisc(&nic->hw, (nic->ndev->flags & IFF_PROMISC) ||
+				       nic->rxf_vlan.promisc_count);
 }
 
 static bool atl_vlan_pull_from_promisc(struct atl_nic *nic, uint32_t idx)
@@ -1827,7 +1829,8 @@ static bool atl_vlan_pull_from_promisc(struct atl_nic *nic, uint32_t idx)
 	} while (idx & ATL_VIDX_FREE);
 
 	kfree(map);
-	atl_set_vlan_promisc(&nic->hw, vlan->promisc_count);
+	atl_set_vlan_promisc(&nic->hw, (nic->ndev->flags & IFF_PROMISC) ||
+				       vlan->promisc_count);
 	return true;
 }
 
@@ -2013,7 +2016,8 @@ int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
 	if (idx == ATL_VIDX_NONE) {
 		/* VID not found and no unused filters */
 		vlan->promisc_count++;
-		atl_set_vlan_promisc(&nic->hw, vlan->promisc_count);
+		atl_set_vlan_promisc(&nic->hw, (ndev->flags & IFF_PROMISC) ||
+					        vlan->promisc_count);
 		return 0;
 	}
 
@@ -2059,7 +2063,8 @@ int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
 	if (!(idx & ATL_VIDX_FOUND)) {
 		/* VID not present in filters, decrease promisc count */
 		vlan->promisc_count--;
-		atl_set_vlan_promisc(&nic->hw, vlan->promisc_count);
+		atl_set_vlan_promisc(&nic->hw, (ndev->flags & IFF_PROMISC) ||
+					       vlan->promisc_count);
 		return 0;
 	}
 
