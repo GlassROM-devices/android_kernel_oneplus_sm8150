@@ -269,7 +269,7 @@ extern const struct ethtool_ops atl_ethtool_ops;
 extern unsigned int atl_max_queues;
 extern unsigned atl_rx_linear;
 extern unsigned atl_min_intr_delay;
-extern int atl_enable_msi;
+extern bool atl_enable_msi;
 extern unsigned int atl_tx_clean_budget;
 extern unsigned int atl_tx_free_low;
 extern unsigned int atl_tx_free_high;

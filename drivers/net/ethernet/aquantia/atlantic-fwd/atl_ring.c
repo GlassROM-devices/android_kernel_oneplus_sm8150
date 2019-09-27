@@ -1151,8 +1151,8 @@ static int atl_poll(struct napi_struct *napi, int budget)
 }
 
 /* XXX NOTE: only checked on device probe for now */
-int atl_enable_msi = 1;
-module_param_named(msi, atl_enable_msi, int, 0444);
+bool atl_enable_msi = true;
+module_param_named(msi, atl_enable_msi, bool, 0444);
 
 static int atl_config_interrupts(struct atl_nic *nic)
 {
