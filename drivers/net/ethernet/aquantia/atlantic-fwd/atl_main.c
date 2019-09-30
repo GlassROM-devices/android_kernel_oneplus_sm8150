@@ -34,6 +34,8 @@ static void atl_start_link(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
 
+	atl_set_media_detect(nic, !!(nic->priv_flags & ATL_PF_BIT(MEDIA_DETECT)));
+
 	hw->link_state.force_off = 0;
 	hw->mcp.ops->set_link(hw, true);
 	set_bit(ATL_ST_UPDATE_LINK, &hw->state);
