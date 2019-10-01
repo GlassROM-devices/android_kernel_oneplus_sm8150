@@ -28,7 +28,6 @@
 static struct genl_family atlfwd_nl_family;
 static bool is_tx_ring_index(const int ring_index);
 static bool is_tx_ring(const struct atl_fwd_ring *ring);
-static struct atl_fwd_ring_desc *get_fwd_ring_desc(struct atl_fwd_ring *ring);
 static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 					 const int ring_index,
 					 struct genl_info *info,
@@ -37,6 +36,11 @@ static int enable_fwd_queue(struct atl_nic *nic);
 static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 				       struct sk_buff *skb);
 static void atlfwd_nl_tx_head_poll(struct work_struct *);
+static void atlfwd_nl_rx_poll(struct timer_list *);
+static int release_ring(struct net_device *ndev, struct genl_info *info,
+			struct atl_fwd_ring *ring);
+static int disable_ring(struct net_device *ndev, struct genl_info *info,
+			struct atl_fwd_ring *ring);
 static int release_event(struct net_device *ndev, struct genl_info *info,
 			 struct atl_fwd_ring *ring);
 
@@ -45,6 +49,12 @@ struct atlfwd_nl_tx_cleanup_workdata {
 	/* NB! delayed_work must be the first field in this structure */
 	struct delayed_work dwork;
 	struct net_device *ndev;
+};
+
+/* data used to perform rx polling */
+struct atlfwd_nl_rx_poll_workdata {
+	struct atl_fwd_ring *ring;
+	struct timer_list timer;
 };
 
 /* Register generic netlink family upon module initialization */
@@ -56,8 +66,10 @@ int __init atlfwd_nl_init(void)
 /* Populate private fwdnl data on probe */
 void atlfwd_nl_on_probe(struct net_device *ndev)
 {
+	struct atlfwd_nl_rx_poll_workdata *timer = NULL;
 	struct atlfwd_nl_tx_cleanup_workdata *wq = NULL;
 	struct atl_nic *nic = netdev_priv(ndev);
+	int i = 0;
 
 	nic->fwdnl.force_icmp_via = S32_MIN;
 	nic->fwdnl.force_tx_via = S32_MIN;
@@ -75,6 +87,16 @@ void atlfwd_nl_on_probe(struct net_device *ndev)
 
 	for (i = 0; i != ARRAY_SIZE(nic->fwdnl.ring_desc); i++) {
 		nic->fwdnl.ring_desc[i].std.nic = nic;
+
+		if (is_tx_ring_index(i))
+			continue;
+
+		timer = devm_kzalloc(&ndev->dev, sizeof(*timer), GFP_KERNEL);
+		if (likely(timer)) {
+			timer_setup(&timer->timer, atlfwd_nl_rx_poll, 0);
+			nic->fwdnl.ring_desc[i].rx_poll_timer = &timer->timer;
+		} else
+			pr_warn(ATL_FWDNL_PREFIX "RX timer creation failed!");
 	}
 }
 
@@ -82,9 +104,20 @@ void atlfwd_nl_on_probe(struct net_device *ndev)
 void atlfwd_nl_on_remove(struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
+	struct atl_fwd_ring *ring = NULL;
+	int i = 0;
 
 	if (nic->fwdnl.tx_cleanup_wq)
 		cancel_delayed_work_sync(nic->fwdnl.tx_cleanup_wq);
+
+	for (i = 0; i != ATL_NUM_FWD_RINGS * 2; i++) {
+		ring = get_fwd_ring(ndev, i, NULL, false);
+		if (ring)
+			release_ring(ndev, NULL, ring);
+	}
+
+	for (i = 0; i != ARRAY_SIZE(nic->fwdnl.ring_desc); i++)
+		nic->fwdnl.ring_desc[i].rx_poll_timer = NULL;
 }
 
 /* Enables FWD egress queue, if necessary */
@@ -108,7 +141,7 @@ void __exit atlfwd_nl_exit(void)
 void atl_fwd_get_ring_stats(struct atl_fwd_ring *ring,
 			    struct atl_ring_stats *stats)
 {
-	struct atl_fwd_ring_desc *desc = get_fwd_ring_desc(ring);
+	struct atl_fwd_ring_desc *desc = atlfwd_nl_get_fwd_ring_desc(ring);
 
 	if (likely(desc != NULL)) {
 		unsigned int start;
@@ -223,13 +256,25 @@ bool atlfwd_nl_is_tx_fwd_ring_created(struct net_device *ndev,
 	return test_bit(ring_index, &nic->fwd.ring_map[ATL_FWDIR_TX]);
 }
 
+struct atl_fwd_ring *atlfwd_nl_get_fwd_ring(struct net_device *ndev,
+					    const int ring_index)
+{
+	return get_fwd_ring(ndev, ring_index, NULL, false);
+}
+
 /* Set the netlink error message
  *
  * Before Linux 4.12 we could only put it in kernel logs.
  * Starting with 4.12 we can also use extack to pass the message to user-mode.
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-#define ATLFWD_NL_SET_ERR_MSG(info, msg) GENL_SET_ERR_MSG(info, msg)
+#define ATLFWD_NL_SET_ERR_MSG(info, msg)                                       \
+	do {                                                                   \
+		if (info)                                                      \
+			GENL_SET_ERR_MSG(info, msg);                           \
+		else                                                           \
+			pr_warn(ATL_FWDNL_PREFIX "%s\n", msg);                 \
+	} while (0)
 #else
 #define ATLFWD_NL_SET_ERR_MSG(info, msg) pr_warn(ATL_FWDNL_PREFIX "%s\n", msg)
 #endif
@@ -492,7 +537,7 @@ static int atlfwd_nl_send_reply(struct genl_info *info,
  *
  * Returns NULL on error.
  */
-static struct atl_fwd_ring_desc *get_fwd_ring_desc(struct atl_fwd_ring *ring)
+struct atl_fwd_ring_desc *atlfwd_nl_get_fwd_ring_desc(struct atl_fwd_ring *ring)
 {
 	int ring_index = S32_MIN;
 
@@ -526,13 +571,11 @@ static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 	pr_debug(ATL_FWDNL_PREFIX "index=%d/n%d\n", ring_index, norm_index);
 
 	if (unlikely(norm_index < 0 || norm_index >= ATL_NUM_FWD_RINGS)) {
-		if (info)
-			ATLFWD_NL_SET_ERR_MSG(info,
-					      "Ring index is out of bounds");
+		ATLFWD_NL_SET_ERR_MSG(info, "Ring index is out of bounds");
 		return NULL;
 	}
 
-	if (unlikely(ring == NULL && info && err_if_released))
+	if (unlikely(ring == NULL && err_if_released))
 		ATLFWD_NL_SET_ERR_MSG(info,
 				      "Requested ring is NULL / released");
 
@@ -697,7 +740,7 @@ static unsigned int atlfwd_nl_num_txd_for_skb(struct sk_buff *skb)
  */
 static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 {
-	struct atl_fwd_ring_desc *desc = get_fwd_ring_desc(ring);
+	struct atl_fwd_ring_desc *desc = atlfwd_nl_get_fwd_ring_desc(ring);
 	uint32_t budget = atl_tx_clean_budget;
 	unsigned int free_high = 0;
 	struct device *dev = NULL;
@@ -792,6 +835,32 @@ static void atlfwd_nl_tx_head_poll(struct work_struct *work)
 			msecs_to_jiffies(atlfwd_nl_tx_clean_threshold_msec));
 }
 
+static int atlfwd_nl_receive_skb(struct atl_desc_ring *ring,
+				 struct sk_buff *skb)
+{
+	struct net_device *ndev = ring->nic->ndev;
+
+	return atl_fwd_receive_skb(ndev, skb);
+}
+
+static void atlfwd_nl_rx_poll(struct timer_list *timer)
+{
+	struct atlfwd_nl_rx_poll_workdata *data =
+		from_timer(data, timer, timer);
+	struct atl_fwd_ring_desc *desc =
+		atlfwd_nl_get_fwd_ring_desc(data->ring);
+	int budget = atlfwd_nl_rx_clean_budget;
+
+	atl_clean_rx(&desc->std, budget, atlfwd_nl_receive_skb);
+
+	if (likely(altfwd_nl_rx_poll_interval_msec != 0)) {
+		timer->expires =
+			jiffies +
+			msecs_to_jiffies(altfwd_nl_rx_poll_interval_msec);
+		add_timer(timer);
+	}
+}
+
 static void atl_fwd_txbuf_free(struct device *dev, struct atl_txbuf *txbuf)
 {
 	if (dma_unmap_len(txbuf, len)) {
@@ -821,7 +890,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	struct atl_tx_desc desc;
 	uint32_t desc_idx;
 
-	ring_desc = get_fwd_ring_desc(ring);
+	ring_desc = atlfwd_nl_get_fwd_ring_desc(ring);
 	if (unlikely(ring_desc == NULL))
 		return -EFAULT;
 
@@ -1064,7 +1133,7 @@ static int request_ring(struct net_device *ndev, struct genl_info *info)
 
 	pr_debug(ATL_FWDNL_PREFIX "Got ring %d (%p)\n", ring->idx, ring);
 
-	ring_desc = get_fwd_ring_desc(ring);
+	ring_desc = atlfwd_nl_get_fwd_ring_desc(ring);
 	ring_index = nl_ring_index(ring);
 	if (unlikely(ring_desc == NULL || ring_index == S32_MIN)) {
 		ATLFWD_NL_SET_ERR_MSG(info, "Internal error");
@@ -1075,17 +1144,27 @@ static int request_ring(struct net_device *ndev, struct genl_info *info)
 	memcpy(&ring_desc->std.hw, &ring->hw, sizeof(ring_desc->std.hw));
 
 	if (is_tx_ring(ring)) {
-		ring_desc->std.head = 0;
-		ring_desc->std.tail = 0;
 		ring_desc->std.txbufs = kcalloc(
 			ring_size, sizeof(*ring_desc->std.txbufs), GFP_KERNEL);
 		if (unlikely(ring_desc->std.txbufs == NULL)) {
 			result = -ENOMEM;
 			goto err_relring;
 		}
+
+		result = atl_init_tx_ring(&ring_desc->std);
 	} else {
-		ring_desc->std.txbufs = NULL;
+		ring_desc->std.rxbufs = kcalloc(
+			ring_size, sizeof(*ring_desc->std.rxbufs), GFP_KERNEL);
+		if (unlikely(ring_desc->std.rxbufs == NULL)) {
+			result = -ENOMEM;
+			goto err_relring;
+		}
+
+		result = atl_init_rx_ring(&ring_desc->std);
 	}
+	if (result)
+		goto err_relring;
+
 	u64_stats_init(&ring_desc->std.syncp);
 	memset(&ring_desc->std.stats, 0, sizeof(ring_desc->std.stats));
 
@@ -1106,19 +1185,23 @@ static int doit_request_ring(struct sk_buff *skb, struct genl_info *info)
 static int release_ring(struct net_device *ndev, struct genl_info *info,
 			struct atl_fwd_ring *ring)
 {
-	struct atl_fwd_ring_desc *ring_desc = get_fwd_ring_desc(ring);
+	struct atl_fwd_ring_desc *ring_desc = atlfwd_nl_get_fwd_ring_desc(ring);
 
 	if (unlikely(ring_desc == NULL)) {
 		ATLFWD_NL_SET_ERR_MSG(info, "Internal error");
 		return -EFAULT;
 	}
 
+	disable_ring(ndev, info, ring);
 	release_event(ndev, info, ring);
 
 	memset(&ring_desc->std.hw, 0, sizeof(ring_desc->std.hw));
 	if (is_tx_ring(ring)) {
 		kfree(ring_desc->std.txbufs);
 		ring_desc->std.txbufs = NULL;
+	} else {
+		kfree(ring_desc->std.rxbufs);
+		ring_desc->std.rxbufs = NULL;
 	}
 
 	pr_debug(ATL_FWDNL_PREFIX "Releasing ring %d (%p)\n",
@@ -1137,8 +1220,39 @@ static int doit_release_ring(struct sk_buff *skb, struct genl_info *info)
 static int enable_ring(struct net_device *ndev, struct genl_info *info,
 		       struct atl_fwd_ring *ring)
 {
+	struct atl_fwd_ring_desc *desc = NULL;
+
 	pr_debug(ATL_FWDNL_PREFIX "Enabling ring %d (%p)\n",
 		 nl_ring_index(ring), ring);
+
+	if (is_rx_ring(ring)) {
+		struct atlfwd_nl_rx_poll_workdata *data = NULL;
+
+		desc = atlfwd_nl_get_fwd_ring_desc(ring);
+		if (unlikely(desc == NULL)) {
+			ATLFWD_NL_SET_ERR_MSG(info, "Internal error");
+			return -EFAULT;
+		}
+
+		if (unlikely(desc->rx_poll_timer == NULL)) {
+			ATLFWD_NL_SET_ERR_MSG(
+				info,
+				"RX polling timer doesn't exist. The ring might not function properly.");
+			goto err_enablering;
+		}
+
+		data = from_timer(data, desc->rx_poll_timer, timer);
+		data->ring = ring;
+		if (likely(altfwd_nl_rx_poll_interval_msec != 0)) {
+			desc->rx_poll_timer->expires =
+				jiffies +
+				msecs_to_jiffies(
+					altfwd_nl_rx_poll_interval_msec);
+			add_timer(desc->rx_poll_timer);
+		}
+	}
+
+err_enablering:
 	return atl_fwd_enable_ring(ring);
 }
 
@@ -1151,9 +1265,22 @@ static int doit_enable_ring(struct sk_buff *skb, struct genl_info *info)
 static int disable_ring(struct net_device *ndev, struct genl_info *info,
 			struct atl_fwd_ring *ring)
 {
+	struct atl_fwd_ring_desc *desc = NULL;
+
 	pr_debug(ATL_FWDNL_PREFIX "Disabling ring %d (%p)\n",
 		 nl_ring_index(ring), ring);
 	atl_fwd_disable_ring(ring);
+
+	if (is_tx_ring(ring))
+		return 0;
+
+	// RX ring
+	desc = atlfwd_nl_get_fwd_ring_desc(ring);
+	if (unlikely(desc == NULL || desc->rx_poll_timer == NULL))
+		return 0;
+
+	del_timer_sync(desc->rx_poll_timer);
+	atl_clear_rx_bufs(&desc->std);
 
 	return 0;
 }
@@ -1223,7 +1350,7 @@ static int doit_set_tx_bunch(struct sk_buff *skb, struct genl_info *info)
 static int request_event(struct net_device *ndev, struct genl_info *info,
 			 struct atl_fwd_ring *ring)
 {
-	struct atl_fwd_ring_desc *desc = get_fwd_ring_desc(ring);
+	struct atl_fwd_ring_desc *desc = atlfwd_nl_get_fwd_ring_desc(ring);
 	int flags;
 
 	if (is_tx_ring(ring)) {
@@ -1264,7 +1391,8 @@ static int release_event(struct net_device *ndev, struct genl_info *info,
 			 struct atl_fwd_ring *ring)
 {
 	if (is_tx_ring(ring) && ring->evt) {
-		struct atl_fwd_ring_desc *desc = get_fwd_ring_desc(ring);
+		struct atl_fwd_ring_desc *desc =
+			atlfwd_nl_get_fwd_ring_desc(ring);
 
 		pr_debug(ATL_FWDNL_PREFIX "Releasing event for ring %d (%p)\n",
 			 nl_ring_index(ring), ring);

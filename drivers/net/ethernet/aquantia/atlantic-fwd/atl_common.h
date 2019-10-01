@@ -175,6 +175,8 @@ struct atl_fwd_ring_desc {
 		struct atl_fwd_event *tx_evt;
 		struct atl_fwd_event *rx_evt;
 	};
+	/* RX ring polling */
+	struct timer_list *rx_poll_timer;
 };
 
 struct atl_fwdnl {

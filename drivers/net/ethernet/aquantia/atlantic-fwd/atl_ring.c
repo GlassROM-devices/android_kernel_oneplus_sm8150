@@ -454,8 +454,8 @@ static bool atl_checksum_workaround(struct sk_buff *skb,
 	return false;
 }
 
-static bool atl_rx_checksum(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
-	struct atl_desc_ring *ring)
+bool atl_rx_checksum(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
+		     struct atl_desc_ring *ring)
 {
 	struct atl_nic *nic = ring->nic;
 	struct net_device *ndev = nic->ndev;
@@ -513,8 +513,8 @@ drop:
 	return false;
 }
 
-static void atl_rx_hash(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
-	struct net_device *ndev)
+void atl_rx_hash(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
+		 struct net_device *ndev)
 {
 	uint8_t rss_type = desc->rss_type;
 
@@ -526,11 +526,23 @@ static void atl_rx_hash(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 		PKT_HASH_TYPE_L3);
 }
 
-static bool atl_rx_packet(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
-			  struct atl_desc_ring *ring)
+static int atl_napi_receive_skb(struct atl_desc_ring *ring, struct sk_buff *skb)
 {
 	struct net_device *ndev = ring->nic->ndev;
 	struct napi_struct *napi = &ring->qvec->napi;
+
+	skb_record_rx_queue(skb, ring->qvec->idx);
+	skb->protocol = eth_type_trans(skb, ndev);
+	napi_gro_receive(napi, skb);
+
+	return 0;
+}
+
+static bool atl_rx_packet(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
+			  struct atl_desc_ring *ring,
+			  rx_skb_handler_t rx_skb_func)
+{
+	struct net_device *ndev = ring->nic->ndev;
 
 	if (!atl_rx_checksum(skb, desc, ring))
 		return false;
@@ -538,19 +550,19 @@ static bool atl_rx_packet(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 	if (!skb_is_nonlinear(skb) && eth_skb_pad(skb))
 		return false;
 
-	if (ndev->features & NETIF_F_HW_VLAN_CTAG_RX
-	    && desc->rx_estat & atl_rx_estat_vlan_stripped) {
+	if ((ndev->features & NETIF_F_HW_VLAN_CTAG_RX) &&
+	    (desc->rx_estat & atl_rx_estat_vlan_stripped)) {
 		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
 				       le16_to_cpu(desc->vlan_tag));
 	}
 
 	atl_rx_hash(skb, desc, ndev);
 
-	skb_record_rx_queue(skb, ring->qvec->idx);
-	skb->protocol = eth_type_trans(skb, ndev);
 	if (skb->pkt_type == PACKET_MULTICAST)
 		atl_update_ring_stat(ring, rx.multicast, 1);
-	napi_gro_receive(napi, skb);
+
+	rx_skb_func(ring, skb);
+
 	return true;
 }
 
@@ -1028,7 +1040,8 @@ static struct sk_buff *atl_process_rx_frag(struct atl_desc_ring *ring,
 unsigned int atl_rx_refill_batch = 16;
 module_param_named(rx_refill_batch, atl_rx_refill_batch, uint, 0644);
 
-static int atl_clean_rx(struct atl_desc_ring *ring, int budget)
+int atl_clean_rx(struct atl_desc_ring *ring, int budget,
+		 rx_skb_handler_t rx_skb_func)
 {
 	unsigned int packets = 0;
 	unsigned int bytes = 0;
@@ -1086,7 +1099,7 @@ static int atl_clean_rx(struct atl_desc_ring *ring, int budget)
 			continue;
 
 		len = skb->len;
-		if (atl_rx_packet(skb, wb, ring)) {
+		if (atl_rx_packet(skb, wb, ring, rx_skb_func)) {
 			packets++;
 			bytes += len;
 		}
@@ -1121,7 +1134,7 @@ static int atl_poll(struct napi_struct *napi, int budget)
 	nic = qvec->nic;
 
 	clean_done = atl_clean_tx(&qvec->tx);
-	rx_cleaned = atl_clean_rx(&qvec->rx, budget);
+	rx_cleaned = atl_clean_rx(&qvec->rx, budget, atl_napi_receive_skb);
 
 	clean_done &= (rx_cleaned < budget);
 
@@ -1321,7 +1334,7 @@ static inline void atl_free_rxpage(struct atl_pgref *pgref, struct device *dev)
 /* Releases any skbs that may have been queued on ring positions yet
  * to be processes by poll. The buffers are kept to be re-used after
  * resume / thaw. */
-static void atl_clear_rx_bufs(struct atl_desc_ring *ring)
+void atl_clear_rx_bufs(struct atl_desc_ring *ring)
 {
 	unsigned int bufs = ring_occupied(ring);
 	struct device *dev = &ring->nic->hw.pdev->dev;
@@ -1562,6 +1575,43 @@ void atl_set_intr_mod(struct atl_nic *nic)
 		atl_set_intr_mod_qvec(qvec);
 }
 
+int atl_init_rx_ring(struct atl_desc_ring *rx)
+{
+	struct atl_hw *hw = &rx->nic->hw;
+	struct atl_rxbuf *rxbuf;
+	int ret = 0;
+
+	rx->head = rx->tail = atl_read(hw, ATL_RING_HEAD(rx)) & 0x1fff;
+
+	ret = atl_fill_rx(rx, ring_space(rx), false);
+	if (ret)
+		return ret;
+
+	rx->next_to_recycle = rx->tail;
+	/* rxbuf at ->next_to_recycle is always kept empty so that
+	 * atl_maybe_recycle_rxbuf() always have a spot to recycle into
+	 * without overwriting a pgref to an already allocated page,
+	 * leaking memory. It's also the guard element in the ring
+	 * that keeps ->tail from overrunning ->head. If it's nonempty
+	 * on ring init (e.g. after a sleep-wake cycle) just release
+	 * the pages.
+	 */
+	rxbuf = &rx->rxbufs[rx->next_to_recycle];
+	atl_put_rxpage(&rxbuf->head, &hw->pdev->dev);
+	atl_put_rxpage(&rxbuf->data, &hw->pdev->dev);
+
+	return 0;
+}
+
+int atl_init_tx_ring(struct atl_desc_ring *tx)
+{
+	struct atl_hw *hw = &tx->nic->hw;
+
+	tx->head = tx->tail = atl_read(hw, ATL_RING_HEAD(tx)) & 0x1fff;
+
+	return 0;
+}
+
 static void atl_start_rx_ring(struct atl_desc_ring *ring)
 {
 	struct atl_hw *hw = &ring->nic->hw;
@@ -1609,27 +1659,14 @@ static int atl_start_qvec(struct atl_queue_vec *qvec)
 	struct atl_desc_ring *tx = &qvec->tx;
 	struct atl_hw *hw = &qvec->nic->hw;
 	int intr = atl_qvec_intr(qvec);
-	struct atl_rxbuf *rxbuf;
 	int ret;
 
-	rx->head = rx->tail = atl_read(hw, ATL_RING_HEAD(rx)) & 0x1fff;
-	tx->head = tx->tail = atl_read(hw, ATL_RING_HEAD(tx)) & 0x1fff;
-
-	ret = atl_fill_rx(rx, ring_space(rx), false);
+	ret = atl_init_rx_ring(rx);
 	if (ret)
 		return ret;
-
-	rx->next_to_recycle = rx->tail;
-	/* rxbuf at ->next_to_recycle is always kept empty so that
-	 * atl_maybe_recycle_rxbuf() always have a spot to recyle into
-	 * without overwriting a pgref to an already allocated page,
-	 * leaking memory. It's also the guard element in the ring
-	 * that keeps ->tail from overrunning ->head. If it's nonempty
-	 * on ring init (e.g. after a sleep-wake cycle) just release
-	 * the pages. */
-	rxbuf = &rx->rxbufs[rx->next_to_recycle];
-	atl_put_rxpage(&rxbuf->head, &hw->pdev->dev);
-	atl_put_rxpage(&rxbuf->data, &hw->pdev->dev);
+	ret = atl_init_tx_ring(tx);
+	if (ret)
+		return ret;
 
 	/* Map ring interrups into corresponding cause bit*/
 	atl_set_intr_bits(hw, qvec->idx, intr, intr);

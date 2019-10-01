@@ -89,7 +89,9 @@ enum atlfwd_nl_ring_status {
 #ifdef __KERNEL__
 #include <linux/netdevice.h>
 #include <linux/version.h>
+
 struct atl_fwd_ring;
+struct atl_fwd_ring_desc;
 
 int atlfwd_nl_init(void);
 void atlfwd_nl_on_probe(struct net_device *ndev);
@@ -104,6 +106,11 @@ u16 atlfwd_nl_select_queue_fallback(struct net_device *dev, struct sk_buff *skb,
 
 bool atlfwd_nl_is_tx_fwd_ring_created(struct net_device *ndev,
 				      const int fwd_ring_index);
+
+struct atl_fwd_ring *atlfwd_nl_get_fwd_ring(struct net_device *ndev,
+					    const int ring_index);
+struct atl_fwd_ring_desc *
+atlfwd_nl_get_fwd_ring_desc(struct atl_fwd_ring *ring);
 
 bool is_atlfwd_device(const struct net_device *dev);
 #endif

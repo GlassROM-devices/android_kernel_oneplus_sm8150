@@ -153,6 +153,15 @@ do {								\
 	u64_stats_update_end(&_ring->syncp);			\
 } while (0)
 
+int atl_init_rx_ring(struct atl_desc_ring *rx);
+int atl_init_tx_ring(struct atl_desc_ring *tx);
+
+typedef int (*rx_skb_handler_t)(struct atl_desc_ring *ring,
+				struct sk_buff *skb);
+int atl_clean_rx(struct atl_desc_ring *ring, int budget,
+		 rx_skb_handler_t rx_skb_func);
+void atl_clear_rx_bufs(struct atl_desc_ring *ring);
+
 #ifdef ATL_RINGS_IN_UC_MEM
 
 #define DECLARE_SCRATCH_DESC(_name) union atl_desc _name
