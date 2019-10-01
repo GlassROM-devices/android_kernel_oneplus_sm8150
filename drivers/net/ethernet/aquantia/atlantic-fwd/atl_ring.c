@@ -23,15 +23,6 @@
 #include "atl_trace.h"
 #include "atl_fwdnl.h"
 
-#define atl_update_ring_stat(ring, stat, delta)			\
-do {								\
-	struct atl_desc_ring *_ring = (ring);			\
-								\
-	u64_stats_update_begin(&_ring->syncp);			\
-	_ring->stats.stat += (delta);				\
-	u64_stats_update_end(&_ring->syncp);			\
-} while (0)
-
 static inline uint32_t fetch_tx_head(struct atl_desc_ring *ring)
 {
 #ifdef ATL_TX_HEAD_WB
@@ -43,12 +34,12 @@ static inline uint32_t fetch_tx_head(struct atl_desc_ring *ring)
 
 static int tx_full(struct atl_desc_ring *ring, int needed)
 {
-	struct atl_nic *nic = ring->qvec->nic;
+	struct atl_nic *nic = ring->nic;
 
 	if (likely(ring_space(ring) >= needed))
 		return 0;
 
-	netif_stop_subqueue(ring->qvec->nic->ndev, ring->qvec->idx);
+	netif_stop_subqueue(nic->ndev, ring->qvec->idx);
 	atl_nic_dbg("Stopping tx queue\n");
 
 	smp_mb();
@@ -57,7 +48,7 @@ static int tx_full(struct atl_desc_ring *ring, int needed)
 	if (likely(ring_space(ring) < needed))
 		return -EAGAIN;
 
-	netif_start_subqueue(ring->qvec->nic->ndev, ring->qvec->idx);
+	netif_start_subqueue(nic->ndev, ring->qvec->idx);
 	atl_nic_dbg("Restarting tx queue in %s...\n", __func__);
 	atl_update_ring_stat(ring, tx.tx_restart, 1);
 	return 0;
@@ -92,8 +83,7 @@ static void atl_txbuf_free(struct atl_txbuf *txbuf, struct device *dev,
 
 static inline struct netdev_queue *atl_txq(struct atl_desc_ring *ring)
 {
-	return netdev_get_tx_queue(ring->qvec->nic->ndev,
-		ring->qvec->idx);
+	return netdev_get_tx_queue(ring->nic->ndev, ring->qvec->idx);
 }
 
 unsigned int atl_tx_free_low = MAX_SKB_FRAGS + 4;
@@ -106,7 +96,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 	struct atl_desc_ring *ring, struct atl_txbuf *first_buf)
 {
 	int idx = ring->tail;
-	struct device *dev = ring->qvec->dev;
+	struct device *dev = &ring->nic->hw.pdev->dev;
 	struct atl_tx_desc *desc = &ring->desc.tx;
 	skb_frag_t *frag;
 	/* Header's DMA mapping must be stored in the txbuf that has
@@ -321,8 +311,8 @@ module_param_named(tx_clean_budget, atl_tx_clean_budget, uint, 0644);
 // Returns true if all work done
 static bool atl_clean_tx(struct atl_desc_ring *ring)
 {
-	struct atl_nic *nic = ring->qvec->nic;
-	struct device *dev = ring->qvec->dev;
+	struct atl_nic *nic = ring->nic;
+	struct device *dev = &nic->hw.pdev->dev;
 	uint32_t first = READ_ONCE(ring->head);
 #ifndef ATL_TX_DESC_WB
 	uint32_t done = atl_get_tx_head(ring);
@@ -467,7 +457,7 @@ static bool atl_checksum_workaround(struct sk_buff *skb,
 static bool atl_rx_checksum(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 	struct atl_desc_ring *ring)
 {
-	struct atl_nic *nic = ring->qvec->nic;
+	struct atl_nic *nic = ring->nic;
 	struct net_device *ndev = nic->ndev;
 	int csum_ok = 1;
 
@@ -539,7 +529,7 @@ static void atl_rx_hash(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 static bool atl_rx_packet(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 			  struct atl_desc_ring *ring)
 {
-	struct net_device *ndev = ring->qvec->nic->ndev;
+	struct net_device *ndev = ring->nic->ndev;
 	struct napi_struct *napi = &ring->qvec->napi;
 
 	if (!atl_rx_checksum(skb, desc, ring))
@@ -617,7 +607,7 @@ static int atl_get_pages(struct atl_rxbuf *rxbuf,
 	struct atl_desc_ring *ring, bool atomic)
 {
 	int ret;
-	struct device *dev = ring->qvec->dev;
+	struct device *dev = &ring->nic->hw.pdev->dev;
 
 	if (likely((rxbuf->head.rxpage || atl_rx_linear)
 			&& rxbuf->data.rxpage))
@@ -755,17 +745,18 @@ static void atl_maybe_recycle_rxbuf(struct atl_desc_ring *ring,
 	struct atl_rxbuf *new = &ring->rxbufs[ring->next_to_recycle];
 	unsigned int data_len = ATL_RX_BUF_SIZE +
 		(atl_rx_linear ? ATL_RX_HDR_OVRHD : 0);
+	struct device *dev = &ring->nic->hw.pdev->dev;
 
-	if (!atl_rx_linear
-		&& atl_recycle_or_put_page(head,
-			ATL_RX_HDR_SIZE + ATL_RX_HDR_OVRHD, ring->qvec->dev)) {
+	if (!atl_rx_linear &&
+	    atl_recycle_or_put_page(head, ATL_RX_HDR_SIZE + ATL_RX_HDR_OVRHD,
+				    dev)) {
 		new->head = *head;
 		reused = 1;
 		atl_update_ring_stat(ring, rx.reused_head_page, 1);
 	}
 	head->rxpage = 0;
 
-	if (atl_recycle_or_put_page(data, data_len, ring->qvec->dev)) {
+	if (atl_recycle_or_put_page(data, data_len, dev)) {
 		new->data = *data;
 		reused = 1;
 		atl_update_ring_stat(ring, rx.reused_data_page, 1);
@@ -795,9 +786,9 @@ static void atl_sync_range(struct atl_desc_ring *ring,
 {
 	dma_addr_t daddr = pgref->rxpage->daddr;
 	unsigned int pg_off = pgref->pg_off + offt;
+	struct device *dev = &ring->nic->hw.pdev->dev;
 
-	dma_sync_single_range_for_cpu(ring->qvec->dev, daddr, pg_off, len,
-		DMA_FROM_DEVICE);
+	dma_sync_single_range_for_cpu(dev, daddr, pg_off, len, DMA_FROM_DEVICE);
 	trace_atl_sync_rx_range(-1, daddr, pg_off, len);
 }
 
@@ -809,7 +800,7 @@ static struct sk_buff *atl_init_skb(struct atl_desc_ring *ring,
 	unsigned int data_len = atl_data_len(wb);
 	void *hdr;
 	struct atl_pgref *pgref;
-	struct atl_nic *nic = ring->qvec->nic;
+	struct atl_nic *nic = ring->nic;
 
 	if (atl_rx_linear) {
 		if (!wb->eop) {
@@ -917,7 +908,7 @@ static struct sk_buff *atl_process_rx_frag(struct atl_desc_ring *ring,
 	struct sk_buff *skb = rxbuf->skb;
 	struct atl_cb *atl_cb;
 	struct atl_pgref *headref = &rxbuf->head, *dataref = &rxbuf->data;
-	struct device *dev = ring->qvec->dev;
+	struct device *dev = &ring->nic->hw.pdev->dev;
 
 	if (unlikely(wb->rdm_err)) {
 		if (skb && skb != (void *)-1l)
@@ -1066,7 +1057,7 @@ static int atl_clean_rx(struct atl_desc_ring *ring, int budget)
 
 		/* Treat allocation errors as transient and retry later */
 		if (!skb) {
-			struct atl_nic *nic = ring->qvec->nic;
+			struct atl_nic *nic = ring->nic;
 
 			atl_nic_err("failed to alloc skb for RX packet\n");
 			break;
@@ -1281,15 +1272,16 @@ int atl_setup_datapath(struct atl_nic *nic)
 	for (i = 0; i < nvecs; i++, qvec++) {
 		qvec->nic = nic;
 		qvec->idx = i;
-		qvec->dev = &nic->hw.pdev->dev;
 
 		qvec->rx.hw.reg_base = ATL_RX_RING(i);
-		qvec->rx.qvec = qvec;
 		qvec->rx.hw.size = nic->requested_rx_size;
+		qvec->rx.nic = nic;
+		qvec->rx.qvec = qvec;
 
 		qvec->tx.hw.reg_base = ATL_TX_RING(i);
-		qvec->tx.qvec = qvec;
 		qvec->tx.hw.size = nic->requested_tx_size;
+		qvec->tx.nic = nic;
+		qvec->tx.qvec = qvec;
 
 		u64_stats_init(&qvec->rx.syncp);
 		u64_stats_init(&qvec->tx.syncp);
@@ -1332,7 +1324,7 @@ static inline void atl_free_rxpage(struct atl_pgref *pgref, struct device *dev)
 static void atl_clear_rx_bufs(struct atl_desc_ring *ring)
 {
 	unsigned int bufs = ring_occupied(ring);
-	struct device *dev = ring->qvec->dev;
+	struct device *dev = &ring->nic->hw.pdev->dev;
 
 	while (bufs) {
 		struct atl_rxbuf *rxbuf = &ring->rxbufs[ring->head];
@@ -1353,7 +1345,7 @@ static void atl_clear_rx_bufs(struct atl_desc_ring *ring)
 
 static void atl_free_rx_bufs(struct atl_desc_ring *ring)
 {
-	struct device *dev = ring->qvec->dev;
+	struct device *dev = &ring->nic->hw.pdev->dev;
 	struct atl_rxbuf *rxbuf;
 
 	if (!ring->rxbufs)
@@ -1379,7 +1371,7 @@ static void atl_free_tx_bufs(struct atl_desc_ring *ring)
 		bump_tail(ring, -1);
 		txbuf = &ring->txbufs[ring->tail];
 
-		atl_txbuf_free(txbuf, ring->qvec->dev, ring->tail);
+		atl_txbuf_free(txbuf, &ring->nic->hw.pdev->dev, ring->tail);
 		bufs--;
 	}
 }
@@ -1391,14 +1383,14 @@ static void atl_free_ring(struct atl_desc_ring *ring)
 		ring->bufs = 0;
 	}
 
-	atl_free_descs(ring->qvec->nic, &ring->hw);
+	atl_free_descs(ring->nic, &ring->hw);
 }
 
 static int atl_alloc_ring(struct atl_desc_ring *ring, size_t buf_size,
 	char *type)
 {
 	int ret;
-	struct atl_nic *nic = ring->qvec->nic;
+	struct atl_nic *nic = ring->nic;
 	int idx = ring->qvec->idx;
 
 	ret = atl_alloc_descs(nic, &ring->hw);
@@ -1456,9 +1448,10 @@ static int atl_alloc_qvec_intr(struct atl_queue_vec *qvec)
 
 static void atl_free_qvec_intr(struct atl_queue_vec *qvec)
 {
-	int vector = pci_irq_vector(qvec->nic->hw.pdev, atl_qvec_intr(qvec));
+	struct atl_nic *nic = qvec->nic;
+	int vector = pci_irq_vector(nic->hw.pdev, atl_qvec_intr(qvec));
 
-	if (!(qvec->nic->flags & ATL_FL_MULTIPLE_VECTORS))
+	if (!(nic->flags & ATL_FL_MULTIPLE_VECTORS))
 		return;
 
 	atl_set_affinity(vector, NULL);
@@ -1571,7 +1564,7 @@ void atl_set_intr_mod(struct atl_nic *nic)
 
 static void atl_start_rx_ring(struct atl_desc_ring *ring)
 {
-	struct atl_hw *hw = &ring->qvec->nic->hw;
+	struct atl_hw *hw = &ring->nic->hw;
 	int idx = ring->qvec->idx;
 	unsigned int rx_ctl;
 
@@ -1595,7 +1588,7 @@ static void atl_start_rx_ring(struct atl_desc_ring *ring)
 
 static void atl_start_tx_ring(struct atl_desc_ring *ring)
 {
-	struct atl_nic *nic = ring->qvec->nic;
+	struct atl_nic *nic = ring->nic;
 	struct atl_hw *hw = &nic->hw;
 
 	atl_write(hw, ATL_RING_BASE_LSW(ring), ring->hw.daddr);
@@ -1635,8 +1628,8 @@ static int atl_start_qvec(struct atl_queue_vec *qvec)
 	 * on ring init (e.g. after a sleep-wake cycle) just release
 	 * the pages. */
 	rxbuf = &rx->rxbufs[rx->next_to_recycle];
-	atl_put_rxpage(&rxbuf->head, qvec->dev);
-	atl_put_rxpage(&rxbuf->data, qvec->dev);
+	atl_put_rxpage(&rxbuf->head, &hw->pdev->dev);
+	atl_put_rxpage(&rxbuf->data, &hw->pdev->dev);
 
 	/* Map ring interrups into corresponding cause bit*/
 	atl_set_intr_bits(hw, qvec->idx, intr, intr);

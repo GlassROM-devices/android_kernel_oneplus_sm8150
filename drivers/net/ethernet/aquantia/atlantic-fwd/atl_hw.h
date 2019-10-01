@@ -9,12 +9,17 @@
 
 #ifndef _ATL_HW_H_
 #define _ATL_HW_H_
-#include <linux/pci.h>
-#include <linux/if_ether.h>
-#include <linux/ethtool.h>
 
-#include "atl_regs.h"
+#include <linux/compiler.h>
+#include <linux/if_ether.h>
+#include <linux/mutex.h>
+#include <linux/types.h>
+
 #include "atl_fw.h"
+#include "atl_regs.h"
+
+union atl_desc;
+struct atl_nic;
 
 #define PCI_VENDOR_ID_AQUANTIA 0x1d6a
 
@@ -85,7 +90,6 @@ struct atl_hw {
 	uint32_t fw_cfg_dump[ATL_FW_CFG_DUMP_SIZE];
 };
 
-union atl_desc;
 struct atl_hw_ring {
 	union atl_desc *descs;
 	uint32_t size;
@@ -100,7 +104,8 @@ enum mcp_area {
 
 #define offset_ptr(ptr, ring, amount)					\
 	({								\
-		uint32_t size = ((struct atl_hw_ring *)(ring))->size;	\
+		struct atl_hw_ring *hw_ring = (ring);			\
+		uint32_t size = hw_ring->size;				\
 									\
 		uint32_t res = (ptr) + (amount);			\
 		if ((int32_t)res < 0)					\

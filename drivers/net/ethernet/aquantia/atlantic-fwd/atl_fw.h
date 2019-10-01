@@ -10,7 +10,12 @@
 #ifndef _ATL_FW_H_
 #define _ATL_FW_H_
 
+#include <linux/kernel.h>
+#include <linux/mutex.h>
+#include <linux/ethtool.h>
+
 struct atl_hw;
+struct atl_nic;
 
 struct atl_mcp {
 	uint32_t fw_rev;

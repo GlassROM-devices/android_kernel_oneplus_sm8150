@@ -26,6 +26,8 @@
 #define ATL_FWDNL_PREFIX "atl_fwdnl: "
 /* Forward declaration, actual definition is at the bottom of the file */
 static struct genl_family atlfwd_nl_family;
+static bool is_tx_ring_index(const int ring_index);
+static bool is_tx_ring(const struct atl_fwd_ring *ring);
 static struct atl_fwd_ring_desc *get_fwd_ring_desc(struct atl_fwd_ring *ring);
 static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 					 const int ring_index,
@@ -35,6 +37,8 @@ static int enable_fwd_queue(struct atl_nic *nic);
 static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 				       struct sk_buff *skb);
 static void atlfwd_nl_tx_head_poll(struct work_struct *);
+static int release_event(struct net_device *ndev, struct genl_info *info,
+			 struct atl_fwd_ring *ring);
 
 /* workqueue data to perform tx cleanup */
 struct atlfwd_nl_tx_cleanup_workdata {
@@ -67,6 +71,10 @@ void atlfwd_nl_on_probe(struct net_device *ndev)
 		INIT_DELAYED_WORK(&wq->dwork, atlfwd_nl_tx_head_poll);
 		wq->ndev = ndev;
 		nic->fwdnl.tx_cleanup_wq = &wq->dwork;
+	}
+
+	for (i = 0; i != ARRAY_SIZE(nic->fwdnl.ring_desc); i++) {
+		nic->fwdnl.ring_desc[i].std.nic = nic;
 	}
 }
 
@@ -106,9 +114,9 @@ void atl_fwd_get_ring_stats(struct atl_fwd_ring *ring,
 		unsigned int start;
 
 		do {
-			start = u64_stats_fetch_begin_irq(&desc->syncp);
-			memcpy(stats, &desc->stats, sizeof(*stats));
-		} while (u64_stats_fetch_retry_irq(&desc->syncp, start));
+			start = u64_stats_fetch_begin_irq(&desc->std.syncp);
+			memcpy(stats, &desc->std.stats, sizeof(*stats));
+		} while (u64_stats_fetch_retry_irq(&desc->std.syncp, start));
 	} else {
 		memset(stats, 0, sizeof(*stats));
 	}
@@ -364,9 +372,19 @@ static int atlfwd_attr_to_s32_optional(struct genl_info *info,
 	return atlfwd_attr_to_s32_priv(info, attr, true);
 }
 
-static bool is_tx_ring(const int ring_index)
+static bool is_tx_ring_index(const int ring_index)
 {
 	return ring_index % 2;
+}
+
+static bool is_tx_ring(const struct atl_fwd_ring *ring)
+{
+	return !!(ring->flags & ATL_FWR_TX);
+}
+
+static bool is_rx_ring(const struct atl_fwd_ring *ring)
+{
+	return !(ring->flags & ATL_FWR_TX);
 }
 
 /* Converts regular ring index to "normalized" internal representation.
@@ -374,7 +392,6 @@ static bool is_tx_ring(const int ring_index)
  */
 static int nl_ring_index(const struct atl_fwd_ring *ring)
 {
-	const bool is_tx = !!(ring->flags & ATL_FWR_TX);
 	int idx = 0;
 
 	if (ring->idx < ATL_FWD_RING_BASE) {
@@ -389,7 +406,7 @@ static int nl_ring_index(const struct atl_fwd_ring *ring)
 
 	/* Use even (0,2,...) indexes for RX rings, odd - for TX. */
 	idx *= 2;
-	if (is_tx)
+	if (is_tx_ring(ring))
 		idx++;
 	pr_debug(ATL_FWDNL_PREFIX "Normalized ring index %d\n", idx);
 
@@ -501,7 +518,7 @@ static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 					 struct genl_info *info,
 					 const bool err_if_released)
 {
-	const int dir_tx = is_tx_ring(ring_index);
+	const int dir_tx = is_tx_ring_index(ring_index);
 	const int norm_index = (dir_tx ? ring_index - 1 : ring_index) / 2;
 	struct atl_nic *nic = netdev_priv(netdev);
 	struct atl_fwd_ring *ring = nic->fwd.rings[dir_tx][norm_index];
@@ -548,7 +565,7 @@ static int atlfwd_nl_ring_occupied(struct atl_fwd_ring *ring, u32 sw_tail)
 static bool atlfwd_nl_tx_full(struct atl_fwd_ring_desc *ring,
 			      const unsigned int needed)
 {
-	int space = ring_space(ring);
+	int space = ring_space(&ring->std);
 
 	pr_debug(ATL_FWDNL_PREFIX "Needed %u, actual %d\n", needed, space);
 	if (likely(space >= needed))
@@ -575,9 +592,7 @@ static void atlfwd_nl_restart_queue(struct atl_nic *nic,
 {
 	pr_debug(ATL_FWDNL_PREFIX "Restarting TX queue %d\n", nic->nvecs);
 	netif_start_subqueue(nic->ndev, nic->nvecs);
-	u64_stats_update_begin(&ring_desc->syncp);
-	ring_desc->stats.tx.tx_restart++;
-	u64_stats_update_end(&ring_desc->syncp);
+	atl_update_ring_stat(&ring_desc->std, tx.tx_restart, 1);
 }
 
 static int enable_fwd_queue(struct atl_nic *nic)
@@ -626,8 +641,8 @@ static bool atlfwd_nl_tx_above_threshold(struct atl_fwd_ring_desc *ring,
 	if (unlikely(threshold_frac == 0))
 		return false;
 
-	return ring->hw.size - ring_space(ring) >
-	       ring->hw.size / threshold_frac;
+	return ring->std.hw.size - ring_space(&ring->std) >
+	       ring->std.hw.size / threshold_frac;
 }
 
 /* Returns checksum offload flags for TX descriptor */
@@ -682,8 +697,8 @@ static unsigned int atlfwd_nl_num_txd_for_skb(struct sk_buff *skb)
  */
 static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 {
+	struct atl_fwd_ring_desc *desc = get_fwd_ring_desc(ring);
 	uint32_t budget = atl_tx_clean_budget;
-	struct atl_fwd_ring_desc *desc = NULL;
 	unsigned int free_high = 0;
 	struct device *dev = NULL;
 	unsigned int packets = 0;
@@ -691,17 +706,16 @@ static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 	uint32_t hw_head = 0;
 	uint32_t sw_head = 0;
 
-	desc = get_fwd_ring_desc(ring);
-	if (unlikely(ring == NULL || desc == NULL))
+	if (unlikely(desc == NULL))
 		return true;
 
 	dev = &ring->nic->hw.pdev->dev;
 	hw_head = atlfwd_nl_ring_hw_head(ring);
-	sw_head = READ_ONCE(desc->head);
+	sw_head = READ_ONCE(desc->std.head);
 	pr_debug(ATL_FWDNL_PREFIX "hw_head=%d, sw_head=%d\n", hw_head, sw_head);
 
 	do {
-		struct atl_txbuf *txbuf = &desc->txbufs[sw_head];
+		struct atl_txbuf *txbuf = &desc->std.txbufs[sw_head];
 
 		if (sw_head == hw_head)
 			break;
@@ -721,17 +735,17 @@ static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 			txbuf->skb = NULL;
 		}
 
-		bump_ptr(sw_head, ring, 1);
+		bump_ptr(sw_head, &desc->std, 1);
 	} while (budget--);
 
-	WRITE_ONCE(desc->head, sw_head);
+	WRITE_ONCE(desc->std.head, sw_head);
 	pr_debug(ATL_FWDNL_PREFIX "bytes=%u, packets=%u, sw_head=%d\n", bytes,
 		 packets, sw_head);
 
-	u64_stats_update_begin(&desc->syncp);
-	desc->stats.tx.bytes += bytes;
-	desc->stats.tx.packets += packets;
-	u64_stats_update_end(&desc->syncp);
+	u64_stats_update_begin(&desc->std.syncp);
+	desc->std.stats.tx.bytes += bytes;
+	desc->std.stats.tx.packets += packets;
+	u64_stats_update_end(&desc->std.syncp);
 
 	free_high = min_t(typeof(atl_tx_free_high), atl_tx_free_high,
 			  ring->hw.size - 1);
@@ -741,7 +755,7 @@ static bool atlfwd_nl_tx_head_poll_ring(struct atl_fwd_ring *ring)
 		atlfwd_nl_restart_queue(ring->nic, desc);
 	}
 
-	return (hw_head == READ_ONCE(desc->tail));
+	return (hw_head == READ_ONCE(desc->std.tail));
 }
 
 static void atlfwd_nl_tx_head_poll(struct work_struct *work)
@@ -811,7 +825,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	if (unlikely(ring_desc == NULL))
 		return -EFAULT;
 
-	desc_idx = ring_desc->tail;
+	desc_idx = ring_desc->std.tail;
 
 	if (atlfwd_nl_tx_above_threshold(ring_desc,
 					 atlfwd_nl_tx_clean_threshold_frac)) {
@@ -821,9 +835,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 
 	if (unlikely(atlfwd_nl_tx_full(ring_desc, num_txd))) {
 		if (atlfwd_nl_tx_full_after_stop(nic, ring_desc, num_txd)) {
-			u64_stats_update_begin(&ring_desc->syncp);
-			ring_desc->stats.tx.tx_busy++;
-			u64_stats_update_end(&ring_desc->syncp);
+			atl_update_ring_stat(&ring_desc->std, tx.tx_busy, 1);
 			return NETDEV_TX_BUSY;
 		}
 
@@ -837,7 +849,7 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	desc.type = tx_desc_type_desc;
 	desc.pay_len = skb->len;
 
-	first_buf = &ring_desc->txbufs[desc_idx];
+	first_buf = &ring_desc->std.txbufs[desc_idx];
 	txbuf = first_buf;
 	memset(txbuf, 0, sizeof(*txbuf));
 
@@ -854,8 +866,8 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 			desc.len = cpu_to_le16(ATL_DATA_PER_TXD);
 			txbuf->bytes = ATL_DATA_PER_TXD;
 			WRITE_ONCE(ring->hw.descs[desc_idx].tx, desc);
-			bump_ptr(desc_idx, ring, 1);
-			txbuf = &ring_desc->txbufs[desc_idx];
+			bump_ptr(desc_idx, &ring_desc->std, 1);
+			txbuf = &ring_desc->std.txbufs[desc_idx];
 			memset(txbuf, 0, sizeof(*txbuf));
 			daddr += ATL_DATA_PER_TXD;
 			len -= ATL_DATA_PER_TXD;
@@ -873,8 +885,8 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 			break;
 
 		WRITE_ONCE(ring->hw.descs[desc_idx].tx, desc);
-		bump_ptr(desc_idx, ring, 1);
-		txbuf = &ring_desc->txbufs[desc_idx];
+		bump_ptr(desc_idx, &ring_desc->std, 1);
+		txbuf = &ring_desc->std.txbufs[desc_idx];
 		memset(txbuf, 0, sizeof(*txbuf));
 		frag_len = skb_frag_size(frag);
 		frag_daddr =
@@ -894,8 +906,8 @@ static int atlfwd_nl_transmit_skb_ring(struct atl_fwd_ring *ring,
 	txbuf->packets = 1;
 	txbuf->skb = skb;
 	WRITE_ONCE(ring->hw.descs[desc_idx].tx, desc);
-	bump_ptr(desc_idx, ring, 1);
-	ring_desc->tail = desc_idx;
+	bump_ptr(desc_idx, &ring_desc->std, 1);
+	ring_desc->std.tail = desc_idx;
 
 	if (likely(atlfwd_nl_tx_clean_threshold_msec != 0))
 		schedule_delayed_work(
@@ -926,12 +938,10 @@ err_dma:
 		atl_fwd_txbuf_free(dev, txbuf);
 		if (txbuf == first_buf)
 			break;
-		bump_ptr(desc_idx, ring, -1);
-		txbuf = &ring_desc->txbufs[desc_idx];
+		bump_ptr(desc_idx, &ring_desc->std, -1);
+		txbuf = &ring_desc->std.txbufs[desc_idx];
 	}
-	u64_stats_update_begin(&ring_desc->syncp);
-	ring_desc->stats.tx.dma_map_failed++;
-	u64_stats_update_end(&ring_desc->syncp);
+	atl_update_ring_stat(&ring_desc->std, tx.dma_map_failed, 1);
 	return -EFAULT;
 }
 
@@ -1062,23 +1072,22 @@ static int request_ring(struct net_device *ndev, struct genl_info *info)
 		goto err_relring;
 	}
 
-	memcpy(&ring_desc->hw, &ring->hw, sizeof(ring_desc->hw));
+	memcpy(&ring_desc->std.hw, &ring->hw, sizeof(ring_desc->std.hw));
 
-	if (ring->flags & ATL_FWR_TX) {
-		/* TX ring */
-		ring_desc->head = 0;
-		ring_desc->tail = 0;
-		ring_desc->txbufs = kcalloc(
-			ring_size, sizeof(*ring_desc->txbufs), GFP_KERNEL);
-		if (ring_desc->txbufs == NULL) {
+	if (is_tx_ring(ring)) {
+		ring_desc->std.head = 0;
+		ring_desc->std.tail = 0;
+		ring_desc->std.txbufs = kcalloc(
+			ring_size, sizeof(*ring_desc->std.txbufs), GFP_KERNEL);
+		if (unlikely(ring_desc->std.txbufs == NULL)) {
 			result = -ENOMEM;
 			goto err_relring;
 		}
 	} else {
-		ring_desc->txbufs = NULL;
+		ring_desc->std.txbufs = NULL;
 	}
-	u64_stats_init(&ring_desc->syncp);
-	memset(&ring_desc->stats, 0, sizeof(ring_desc->stats));
+	u64_stats_init(&ring_desc->std.syncp);
+	memset(&ring_desc->std.stats, 0, sizeof(ring_desc->std.stats));
 
 	return atlfwd_nl_send_reply(info, ATL_FWD_CMD_REQUEST_RING,
 				    ATL_FWD_ATTR_RING_INDEX, ring_index);
@@ -1104,9 +1113,13 @@ static int release_ring(struct net_device *ndev, struct genl_info *info,
 		return -EFAULT;
 	}
 
-	memset(&ring_desc->hw, 0, sizeof(ring_desc->hw));
-	kfree(ring_desc->txbufs);
-	ring_desc->txbufs = NULL;
+	release_event(ndev, info, ring);
+
+	memset(&ring_desc->std.hw, 0, sizeof(ring_desc->std.hw));
+	if (is_tx_ring(ring)) {
+		kfree(ring_desc->std.txbufs);
+		ring_desc->std.txbufs = NULL;
+	}
 
 	pr_debug(ATL_FWDNL_PREFIX "Releasing ring %d (%p)\n",
 		 nl_ring_index(ring), ring);
@@ -1156,7 +1169,7 @@ static int dump_ring(struct net_device *ndev, struct genl_info *info,
 {
 	const uint32_t head = atlfwd_nl_ring_hw_head(ring);
 	const uint32_t tail = atlfwd_nl_ring_hw_tail(ring);
-	bool dir_tx = !!(ring->flags & ATL_FWR_TX);
+	bool dir_tx = is_tx_ring(ring);
 	int j;
 
 	pr_debug(ATL_FWDNL_PREFIX "Dumping ring %d (%p)\n", nl_ring_index(ring),
@@ -1213,20 +1226,29 @@ static int request_event(struct net_device *ndev, struct genl_info *info,
 	struct atl_fwd_ring_desc *desc = get_fwd_ring_desc(ring);
 	int flags;
 
-	if (ring->flags & ATL_FWR_TX) {
+	if (is_tx_ring(ring)) {
+		if (unlikely(ring->evt)) {
+			ATLFWD_NL_SET_ERR_MSG(info, "Event exists already.");
+			return -EFAULT;
+		}
+
+		desc->tx_evt = kzalloc(sizeof(*desc->tx_evt), GFP_KERNEL);
+		if (unlikely(!desc->tx_evt))
+			return -ENOBUFS;
+
 		/* right now we support head pointer writeback only */
 		flags = ATL_FWD_EVT_TXWB;
-		desc->tx_evt.ring = ring;
-		desc->tx_evt.flags = flags;
-		if (desc->tx_evt.flags & ATL_FWD_EVT_TXWB)
-			desc->tx_evt.tx_head_wrb = dma_map_single(
+		desc->tx_evt->ring = ring;
+		desc->tx_evt->flags = flags;
+		if (desc->tx_evt->flags & ATL_FWD_EVT_TXWB)
+			desc->tx_evt->tx_head_wrb = dma_map_single(
 				&ring->nic->hw.pdev->dev, &desc->tx_hw_head,
 				sizeof(desc->tx_hw_head), DMA_FROM_DEVICE);
 
 		pr_debug(ATL_FWDNL_PREFIX "Requesting event for ring %d (%p)\n",
 			 nl_ring_index(ring), ring);
 
-		return atl_fwd_request_event(&desc->tx_evt);
+		return atl_fwd_request_event(desc->tx_evt);
 	}
 
 	return 0;
@@ -1241,18 +1263,21 @@ static int doit_request_event(struct sk_buff *skb, struct genl_info *info)
 static int release_event(struct net_device *ndev, struct genl_info *info,
 			 struct atl_fwd_ring *ring)
 {
-	if (ring->flags & ATL_FWR_TX) {
+	if (is_tx_ring(ring) && ring->evt) {
 		struct atl_fwd_ring_desc *desc = get_fwd_ring_desc(ring);
 
 		pr_debug(ATL_FWDNL_PREFIX "Releasing event for ring %d (%p)\n",
 			 nl_ring_index(ring), ring);
 		atl_fwd_release_event(ring->evt);
 
-		if (desc->tx_evt.flags & ATL_FWD_EVT_TXWB)
+		if (desc->tx_evt->flags & ATL_FWD_EVT_TXWB)
 			dma_unmap_single(&ring->nic->hw.pdev->dev,
-					 desc->tx_evt.tx_head_wrb,
+					 desc->tx_evt->tx_head_wrb,
 					 sizeof(desc->tx_hw_head),
 					 DMA_FROM_DEVICE);
+
+		kfree(desc->tx_evt);
+		desc->tx_evt = NULL;
 	}
 
 	return 0;
@@ -1267,7 +1292,7 @@ static int doit_release_event(struct sk_buff *skb, struct genl_info *info)
 static int enable_event(struct net_device *ndev, struct genl_info *info,
 			struct atl_fwd_ring *ring)
 {
-	if (ring->flags & ATL_FWR_TX) {
+	if (is_tx_ring(ring)) {
 		pr_debug(ATL_FWDNL_PREFIX "Enabling event for ring %d (%p)\n",
 			 nl_ring_index(ring), ring);
 
@@ -1285,7 +1310,7 @@ static int doit_enable_event(struct sk_buff *skb, struct genl_info *info)
 static int disable_event(struct net_device *ndev, struct genl_info *info,
 			 struct atl_fwd_ring *ring)
 {
-	if (ring->flags & ATL_FWR_TX) {
+	if (is_tx_ring(ring)) {
 		pr_debug(ATL_FWDNL_PREFIX "Disabling event for ring %d (%p)\n",
 			 nl_ring_index(ring), ring);
 
@@ -1326,7 +1351,7 @@ static int force_icmp_tx_via(struct net_device *ndev, struct genl_info *info,
 	struct atl_nic *nic = netdev_priv(ndev);
 	int ring_index = 0;
 
-	if (unlikely(!(ring->flags & ATL_FWR_TX))) {
+	if (unlikely(!is_tx_ring(ring))) {
 		ATLFWD_NL_SET_ERR_MSG(info, "Expected TX ring");
 		return -EINVAL;
 	}
@@ -1353,7 +1378,7 @@ static int force_tx_via(struct net_device *ndev, struct genl_info *info,
 	struct atl_nic *nic = netdev_priv(ndev);
 	int ring_index = 0;
 
-	if (unlikely(!(ring->flags & ATL_FWR_TX))) {
+	if (unlikely(!is_tx_ring(ring))) {
 		ATLFWD_NL_SET_ERR_MSG(info, "Expected TX ring");
 		return -EINVAL;
 	}
@@ -1390,7 +1415,7 @@ static int atlfwd_nl_add_ring_status(struct net_device *netdev,
 		return -EMSGSIZE;
 
 	if (unlikely(!nl_reply_add_attr(msg, hdr, info, ATL_FWD_ATTR_RING_IS_TX,
-					is_tx_ring(ring_index))))
+					is_tx_ring_index(ring_index))))
 		return -EMSGSIZE;
 
 	if (ring != NULL) {

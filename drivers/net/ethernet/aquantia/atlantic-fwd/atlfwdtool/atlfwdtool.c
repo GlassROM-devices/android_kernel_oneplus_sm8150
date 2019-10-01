@@ -51,7 +51,9 @@ static int atlnl_get_family_id(struct nl_context *ctx)
 	if (mnl_socket_sendto(ctx->sock, ctx->nlhdr, ctx->nlhdr->nlmsg_len) < 0)
 		goto err_msgfree;
 
-	atlnl_process_reply(ctx, atlnl_family_cb);
+	ret = atlnl_process_reply(ctx, atlnl_family_cb);
+	if (ret < 0)
+		goto err_msgfree;
 
 	ret = ctx->family_id ? 0 : -EADDRNOTAVAIL;
 
@@ -257,7 +259,7 @@ static int atlnl_cmd_generic_u32_args(struct nl_context *ctx,
 	if (mnl_socket_sendto(ctx->sock, ctx->nlhdr, ctx->nlhdr->nlmsg_len) < 0)
 		goto err_msgfree;
 
-	atlnl_process_reply(ctx, reply_cb);
+	ret = atlnl_process_reply(ctx, reply_cb);
 
 err_msgfree:
 	atlnl_msg_free(ctx);

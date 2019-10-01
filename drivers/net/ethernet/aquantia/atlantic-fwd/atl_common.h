@@ -25,6 +25,7 @@ enum atl_fwd_notify;
 
 #include "atl_compat.h"
 #include "atl_hw.h"
+#include "atl_ring_desc.h"
 #include "atl_stats.h"
 
 #define ATL_MAX_QUEUES 8
@@ -161,22 +162,19 @@ struct atl_fwd {
 
 #ifdef CONFIG_ATLFWD_FWD_NETLINK
 /* FWD ring descriptor
- * Similar to atl_desc_ring, but has less fields.
+ * Similar to atl_desc_ring, but has additional fields.
  *
  * Note: it's not a part of atl_fwd_ring on purpose.
  */
 struct atl_fwd_ring_desc {
-	struct atl_hw_ring hw;
-	uint32_t head;
-	uint32_t tail;
-	union {
-		struct atl_txbuf *txbufs;
-	};
-	struct u64_stats_sync syncp;
-	struct atl_ring_stats stats;
+	/* First, standard ring descriptor */
+	struct atl_desc_ring std;
+	/* Now, FWD specific stuff */
 	u32 tx_hw_head;
-	struct atl_fwd_event tx_evt;
-	struct atl_fwd_event rx_evt;
+	union {
+		struct atl_fwd_event *tx_evt;
+		struct atl_fwd_event *rx_evt;
+	};
 };
 
 struct atl_fwdnl {
