@@ -1481,6 +1481,29 @@ static int doit_ring_status(struct sk_buff *skb, struct genl_info *info)
 				 OPTIONAL_ATTR, ring_status);
 }
 
+/* ATL_FWD_CMD_GET_RX_QUEUE processor */
+static int get_rx_queue_index(struct net_device *ndev, struct genl_info *info,
+			      struct atl_fwd_ring *ring)
+{
+	struct sk_buff *msg = nl_reply_create();
+	void *hdr = nl_reply_init(msg, info, ATL_FWD_CMD_GET_RX_QUEUE);
+
+	if (unlikely(msg == NULL))
+		return -ENOBUFS;
+	if (unlikely(hdr == NULL))
+		return -EMSGSIZE;
+
+	if (unlikely(!nl_reply_add_attr(
+		    msg, hdr, info, ATL_FWD_ATTR_RX_QUEUE_INDEX, ring->idx)))
+		return -EMSGSIZE;
+
+	return nl_reply_send(msg, hdr, info);
+}
+static int doit_get_rx_queue(struct sk_buff *skb, struct genl_info *info)
+{
+	return cmd_with_ring_index_attr(skb, info, get_rx_queue_index);
+}
+
 /* This handler is called before the actual command handler.
  *
  * At the moment we simply check that all mandatory attributes are present.
@@ -1514,6 +1537,7 @@ static int atlfwd_nl_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 	case ATL_FWD_CMD_DUMP_RING:
 	case ATL_FWD_CMD_FORCE_ICMP_TX_VIA:
 	case ATL_FWD_CMD_FORCE_TX_VIA:
+	case ATL_FWD_CMD_GET_RX_QUEUE:
 		if (!info->attrs[ATL_FWD_ATTR_RING_INDEX])
 			missing_attr = ATL_FWD_ATTR_RING_INDEX;
 		break;
@@ -1550,6 +1574,7 @@ static const struct nla_policy atlfwd_nl_policy[NUM_ATL_FWD_ATTR] = {
 	[ATL_FWD_ATTR_PAGE_ORDER] = { .type = NLA_S32 },
 	[ATL_FWD_ATTR_RING_INDEX] = { .type = NLA_S32 },
 	[ATL_FWD_ATTR_TX_BUNCH_SIZE] = { .type = NLA_S32 },
+	[ATL_FWD_ATTR_RX_QUEUE_INDEX] = { .type = NLA_S32 },
 };
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0)
@@ -1600,6 +1625,9 @@ static const struct genl_ops atlfwd_nl_ops[] = {
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 	{ .cmd = ATL_FWD_CMD_RING_STATUS,
 	  .doit = doit_ring_status,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_GET_RX_QUEUE,
+	  .doit = doit_get_rx_queue,
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 };
 
