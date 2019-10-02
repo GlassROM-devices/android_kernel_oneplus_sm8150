@@ -1043,6 +1043,9 @@ module_param_named(rx_refill_batch, atl_rx_refill_batch, uint, 0644);
 int atl_clean_rx(struct atl_desc_ring *ring, int budget,
 		 rx_skb_handler_t rx_skb_func)
 {
+	unsigned int refill_batch =
+		min_t(typeof(atl_rx_refill_batch), atl_rx_refill_batch,
+		      ring->hw.size - 1);
 	unsigned int packets = 0;
 	unsigned int bytes = 0;
 	struct sk_buff *skb;
@@ -1054,7 +1057,7 @@ int atl_clean_rx(struct atl_desc_ring *ring, int budget,
 		unsigned int len;
 		DECLARE_SCRATCH_DESC(scratch);
 
-		if (space >= atl_rx_refill_batch)
+		if (space >= refill_batch)
 			atl_fill_rx(ring, space, true);
 
 		rxbuf = &ring->rxbufs[ring->head];
