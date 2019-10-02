@@ -256,6 +256,18 @@ bool atlfwd_nl_is_tx_fwd_ring_created(struct net_device *ndev,
 	return test_bit(ring_index, &nic->fwd.ring_map[ATL_FWDIR_TX]);
 }
 
+/* Returns true, if a given RX FWD ring is created/requested.
+ * Ring index argument is 0-based, ATL_FWD_RING_BASE is added automatically.
+ */
+bool atlfwd_nl_is_rx_fwd_ring_created(struct net_device *ndev,
+				      const int fwd_ring_index)
+{
+	const int ring_index = ATL_FWD_RING_BASE + fwd_ring_index;
+	struct atl_nic *nic = netdev_priv(ndev);
+
+	return test_bit(ring_index, &nic->fwd.ring_map[ATL_FWDIR_RX]);
+}
+
 struct atl_fwd_ring *atlfwd_nl_get_fwd_ring(struct net_device *ndev,
 					    const int ring_index)
 {

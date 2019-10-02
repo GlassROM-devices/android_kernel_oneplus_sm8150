@@ -645,6 +645,8 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 #ifdef CONFIG_ATLFWD_FWD_NETLINK
 		       + ARRAY_SIZE(tx_stat_descs) *
 				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_TX])
+		       + ARRAY_SIZE(rx_stat_descs) *
+				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_RX])
 #endif
 			;
 
@@ -698,12 +700,16 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 
 #ifdef CONFIG_ATLFWD_FWD_NETLINK
 		for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
-			if (!atlfwd_nl_is_tx_fwd_ring_created(ndev, i))
-				continue;
-
 			snprintf(prefix, sizeof(prefix), "fwd_ring_%d_", i);
-			atl_copy_stats_strings(&p, prefix, tx_stat_descs,
-					       ARRAY_SIZE(tx_stat_descs));
+
+			if (atlfwd_nl_is_tx_fwd_ring_created(ndev, i))
+				atl_copy_stats_strings(
+					&p, prefix, tx_stat_descs,
+					ARRAY_SIZE(tx_stat_descs));
+			if (atlfwd_nl_is_rx_fwd_ring_created(ndev, i))
+				atl_copy_stats_strings(
+					&p, prefix, rx_stat_descs,
+					ARRAY_SIZE(rx_stat_descs));
 		}
 #endif
 		return;
@@ -752,11 +758,16 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
 		struct atl_ring_stats tmp;
 
-		if (!atlfwd_nl_is_tx_fwd_ring_created(ndev, i))
-			continue;
-
-		atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_TX][i], &tmp);
-		atl_write_stats(&tmp.tx, tx_stat_descs, data, uint64_t);
+		if (atlfwd_nl_is_tx_fwd_ring_created(ndev, i)) {
+			atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_TX][i],
+					       &tmp);
+			atl_write_stats(&tmp.tx, tx_stat_descs, data, uint64_t);
+		}
+		if (atlfwd_nl_is_rx_fwd_ring_created(ndev, i)) {
+			atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_RX][i],
+					       &tmp);
+			atl_write_stats(&tmp.rx, rx_stat_descs, data, uint64_t);
+		}
 	}
 #endif
 }

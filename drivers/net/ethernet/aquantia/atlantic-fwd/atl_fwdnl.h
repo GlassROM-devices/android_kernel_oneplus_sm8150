@@ -106,6 +106,8 @@ u16 atlfwd_nl_select_queue_fallback(struct net_device *dev, struct sk_buff *skb,
 
 bool atlfwd_nl_is_tx_fwd_ring_created(struct net_device *ndev,
 				      const int fwd_ring_index);
+bool atlfwd_nl_is_rx_fwd_ring_created(struct net_device *ndev,
+				      const int fwd_ring_index);
 
 struct atl_fwd_ring *atlfwd_nl_get_fwd_ring(struct net_device *ndev,
 					    const int ring_index);
