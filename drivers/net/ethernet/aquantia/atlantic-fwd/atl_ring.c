@@ -1847,6 +1847,21 @@ void atl_update_global_stats(struct atl_nic *nic)
 		atl_add_stats(nic->stats.tx, stats.tx);
 	}
 
+#ifdef CONFIG_ATLFWD_FWD_NETLINK
+	for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
+		if (atlfwd_nl_is_tx_fwd_ring_created(nic->ndev, i)) {
+			atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_TX][i],
+					       &stats);
+			atl_add_stats(nic->stats.tx, stats.tx);
+		}
+		if (atlfwd_nl_is_rx_fwd_ring_created(nic->ndev, i)) {
+			atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_RX][i],
+					       &stats);
+			atl_add_stats(nic->stats.rx, stats.rx);
+		}
+	}
+#endif
+
 	spin_unlock(&nic->stats_lock);
 }
 
