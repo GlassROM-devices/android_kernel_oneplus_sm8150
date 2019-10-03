@@ -233,6 +233,20 @@ static void ether_addr_to_mac(uint32_t mac[2], unsigned char *emac)
 	mac[1] = swab32(tmp[0]);
 }
 
+int atl_get_sc_idx_from_secy(struct macsec_context *ctx)
+{
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	struct atl_hw *hw = &nic->hw;
+	int i;
+
+	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+		if (hw->macsec_cfg.secys[i].secy == ctx->secy) {
+			return i;
+			break;
+		}
+	}
+	return -1;
+}
 
 static int atl_mdo_dev_open(struct macsec_context *ctx)
 {
@@ -296,7 +310,7 @@ static int atl_update_secy(struct macsec_context * ctx, int sc_idx)
 	}
 
 	/* Current Associacion Number (according to doc: Not used when there is only one SA per SC) */
-	matchSCRecord.curr_an = 0;
+	matchSCRecord.curr_an = secy->tx_sc.encoding_sa;
 
 	matchSCRecord.valid = 1;
 	matchSCRecord.fresh = 1;
@@ -373,16 +387,9 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 {
 	pr_info("%s", __FUNCTION__);
 
-	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	struct atl_hw *hw = &nic->hw;
-	int i, ret = 0, sc_idx = -1;
+	int sc_idx = atl_get_sc_idx_from_secy(ctx);
+	int ret = 0;
 
-	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
-		if (hw->macsec_cfg.secys[sc_idx].secy == ctx->secy) {
-			sc_idx = i;
-			break;
-		}
-	}
 	if (sc_idx < 0)
 		return -ENOENT;
 
