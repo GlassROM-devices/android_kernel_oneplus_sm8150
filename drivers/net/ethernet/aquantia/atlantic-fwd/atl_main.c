@@ -246,9 +246,125 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	return 0;
 }
 
+static int atl_update_secy(struct macsec_context * ctx, int sc_idx)
+{
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const struct macsec_secy *secy = ctx->secy;
+	struct atl_hw *hw = &nic->hw;
+
+	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = {0};
+
+/* SA/SC lookup */
+	ether_addr_to_mac(matchEgressClassRecord.mac_sa,
+			  secy->netdev->dev_addr);
+//	ether_addr_copy(matchEgressClassRecord.mac_da, &param->d_mac);
+
+	matchEgressClassRecord.sci[0] = secy->sci & 0xffffffff;
+	matchEgressClassRecord.sci[1] = secy->sci >> 32;
+	matchEgressClassRecord.sci_mask = 0xFF;
+
+	matchEgressClassRecord.sa_mask = 0x3f; /*  enable/disable (1/0)  mac sa comparison  */
+	matchEgressClassRecord.da_mask = 0; /* enable/disable (1/0)  mac da comparison */
+
+	matchEgressClassRecord.action = 0; /* forward to SA/SC table */
+	matchEgressClassRecord.valid = 1;
+
+	matchEgressClassRecord.sc_idx = sc_idx;
+
+	matchEgressClassRecord.sc_sa = hw->macsec_cfg.sc_sa;
+
+	AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord, sc_idx);
+
+	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
+
+	matchSCRecord.protect = secy->protect_frames;
+	matchSCRecord.tci = 0;
+	matchSCRecord.an_roll = 0;
+
+	switch (secy->key_len) {
+	case 16:
+		matchSCRecord.sak_len = 0;
+		break;
+	case 24:
+		matchSCRecord.sak_len = 1;
+		break;
+	case 32:
+		matchSCRecord.sak_len = 2;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	/* Current Associacion Number (according to doc: Not used when there is only one SA per SC) */
+	matchSCRecord.curr_an = 0;
+
+	matchSCRecord.valid = 1;
+	matchSCRecord.fresh = 1;
+	AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
+
+	return 0;
+}
+
 static int atl_mdo_add_secy(struct macsec_context *ctx)
 {
 	pr_info("%s", __FUNCTION__);
+
+/*
+	secy->netdev = dev;
+	secy->operational = true;
+	secy->key_len = DEFAULT_SAK_LEN;
+	secy->icv_len = icv_len;
+	secy->validate_frames = MACSEC_VALIDATE_DEFAULT;
+	secy->protect_frames = true;
+	secy->replay_protect = false;
+
+	secy->sci = sci;
+	secy->tx_sc.active = true;
+	secy->tx_sc.encoding_sa = DEFAULT_ENCODING_SA;
+	secy->tx_sc.encrypt = DEFAULT_ENCRYPT;
+	secy->tx_sc.send_sci = DEFAULT_SEND_SCI;
+	secy->tx_sc.end_station = false;
+	secy->tx_sc.scb = false;
+*/
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const struct macsec_secy *secy = ctx->secy;
+	uint32_t sc_idx_max = ATL_MACSEC_MAX_SECY;
+	struct atl_hw *hw = &nic->hw;
+	uint32_t sc_idx;
+	int ret = 0;
+
+	switch(MACSEC_NUM_AN){
+		case 4:
+			hw->macsec_cfg.sc_sa = atl_macses_sa_sc_4sa_8sc;
+			sc_idx_max = 8;
+			break;
+		case 2:
+			hw->macsec_cfg.sc_sa = atl_macses_sa_sc_2sa_16sc;
+			sc_idx_max = 16;
+			break;
+		case 1:
+			hw->macsec_cfg.sc_sa = atl_macses_sa_sc_1sa_32sc;
+			sc_idx_max = 32;
+			break;
+		default:
+			return -EINVAL;
+			break;
+	}
+
+	if (hweight32(hw->macsec_cfg.sc_idx_busy) >= sc_idx_max)
+		return -ENOSPC;
+	sc_idx = ffz (hw->macsec_cfg.sc_idx_busy);
+	if (sc_idx == ATL_MACSEC_MAX_SECY)
+		return -ENOSPC;
+
+	hw->macsec_cfg.secys[sc_idx].sc_idx = sc_idx;
+	hw->macsec_cfg.secys[sc_idx].secy = secy;
+
+	ret = atl_update_secy(ctx, sc_idx);
+	if (ret)
+		return ret;
+
+	set_bit(sc_idx, &hw->macsec_cfg.sc_idx_busy);
 
 	return 0;
 }
@@ -256,6 +372,24 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 static int atl_mdo_upd_secy(struct macsec_context *ctx)
 {
 	pr_info("%s", __FUNCTION__);
+
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	struct atl_hw *hw = &nic->hw;
+	int i, ret = 0, sc_idx = -1;
+
+	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+		if (hw->macsec_cfg.secys[sc_idx].secy == ctx->secy) {
+			sc_idx = i;
+			break;
+		}
+	}
+	if (sc_idx < 0)
+		return -ENOENT;
+
+	ret = atl_update_secy(ctx, sc_idx);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 

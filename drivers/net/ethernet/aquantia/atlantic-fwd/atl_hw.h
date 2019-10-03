@@ -70,7 +70,23 @@ enum atl_nic_state {
 	ATL_ST_START_NEEDED,
 	ATL_ST_DETACHED,
 };
-
+#if IS_ENABLED(CONFIG_MACSEC)
+#define ATL_MACSEC_MAX_SECY 32
+enum ast_macsec_sc_sa {
+	atl_macses_sa_sc_4sa_8sc,
+	atl_macses_sa_sc_not_used,
+	atl_macses_sa_sc_2sa_16sc,
+	atl_macses_sa_sc_1sa_32sc,
+};
+struct atl_macsec_cfg {
+	unsigned long int sc_idx_busy;
+	enum ast_macsec_sc_sa sc_sa;
+	struct atl_sc_idxs {
+		uint32_t sc_idx;
+		const struct macsec_secy *secy;
+	} secys[ATL_MACSEC_MAX_SECY];
+};
+#endif
 #define ATL_WAKE_SUPPORTED (WAKE_MAGIC | WAKE_PHY)
 struct atl_hw {
 	uint8_t __iomem *regs;
@@ -88,6 +104,9 @@ struct atl_hw {
 	struct atl_thermal thermal;
 #define ATL_FW_CFG_DUMP_SIZE 2
 	uint32_t fw_cfg_dump[ATL_FW_CFG_DUMP_SIZE];
+#if IS_ENABLED(CONFIG_MACSEC)
+	struct atl_macsec_cfg macsec_cfg;
+#endif
 };
 
 struct atl_hw_ring {
