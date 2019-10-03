@@ -262,6 +262,12 @@ static inline int atl_read_fwstat_word(struct atl_hw *hw, uint32_t offt,
 	return atl_read_mcp_word(hw, offt + hw->mcp.fw_stat_addr, val);
 }
 
+static inline int atl_read_rpc_mem(struct atl_hw *hw, uint32_t offt,
+				   uint32_t *val, size_t length)
+{
+	return atl_read_mcp_mem(hw, offt + hw->mcp.rpc_addr, val, length);
+}
+
 static inline int atl_read_fwsettings_word(struct atl_hw *hw, uint32_t offt,
 	uint32_t *val)
 {
