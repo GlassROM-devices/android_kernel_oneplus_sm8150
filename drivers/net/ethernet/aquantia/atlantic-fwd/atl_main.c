@@ -278,13 +278,87 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 
 static int atl_mdo_dev_open(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	struct atl_hw *hw = &nic->hw;
+	int ret = 0;
+
+        struct macsec_msg_fw_request msg = { 0 };
+        struct macsec_msg_fw_response resp = { 0 };
+
+	if (ctx->prepare)
+		return 0;
+
+        if (hw->mcp.ops->send_macsec_req != NULL) {
+		struct macsec_cfg cfg = { 0 };
+
+		cfg.enabled = 1;
+		cfg.egress_threshold = 4294967295;
+		cfg.ingress_threshold = 4294967295;
+		cfg.interrupts_enabled = 1;
+
+                msg.msg_type = macsec_cfg_msg;
+                msg.cfg = cfg;
+
+                ret = hw->mcp.ops->send_macsec_req(hw, &msg, &resp);
+	}
+
+	int index = 0;
+	int num_ctl_ether_types = 0;
+
+	/* Init Ethertype bypass filters */
+	uint32_t ctl_ether_types[1] = { 0x888e };
+	for (index = 0; index < ARRAY_SIZE(ctl_ether_types); index++) {
+		if (ctl_ether_types[index] != 0) {
+			AQ_API_SEC_EgressCTLFRecord egressCTLFRecord = {0};
+			egressCTLFRecord.eth_type = ctl_ether_types[index];
+			egressCTLFRecord.match_type = 4; /* Match eth_type only */
+			egressCTLFRecord.match_mask = 0xf; /* match for eth_type */
+			egressCTLFRecord.action = 0; /* Bypass remaining MACSEC modules */
+			AQ_API_SetEgressCTLFRecord(hw, &egressCTLFRecord, NUMROWS_EGRESSCTLFRECORD - num_ctl_ether_types - 1);
+
+			AQ_API_SEC_IngressPreCTLFRecord ingressPreCTLFRecord = {0};
+			ingressPreCTLFRecord.eth_type = ctl_ether_types[index];
+			ingressPreCTLFRecord.match_type = 4; /* Match eth_type only */
+			ingressPreCTLFRecord.match_mask = 0xf; /* match for eth_type */
+			ingressPreCTLFRecord.action = 0;
+			AQ_API_SetIngressPreCTLFRecord(hw, &ingressPreCTLFRecord, NUMROWS_INGRESSPRECTLFRECORD - num_ctl_ether_types - 1);
+
+			num_ctl_ether_types++;
+		}
+	}
+
 	return 0;
 }
 
 static int atl_mdo_dev_stop(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	struct atl_hw *hw = &nic->hw;
+	int ret = 0;
+
+        struct macsec_msg_fw_request msg = { 0 };
+        struct macsec_msg_fw_response resp = { 0 };
+
+	if (ctx->prepare)
+		return 0;
+
+        if (hw->mcp.ops->send_macsec_req != NULL) {
+		struct macsec_cfg cfg = { 0 };
+
+		cfg.enabled = 0;
+		cfg.egress_threshold = 4294967295;
+		cfg.ingress_threshold = 4294967295;
+		cfg.interrupts_enabled = 0;
+
+                msg.msg_type = macsec_cfg_msg;
+                msg.cfg = cfg;
+
+                ret = hw->mcp.ops->send_macsec_req(hw, &msg, &resp);
+	}
 	return 0;
 }
 
@@ -532,37 +606,37 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 
 static int atl_mdo_add_rxsc(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	return 0;
 }
 
 static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	return 0;
 }
 
 static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	return 0;
 }
 
 static int atl_mdo_add_rxsa(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	return 0;
 }
 
 static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	return 0;
 }
 
 static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	return 0;
 }
 
