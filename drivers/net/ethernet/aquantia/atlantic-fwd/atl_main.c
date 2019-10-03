@@ -13,7 +13,9 @@
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/pm_runtime.h>
+#include <net/macsec.h>
 #include "atl_fwdnl.h"
+#include "macsec/macsec_api.h"
 
 const char atl_driver_name[] = "atlantic-fwd";
 
@@ -219,6 +221,121 @@ static const struct net_device_ops atl_ndev_ops = {
 	.ndo_get_stats64 = atl_get_stats64,
 #endif
 };
+
+#if IS_ENABLED(CONFIG_MACSEC)
+static void ether_addr_to_mac(uint32_t mac[2], unsigned char *emac)
+{
+	uint32_t tmp[2] = {0};
+
+	memcpy(((uint8_t*)tmp) + 2, emac, ETH_ALEN);
+
+	mac[0] = swab32(tmp[1]);
+	mac[1] = swab32(tmp[0]);
+}
+
+
+static int atl_mdo_dev_open(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_dev_stop(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_add_secy(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+
+	return 0;
+}
+
+static int atl_mdo_upd_secy(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_del_secy(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_add_rxsc(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_del_rxsc(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_add_rxsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_del_rxsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_add_txsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_upd_txsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+static int atl_mdo_del_txsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+	return 0;
+}
+
+const struct macsec_ops atl_macsec_ops = {
+	.mdo_dev_open = atl_mdo_dev_open,
+	.mdo_dev_stop = atl_mdo_dev_stop,
+	.mdo_add_secy = atl_mdo_add_secy,
+	.mdo_upd_secy = atl_mdo_upd_secy,
+	.mdo_del_secy = atl_mdo_del_secy,
+	.mdo_add_rxsc = atl_mdo_add_rxsc,
+	.mdo_upd_rxsc = atl_mdo_upd_rxsc,
+	.mdo_del_rxsc = atl_mdo_del_rxsc,
+	.mdo_add_rxsa = atl_mdo_add_rxsa,
+	.mdo_upd_rxsa = atl_mdo_upd_rxsa,
+	.mdo_del_rxsa = atl_mdo_del_rxsa,
+	.mdo_add_txsa = atl_mdo_add_txsa,
+	.mdo_upd_txsa = atl_mdo_upd_txsa,
+	.mdo_del_txsa = atl_mdo_del_txsa,
+};
+#endif
 
 /* RTNL lock must be held */
 int atl_reconfigure(struct atl_nic *nic)
@@ -509,6 +626,9 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	atl_setup_rss(nic);
 
 	ndev->features |= NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 |
+#if IS_ENABLED(CONFIG_MACSEC)
+	NETIF_F_HW_MACSEC |
+#endif
 		NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 		NETIF_F_RXHASH;
 
@@ -529,6 +649,9 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hw->non_ring_intr_mask = BIT(ATL_NUM_NON_RING_IRQS) - 1;
 	ndev->netdev_ops = &atl_ndev_ops;
+#if IS_ENABLED(CONFIG_MACSEC)
+	ndev->macsec_ops = &atl_macsec_ops,
+#endif
 	ndev->mtu = 1500;
 #ifdef ATL_HAVE_MINMAX_MTU
 	ndev->max_mtu = nic->max_mtu;
