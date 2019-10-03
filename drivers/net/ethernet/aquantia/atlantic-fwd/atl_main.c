@@ -350,7 +350,7 @@ static int atl_update_secy(struct macsec_context * ctx, int sc_idx)
 
 static int atl_mdo_add_secy(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 /*
 	secy->netdev = dev;
@@ -396,6 +396,10 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 
 	if (hweight32(hw->macsec_cfg.sc_idx_busy) >= sc_idx_max)
 		return -ENOSPC;
+
+	if (ctx->prepare)
+		return 0;
+
 	sc_idx = ffz (hw->macsec_cfg.sc_idx_busy);
 	if (sc_idx == ATL_MACSEC_MAX_SECY)
 		return -ENOSPC;
@@ -414,13 +418,16 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 
 static int atl_mdo_upd_secy(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 	int sc_idx = atl_get_sc_idx_from_secy(ctx);
 	int ret = 0;
 
 	if (sc_idx < 0)
 		return -ENOENT;
+
+	if (ctx->prepare)
+		return 0;
 
 	ret = atl_update_secy(ctx, sc_idx);
 	if (ret)
@@ -431,11 +438,14 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 
 static int atl_mdo_del_secy(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 	int sc_idx = atl_get_sc_idx_from_secy(ctx);
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
+
+	if (ctx->prepare)
+		return 0;
 
 	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
 
@@ -457,39 +467,55 @@ static int atl_update_txsa(struct macsec_context *ctx)
 	matchSARecord.next_pn = tx_sa->next_pn;
 
 	ret = AQ_API_SetEgressSARecord(hw, &matchSARecord, ctx->sa.assoc_num);
-	if (ret)
+	if (ret) {
+		pr_err("AQ_API_SetEgressSARecord failed with %d\n", ret);
 		return ret;
+	}
 
 	AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = {0};
 	memcpy(&matchKeyRecord.key, &ctx->sa.key, secy->key_len);
 
 	atl_rotate_keys(&matchKeyRecord.key, secy->key_len);
 
-	return AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord,
-					   ctx->sa.assoc_num);
+	ret = AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord,
+					  ctx->sa.assoc_num);
+	if (ret) {
+		pr_err("AQ_API_SetEgressSAKeyRecord failed with %d\n", ret);
+	}
+	return ret;
+
 }
 
 static int atl_mdo_add_txsa(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+
+	if (ctx->prepare)
+		return 0;
 
 	return atl_update_txsa(ctx);
 }
 
 static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+
+	if (ctx->prepare)
+		return 0;
 
 	return atl_update_txsa(ctx);
 }
 
 static int atl_mdo_del_txsa(struct macsec_context *ctx)
 {
-	pr_info("%s", __FUNCTION__);
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
+
+	if (ctx->prepare)
+		return 0;
 
 	AQ_API_SEC_EgressSARecord matchSARecord = {0};
 	matchSARecord.fresh = 1;
