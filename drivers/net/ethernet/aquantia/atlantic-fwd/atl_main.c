@@ -248,6 +248,34 @@ int atl_get_sc_idx_from_secy(struct macsec_context *ctx)
 	return -1;
 }
 
+/* Rotate keys uint32_t[8] */
+static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
+{
+	uint32_t tmp[8] = {0};
+
+	memcpy(&tmp, key, sizeof(tmp));
+	memset(*key, 0, sizeof(*key));
+
+	if (key_len == 16) {
+		(*key)[0] = tmp[3];
+		(*key)[1] = tmp[2];
+		(*key)[2] = tmp[1];
+		(*key)[3] = tmp[0];
+	} else if (key_len == 32) {
+		(*key)[0] = tmp[7];
+		(*key)[1] = tmp[6];
+		(*key)[2] = tmp[5];
+		(*key)[3] = tmp[4];
+		(*key)[4] = tmp[3];
+		(*key)[5] = tmp[2];
+		(*key)[6] = tmp[1];
+		(*key)[7] = tmp[0];
+	} else {
+		pr_warn("Rotate_keys: invalid key_len\n");
+	}
+
+}
+
 static int atl_mdo_dev_open(struct macsec_context *ctx)
 {
 	pr_info("%s", __FUNCTION__);
@@ -265,6 +293,7 @@ static int atl_update_secy(struct macsec_context * ctx, int sc_idx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	const struct macsec_secy *secy = ctx->secy;
 	struct atl_hw *hw = &nic->hw;
+	int ret = 0;
 
 	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = {0};
 
@@ -287,7 +316,9 @@ static int atl_update_secy(struct macsec_context * ctx, int sc_idx)
 
 	matchEgressClassRecord.sc_sa = hw->macsec_cfg.sc_sa;
 
-	AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord, sc_idx);
+	ret = AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord, sc_idx);
+	if (ret)
+		return ret;
 
 	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
 
@@ -314,9 +345,7 @@ static int atl_update_secy(struct macsec_context * ctx, int sc_idx)
 
 	matchSCRecord.valid = 1;
 	matchSCRecord.fresh = 1;
-	AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
-
-	return 0;
+	return AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
 }
 
 static int atl_mdo_add_secy(struct macsec_context *ctx)
@@ -403,7 +432,76 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 static int atl_mdo_del_secy(struct macsec_context *ctx)
 {
 	pr_info("%s", __FUNCTION__);
-	return 0;
+
+	int sc_idx = atl_get_sc_idx_from_secy(ctx);
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	struct atl_hw *hw = &nic->hw;
+
+	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
+
+	matchSCRecord.fresh = 1;
+	return AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
+}
+
+static int atl_update_txsa(struct macsec_context *ctx)
+{
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const struct macsec_tx_sa *tx_sa = ctx->sa.tx_sa;
+	const struct macsec_secy *secy = ctx->secy;
+	struct atl_hw *hw = &nic->hw;
+	int ret = 0;
+
+	AQ_API_SEC_EgressSARecord matchSARecord = {0};
+	matchSARecord.valid = tx_sa->active;
+	matchSARecord.fresh = 1;
+	matchSARecord.next_pn = tx_sa->next_pn;
+
+	ret = AQ_API_SetEgressSARecord(hw, &matchSARecord, ctx->sa.assoc_num);
+	if (ret)
+		return ret;
+
+	AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = {0};
+	memcpy(&matchKeyRecord.key, &ctx->sa.key, secy->key_len);
+
+	atl_rotate_keys(&matchKeyRecord.key, secy->key_len);
+
+	return AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord,
+					   ctx->sa.assoc_num);
+}
+
+static int atl_mdo_add_txsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+
+	return atl_update_txsa(ctx);
+}
+
+static int atl_mdo_upd_txsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+
+	return atl_update_txsa(ctx);
+}
+
+static int atl_mdo_del_txsa(struct macsec_context *ctx)
+{
+	pr_info("%s", __FUNCTION__);
+
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	struct atl_hw *hw = &nic->hw;
+	int ret = 0;
+
+	AQ_API_SEC_EgressSARecord matchSARecord = {0};
+	matchSARecord.fresh = 1;
+
+	ret = AQ_API_SetEgressSARecord(hw, &matchSARecord, ctx->sa.assoc_num);
+	if (ret)
+		return ret;
+
+	AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = {0};
+
+	return AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord,
+					   ctx->sa.assoc_num);
 }
 
 static int atl_mdo_add_rxsc(struct macsec_context *ctx)
@@ -437,24 +535,6 @@ static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 }
 
 static int atl_mdo_del_rxsa(struct macsec_context *ctx)
-{
-	pr_info("%s", __FUNCTION__);
-	return 0;
-}
-
-static int atl_mdo_add_txsa(struct macsec_context *ctx)
-{
-	pr_info("%s", __FUNCTION__);
-	return 0;
-}
-
-static int atl_mdo_upd_txsa(struct macsec_context *ctx)
-{
-	pr_info("%s", __FUNCTION__);
-	return 0;
-}
-
-static int atl_mdo_del_txsa(struct macsec_context *ctx)
 {
 	pr_info("%s", __FUNCTION__);
 	return 0;
