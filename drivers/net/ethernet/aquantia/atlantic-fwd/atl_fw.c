@@ -431,7 +431,7 @@ static int atl_fw2_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 		ret = atl_write_fwsettings_word(hw, atl_fw2_setings_wol_ex, 
 						wol_ex_flags);
 		if (ret)
-			return ret;
+			goto unlock_free;
 	}
 
 	req_high |= wol_bits;
