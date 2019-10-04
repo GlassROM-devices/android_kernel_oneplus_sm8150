@@ -1430,7 +1430,7 @@ static int doit_release_event(struct sk_buff *skb, struct genl_info *info)
 static int enable_event(struct net_device *ndev, struct genl_info *info,
 			struct atl_fwd_ring *ring)
 {
-	if (is_tx_ring(ring)) {
+	if (is_tx_ring(ring) && ring->evt) {
 		pr_debug(ATL_FWDNL_PREFIX "Enabling event for ring %d (%p)\n",
 			 nl_ring_index(ring), ring);
 
@@ -1448,7 +1448,7 @@ static int doit_enable_event(struct sk_buff *skb, struct genl_info *info)
 static int disable_event(struct net_device *ndev, struct genl_info *info,
 			 struct atl_fwd_ring *ring)
 {
-	if (is_tx_ring(ring)) {
+	if (is_tx_ring(ring) && ring->evt) {
 		pr_debug(ATL_FWDNL_PREFIX "Disabling event for ring %d (%p)\n",
 			 nl_ring_index(ring), ring);
 
