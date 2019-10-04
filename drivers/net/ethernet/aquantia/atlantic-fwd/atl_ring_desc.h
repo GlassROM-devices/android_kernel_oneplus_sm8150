@@ -18,6 +18,7 @@
 #include "atl_stats.h"
 
 struct atl_nic;
+struct atl_fwd_event;
 
 struct atl_desc_ring {
 	struct atl_hw_ring hw;
@@ -38,6 +39,15 @@ struct atl_desc_ring {
 	struct atl_queue_vec *qvec;
 	struct u64_stats_sync syncp;
 	struct atl_ring_stats stats;
+#ifdef CONFIG_ATLFWD_FWD_NETLINK
+	u32 tx_hw_head;
+	union {
+		struct atl_fwd_event *tx_evt;
+		struct atl_fwd_event *rx_evt;
+	};
+	/* RX ring polling */
+	struct timer_list *rx_poll_timer;
+#endif
 };
 
 #endif /* _ATL_RING_DESC_H_ */

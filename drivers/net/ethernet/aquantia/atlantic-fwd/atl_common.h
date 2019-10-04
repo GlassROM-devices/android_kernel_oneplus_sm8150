@@ -161,26 +161,8 @@ struct atl_fwd {
 };
 
 #ifdef CONFIG_ATLFWD_FWD_NETLINK
-/* FWD ring descriptor
- * Similar to atl_desc_ring, but has additional fields.
- *
- * Note: it's not a part of atl_fwd_ring on purpose.
- */
-struct atl_fwd_ring_desc {
-	/* First, standard ring descriptor */
-	struct atl_desc_ring std;
-	/* Now, FWD specific stuff */
-	u32 tx_hw_head;
-	union {
-		struct atl_fwd_event *tx_evt;
-		struct atl_fwd_event *rx_evt;
-	};
-	/* RX ring polling */
-	struct timer_list *rx_poll_timer;
-};
-
 struct atl_fwdnl {
-	struct atl_fwd_ring_desc ring_desc[ATL_NUM_FWD_RINGS * 2];
+	struct atl_desc_ring ring_desc[ATL_NUM_FWD_RINGS * 2];
 	/* State of forced redirections */
 	int force_icmp_via;
 	int force_tx_via;

@@ -91,7 +91,7 @@ enum atlfwd_nl_ring_status {
 #include <linux/version.h>
 
 struct atl_fwd_ring;
-struct atl_fwd_ring_desc;
+struct atl_desc_ring;
 
 int atlfwd_nl_init(void);
 void atlfwd_nl_on_probe(struct net_device *ndev);
@@ -111,8 +111,7 @@ bool atlfwd_nl_is_rx_fwd_ring_created(struct net_device *ndev,
 
 struct atl_fwd_ring *atlfwd_nl_get_fwd_ring(struct net_device *ndev,
 					    const int ring_index);
-struct atl_fwd_ring_desc *
-atlfwd_nl_get_fwd_ring_desc(struct atl_fwd_ring *ring);
+struct atl_desc_ring *atlfwd_nl_get_fwd_ring_desc(struct atl_fwd_ring *ring);
 
 bool is_atlfwd_device(const struct net_device *dev);
 #endif

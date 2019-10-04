@@ -46,7 +46,7 @@ static void force_tx_housekeeping(struct net_device *ndev)
 
 static void force_rx_polling(struct net_device *ndev)
 {
-	struct atl_fwd_ring_desc *desc = NULL;
+	struct atl_desc_ring *desc = NULL;
 	struct atl_fwd_ring *ring = NULL;
 	int i;
 
