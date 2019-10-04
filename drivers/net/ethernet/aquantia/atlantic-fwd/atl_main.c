@@ -276,21 +276,13 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 
 }
 
-static int atl_mdo_dev_open(struct macsec_context *ctx)
+int atl_init_macsec(struct atl_hw *hw)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+	struct macsec_msg_fw_request msg = { 0 };
+	struct macsec_msg_fw_response resp = { 0 };
+	int ret;
 
-	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	struct atl_hw *hw = &nic->hw;
-	int ret = 0;
-
-        struct macsec_msg_fw_request msg = { 0 };
-        struct macsec_msg_fw_response resp = { 0 };
-
-	if (ctx->prepare)
-		return 0;
-
-        if (hw->mcp.ops->send_macsec_req != NULL) {
+	if (hw->mcp.ops->send_macsec_req != NULL) {
 		struct macsec_cfg cfg = { 0 };
 
 		cfg.enabled = 1;
@@ -298,10 +290,10 @@ static int atl_mdo_dev_open(struct macsec_context *ctx)
 		cfg.ingress_threshold = 4294967295;
 		cfg.interrupts_enabled = 1;
 
-                msg.msg_type = macsec_cfg_msg;
-                msg.cfg = cfg;
+		msg.msg_type = macsec_cfg_msg;
+		msg.cfg = cfg;
 
-                ret = hw->mcp.ops->send_macsec_req(hw, &msg, &resp);
+		ret = hw->mcp.ops->send_macsec_req(hw, &msg, &resp);
 	}
 
 	int index = 0;
@@ -332,6 +324,18 @@ static int atl_mdo_dev_open(struct macsec_context *ctx)
 	return 0;
 }
 
+static int atl_mdo_dev_open(struct macsec_context *ctx)
+{
+	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	struct atl_hw *hw = &nic->hw;
+	int ret = 0;
+
+
+	return 0;
+}
+
 static int atl_mdo_dev_stop(struct macsec_context *ctx)
 {
 	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
@@ -340,25 +344,7 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
-        struct macsec_msg_fw_request msg = { 0 };
-        struct macsec_msg_fw_response resp = { 0 };
 
-	if (ctx->prepare)
-		return 0;
-
-        if (hw->mcp.ops->send_macsec_req != NULL) {
-		struct macsec_cfg cfg = { 0 };
-
-		cfg.enabled = 0;
-		cfg.egress_threshold = 4294967295;
-		cfg.ingress_threshold = 4294967295;
-		cfg.interrupts_enabled = 0;
-
-                msg.msg_type = macsec_cfg_msg;
-                msg.cfg = cfg;
-
-                ret = hw->mcp.ops->send_macsec_req(hw, &msg, &resp);
-	}
 	return 0;
 }
 
@@ -378,7 +364,7 @@ static int atl_update_secy(struct macsec_context * ctx, int sc_idx)
 
 	matchEgressClassRecord.sci[0] = secy->sci & 0xffffffff;
 	matchEgressClassRecord.sci[1] = secy->sci >> 32;
-	matchEgressClassRecord.sci_mask = 0xFF;
+	matchEgressClassRecord.sci_mask = 0;
 
 	matchEgressClassRecord.sa_mask = 0x3f; /*  enable/disable (1/0)  mac sa comparison  */
 	matchEgressClassRecord.da_mask = 0; /* enable/disable (1/0)  mac da comparison */
@@ -517,14 +503,19 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 	int sc_idx = atl_get_sc_idx_from_secy(ctx);
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
+	int ret = 0;
 
 	if (ctx->prepare)
 		return 0;
 
+	clear_bit(sc_idx, &hw->macsec_cfg.sc_idx_busy);
+	hw->macsec_cfg.secys[sc_idx].secy = NULL;
+
 	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
 
 	matchSCRecord.fresh = 1;
-	return AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
+	ret = AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
+	return ret;
 }
 
 static int atl_update_txsa(struct macsec_context *ctx)

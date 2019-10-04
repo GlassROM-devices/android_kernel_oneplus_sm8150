@@ -664,10 +664,10 @@ static int atl_fw2_send_macsec_request(struct atl_hw *hw,
 	low_req = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
 	low_req ^= atl_fw2_macsec;
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW), low_req);
-	busy_wait(1000, udelay(10), low_status,
+
+	busy_wait(1000, mdelay(1), low_status,
 		atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_LOW)),
 		((low_req ^ low_status) & atl_fw2_macsec) != 0);
-
 	if (((low_req ^ low_status) & atl_fw2_macsec) != 0) {
 		atl_dev_err("Timeout waiting for macsec request\n");
 		return -EIO;
