@@ -1154,7 +1154,7 @@ static int atl_poll(struct napi_struct *napi, int budget)
 #ifdef CONFIG_PCI_MSI
 bool atl_enable_msi = true;
 #else
-bool atl_enable_msi = false;
+bool atl_enable_msi /*= false*/;
 #endif
 module_param_named(msi, atl_enable_msi, bool, 0444);
 bool atl_wq_non_msi /*= false*/;
@@ -1299,7 +1299,6 @@ int atl_setup_datapath(struct atl_nic *nic)
 	if (unlikely(!(nic->flags & ATL_FL_MULTIPLE_VECTORS))) {
 		irq_work = kcalloc(nvecs, sizeof(*irq_work), GFP_KERNEL);
 		if (!irq_work) {
-			atl_nic_err("Couldn't alloc irq_work\n");
 			ret = -ENOMEM;
 			goto err_alloc_work;
 		}

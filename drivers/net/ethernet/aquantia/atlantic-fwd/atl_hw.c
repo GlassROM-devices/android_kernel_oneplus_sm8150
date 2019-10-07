@@ -385,7 +385,9 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 			}
 
 			cpu = cpumask_any(&nic->qvecs[i].affinity_hint);
-			BUG_ON(cpu >= nr_cpu_ids);
+			WARN_ON_ONCE(cpu >= nr_cpu_ids);
+			if (cpu >= nr_cpu_ids)
+				cpu = 0;
 			schedule_work_on(cpu, nic->qvecs[i].work);
 		}
 	}
