@@ -358,9 +358,12 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 {
 	struct atl_nic *nic = priv;
 	struct atl_hw *hw = &nic->hw;
-	uint32_t mask = hw->non_ring_intr_mask | BIT(atl_qvec_intr(&nic->qvecs[0]));
+	uint32_t mask = hw->non_ring_intr_mask;
 	uint32_t stat;
+	int i;
 
+	for (i = 0; i != nic->nvecs; i++)
+		mask |= BIT(atl_qvec_intr(&nic->qvecs[i]));
 
 	stat = atl_read(hw, ATL_INTR_STS);
 
@@ -373,9 +376,10 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 		 * masked above, so no need to unmask anything. */
 		return IRQ_NONE;
 
-	if (likely(stat & BIT(atl_qvec_intr(&nic->qvecs[0]))))
-		/* Only one qvec when using legacy interrupts */
-		atl_ring_irq(irq, &nic->qvecs[0].napi);
+	for (i = 0; i != nic->nvecs; i++) {
+		if (likely(stat & BIT(atl_qvec_intr(&nic->qvecs[i]))))
+			atl_ring_irq(irq, &nic->qvecs[i].napi);
+	}
 
 	if (unlikely(stat & hw->non_ring_intr_mask))
 		atl_link_irq(irq, nic);

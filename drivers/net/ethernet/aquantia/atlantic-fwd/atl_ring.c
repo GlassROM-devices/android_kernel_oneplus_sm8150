@@ -1196,7 +1196,7 @@ static int atl_config_interrupts(struct atl_nic *nic)
 
 	nic->flags &= ~ATL_FL_MULTIPLE_VECTORS;
 
-	return 1;
+	return min_t(unsigned int, atl_max_queues_non_msi, num_present_cpus());
 }
 
 irqreturn_t atl_ring_irq(int irq, void *priv)

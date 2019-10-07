@@ -267,6 +267,7 @@ extern const char atl_driver_name[];
 extern const struct ethtool_ops atl_ethtool_ops;
 
 extern unsigned int atl_max_queues;
+extern unsigned int atl_max_queues_non_msi;
 extern unsigned atl_rx_linear;
 extern unsigned atl_min_intr_delay;
 extern bool atl_enable_msi;

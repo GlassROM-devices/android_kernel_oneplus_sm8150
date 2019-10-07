@@ -19,6 +19,8 @@ const char atl_driver_name[] = "atlantic-fwd";
 
 unsigned int atl_max_queues = ATL_MAX_QUEUES;
 module_param_named(max_queues, atl_max_queues, uint, 0444);
+unsigned int atl_max_queues_non_msi = 1;
+module_param_named(max_queues_non_msi, atl_max_queues_non_msi, uint, 0444);
 
 static unsigned int atl_rx_mod = 15, atl_tx_mod = 15;
 module_param_named(rx_mod, atl_rx_mod, uint, 0444);
@@ -831,6 +833,12 @@ static int __init atl_module_init(void)
 	if (atl_max_queues < 1 || atl_max_queues > ATL_MAX_QUEUES) {
 		atl_dev_init_err("Bad atl_max_queues value %d, must be between 1 and %d inclusive\n",
 			 atl_max_queues, ATL_MAX_QUEUES);
+		return -EINVAL;
+	}
+
+	if (atl_max_queues_non_msi < 1 || atl_max_queues_non_msi > atl_max_queues) {
+		atl_dev_init_err("Bad atl_max_queues_non_msi value %d, must be between 1 and %d inclusive\n",
+			 atl_max_queues_non_msi, atl_max_queues);
 		return -EINVAL;
 	}
 
