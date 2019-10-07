@@ -1242,7 +1242,6 @@ void atl_clear_datapath(struct atl_nic *nic)
 
 static void atl_calc_affinities(struct atl_nic *nic)
 {
-	struct pci_dev *pdev = nic->hw.pdev;
 	int i;
 	unsigned int cpu;
 
@@ -1251,7 +1250,6 @@ static void atl_calc_affinities(struct atl_nic *nic)
 
 	for (i = 0; i < nic->nvecs; i++) {
 		cpumask_t *cpumask = &nic->qvecs[i].affinity_hint;
-		int vector;
 
 		/* If more vectors got allocated (based on
 		 * cpu_present_mask) than cpus currently online,
@@ -1263,7 +1261,6 @@ static void atl_calc_affinities(struct atl_nic *nic)
 		cpumask_clear(cpumask);
 		cpumask_set_cpu(cpu, cpumask);
 		cpu = cpumask_next(cpu, cpu_online_mask);
-		vector = pci_irq_vector(pdev, i + ATL_NUM_NON_RING_IRQS);
 	}
 	put_online_cpus();
 }
