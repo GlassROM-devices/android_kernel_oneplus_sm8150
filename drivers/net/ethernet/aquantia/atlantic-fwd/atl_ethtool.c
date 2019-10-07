@@ -364,7 +364,7 @@ static void atl_get_channels(struct net_device *ndev,
 	int max_rings;
 
 	if (nic->flags & ATL_FL_MULTIPLE_VECTORS)
-		max_rings = min_t(int, ATL_MAX_QUEUES, num_present_cpus());
+		max_rings = min_t(int, atl_max_queues, num_present_cpus());
 	else
 		max_rings = 1;
 
