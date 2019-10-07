@@ -1180,7 +1180,6 @@ static int atl_config_interrupts(struct atl_nic *nic)
 		 */
 		if (ret > 0) {
 			ret -= ATL_NUM_NON_RING_IRQS;
-			nic->nvecs = ret;
 			nic->flags |= ATL_FL_MULTIPLE_VECTORS;
 			return ret;
 		}
@@ -1188,13 +1187,13 @@ static int atl_config_interrupts(struct atl_nic *nic)
 
 	atl_nic_warn("Couldn't allocate MSI-X / MSI vectors, falling back to legacy interrupts\n");
 
-	ret = pci_alloc_irq_vectors(hw->pdev, 1, 1, PCI_IRQ_LEGACY);
+	flags = PCI_IRQ_LEGACY;
+	ret = pci_alloc_irq_vectors(hw->pdev, 1, 1, flags);
 	if (ret < 0) {
 		atl_nic_err("Couldn't allocate legacy IRQ\n");
 		return ret;
 	}
 
-	nic->nvecs = 1;
 	nic->flags &= ~ATL_FL_MULTIPLE_VECTORS;
 
 	return 1;
@@ -1275,6 +1274,7 @@ int atl_setup_datapath(struct atl_nic *nic)
 	nvecs = atl_config_interrupts(nic);
 	if (nvecs < 0)
 		return nvecs;
+	nic->nvecs = nvecs;
 
 	qvec = kcalloc(nvecs, sizeof(*qvec), GFP_KERNEL);
 	if (!qvec) {
