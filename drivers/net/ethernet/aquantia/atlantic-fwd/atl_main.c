@@ -13,7 +13,10 @@
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/pm_runtime.h>
+#if IS_ENABLED(CONFIG_MACSEC)
 #include <net/macsec.h>
+#endif
+
 #include "atl_fwdnl.h"
 #include "macsec/macsec_api.h"
 
@@ -541,10 +544,14 @@ static int atl_mdo_add_txsa(struct macsec_context *ctx)
 	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	int sc_idx = atl_get_sc_idx_from_secy(ctx);
 	const struct macsec_secy *secy = ctx->secy;
 
 	if (ctx->prepare)
 		return 0;
+
+	memcpy(nic->hw.macsec_cfg.secys[sc_idx].tx_sa_key[ctx->sa.assoc_num],
+	       ctx->sa.key, secy->key_len);
 
 	if (netif_carrier_ok(nic->ndev) && netif_carrier_ok(secy->netdev))
 		return atl_update_txsa(nic, secy,
@@ -560,10 +567,14 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	int sc_idx = atl_get_sc_idx_from_secy(ctx);
 	const struct macsec_secy *secy = ctx->secy;
 
 	if (ctx->prepare)
 		return 0;
+
+	memcpy(nic->hw.macsec_cfg.secys[sc_idx].tx_sa_key[ctx->sa.assoc_num],
+	       ctx->sa.key, secy->key_len);
 
 	if (netif_carrier_ok(nic->ndev) && netif_carrier_ok(secy->netdev))
 		return atl_update_txsa(nic, secy,

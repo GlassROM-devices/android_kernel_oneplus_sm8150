@@ -14,6 +14,9 @@
 #include <linux/if_ether.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
+#if IS_ENABLED(CONFIG_MACSEC)
+#include <net/macsec.h>
+#endif
 
 #include "atl_fw.h"
 #include "atl_regs.h"
@@ -84,6 +87,8 @@ struct atl_macsec_cfg {
 	struct atl_sc_idxs {
 		uint32_t sc_idx;
 		const struct macsec_secy *secy;
+		/* It is not OK to store key in driver but it is until ... */
+		u8 tx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
 	} secys[ATL_MACSEC_MAX_SECY];
 };
 #endif
