@@ -1234,7 +1234,7 @@ void atl_clear_datapath(struct atl_nic *nic)
 	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
 		for (i = 0; i < nic->nvecs; i++) {
 			int vector = pci_irq_vector(nic->hw.pdev,
-				i + ATL_NUM_NON_RING_IRQS);
+						    i + ATL_NUM_NON_RING_IRQS);
 			irq_set_affinity_hint(vector, NULL);
 		}
 	}

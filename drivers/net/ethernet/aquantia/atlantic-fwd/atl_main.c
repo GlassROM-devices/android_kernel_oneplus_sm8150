@@ -831,14 +831,17 @@ static int __init atl_module_init(void)
 		return ret;
 
 	if (atl_max_queues < 1 || atl_max_queues > ATL_MAX_QUEUES) {
-		atl_dev_init_err("Bad atl_max_queues value %d, must be between 1 and %d inclusive\n",
-			 atl_max_queues, ATL_MAX_QUEUES);
+		atl_dev_init_err(
+			"Bad atl_max_queues value %d, must be between 1 and %d inclusive\n",
+			atl_max_queues, ATL_MAX_QUEUES);
 		return -EINVAL;
 	}
 
-	if (atl_max_queues_non_msi < 1 || atl_max_queues_non_msi > atl_max_queues) {
-		atl_dev_init_err("Bad atl_max_queues_non_msi value %d, must be between 1 and %d inclusive\n",
-			 atl_max_queues_non_msi, atl_max_queues);
+	if (atl_max_queues_non_msi < 1 ||
+	    atl_max_queues_non_msi > atl_max_queues) {
+		atl_dev_init_err(
+			"Bad atl_max_queues_non_msi value %d, must be between 1 and %d inclusive\n",
+			atl_max_queues_non_msi, atl_max_queues);
 		return -EINVAL;
 	}
 

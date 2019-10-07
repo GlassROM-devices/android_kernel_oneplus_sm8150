@@ -358,7 +358,7 @@ static int atl_rss_set_rxfh(struct net_device *ndev, const uint32_t *tbl,
 }
 
 static void atl_get_channels(struct net_device *ndev,
-	struct ethtool_channels *chan)
+			     struct ethtool_channels *chan)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 	int max_rings;
