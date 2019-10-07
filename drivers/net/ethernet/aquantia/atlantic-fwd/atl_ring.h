@@ -108,6 +108,16 @@ struct atl_txbuf {
 	DEFINE_DMA_UNMAP_LEN(len);
 };
 
+struct legacy_irq_work {
+	struct work_struct work;
+
+	struct napi_struct *napi;
+};
+static inline struct legacy_irq_work *to_irq_work(struct work_struct *work)
+{
+	return container_of(work, struct legacy_irq_work, work);
+};
+
 struct ____cacheline_aligned atl_queue_vec {
 	struct atl_desc_ring tx;
 	struct atl_desc_ring rx;
@@ -116,6 +126,7 @@ struct ____cacheline_aligned atl_queue_vec {
 	unsigned idx;
 	char name[IFNAMSIZ + 10];
 	cpumask_t affinity_hint;
+	struct work_struct *work;
 };
 
 #define atl_for_each_qvec(nic, qvec)				\

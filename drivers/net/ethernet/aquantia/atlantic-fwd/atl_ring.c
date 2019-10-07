@@ -1157,6 +1157,8 @@ bool atl_enable_msi = true;
 bool atl_enable_msi = false;
 #endif
 module_param_named(msi, atl_enable_msi, bool, 0444);
+bool atl_wq_non_msi /*= false*/;
+module_param_named(wq_non_msi, atl_wq_non_msi, bool, 0444);
 
 static int atl_config_interrupts(struct atl_nic *nic)
 {
@@ -1207,6 +1209,13 @@ irqreturn_t atl_ring_irq(int irq, void *priv)
 	return IRQ_HANDLED;
 }
 
+void atl_ring_work(struct work_struct *work)
+{
+	struct legacy_irq_work *irq_work = to_irq_work(work);
+
+	napi_schedule_irqoff(irq_work->napi);
+}
+
 void atl_clear_datapath(struct atl_nic *nic)
 {
 	int i;
@@ -1234,6 +1243,8 @@ void atl_clear_datapath(struct atl_nic *nic)
 
 	if (!qvecs)
 		return;
+
+	kfree(to_irq_work(qvecs[0].work));
 
 	for (i = 0; i < nic->nvecs; i++)
 		netif_napi_del(&qvecs[i].napi);
@@ -1268,8 +1279,9 @@ static void atl_calc_affinities(struct atl_nic *nic)
 
 int atl_setup_datapath(struct atl_nic *nic)
 {
-	int nvecs, i, ret;
+	struct legacy_irq_work *irq_work = NULL;
 	struct atl_queue_vec *qvec;
+	int nvecs, i, ret;
 
 	nvecs = atl_config_interrupts(nic);
 	if (nvecs < 0)
@@ -1283,6 +1295,15 @@ int atl_setup_datapath(struct atl_nic *nic)
 		goto err_alloc;
 	}
 	nic->qvecs = qvec;
+
+	if (unlikely(!(nic->flags & ATL_FL_MULTIPLE_VECTORS))) {
+		irq_work = kcalloc(nvecs, sizeof(*irq_work), GFP_KERNEL);
+		if (!irq_work) {
+			atl_nic_err("Couldn't alloc irq_work\n");
+			ret = -ENOMEM;
+			goto err_alloc_work;
+		}
+	}
 
 	ret = atl_alloc_link_intr(nic);
 	if (ret)
@@ -1306,6 +1327,12 @@ int atl_setup_datapath(struct atl_nic *nic)
 		u64_stats_init(&qvec->tx.syncp);
 
 		netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
+
+		if (unlikely(!(nic->flags & ATL_FL_MULTIPLE_VECTORS))) {
+			INIT_WORK(&irq_work[i].work, atl_ring_work);
+			irq_work[i].napi = &qvec->napi;
+			qvec->work = &irq_work[i].work;
+		}
 	}
 
 	atl_calc_affinities(nic);
@@ -1316,6 +1343,9 @@ int atl_setup_datapath(struct atl_nic *nic)
 	return 0;
 
 err_link_intr:
+	kfree(irq_work);
+
+err_alloc_work:
 	kfree(nic->qvecs);
 	nic->qvecs = NULL;
 

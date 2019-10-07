@@ -360,6 +360,7 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 	struct atl_hw *hw = &nic->hw;
 	uint32_t mask = hw->non_ring_intr_mask;
 	uint32_t stat;
+	int cpu;
 	int i;
 
 	for (i = 0; i != nic->nvecs; i++)
@@ -377,8 +378,16 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 		return IRQ_NONE;
 
 	for (i = 0; i != nic->nvecs; i++) {
-		if (likely(stat & BIT(atl_qvec_intr(&nic->qvecs[i]))))
-			atl_ring_irq(irq, &nic->qvecs[i].napi);
+		if (likely(stat & BIT(atl_qvec_intr(&nic->qvecs[i])))) {
+			if (nic->nvecs == 1 || !atl_wq_non_msi) {
+				atl_ring_irq(irq, &nic->qvecs[i].napi);
+				continue;
+			}
+
+			cpu = cpumask_any(&nic->qvecs[i].affinity_hint);
+			BUG_ON(cpu >= nr_cpu_ids);
+			schedule_work_on(cpu, nic->qvecs[i].work);
+		}
 	}
 
 	if (unlikely(stat & hw->non_ring_intr_mask))
