@@ -1223,10 +1223,12 @@ void atl_clear_datapath(struct atl_nic *nic)
 
 	atl_free_link_intr(nic);
 
-	for (i = 0; i < nic->nvecs; i++) {
-		int vector = pci_irq_vector(nic->hw.pdev,
-			i + ATL_NUM_NON_RING_IRQS);
-		irq_set_affinity_hint(vector, NULL);
+	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
+		for (i = 0; i < nic->nvecs; i++) {
+			int vector = pci_irq_vector(nic->hw.pdev,
+				i + ATL_NUM_NON_RING_IRQS);
+			irq_set_affinity_hint(vector, NULL);
+		}
 	}
 
 	pci_free_irq_vectors(nic->hw.pdev);
@@ -1466,11 +1468,12 @@ static int atl_alloc_qvec_intr(struct atl_queue_vec *qvec)
 static void atl_free_qvec_intr(struct atl_queue_vec *qvec)
 {
 	struct atl_nic *nic = qvec->nic;
-	int vector = pci_irq_vector(nic->hw.pdev, atl_qvec_intr(qvec));
+	int vector;
 
 	if (!(nic->flags & ATL_FL_MULTIPLE_VECTORS))
 		return;
 
+	vector = pci_irq_vector(nic->hw.pdev, atl_qvec_intr(qvec));
 	atl_set_affinity(vector, NULL);
 	free_irq(vector, &qvec->napi);
 }
