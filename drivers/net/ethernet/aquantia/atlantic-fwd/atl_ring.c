@@ -1213,7 +1213,7 @@ void atl_ring_work(struct work_struct *work)
 {
 	struct legacy_irq_work *irq_work = to_irq_work(work);
 
-	napi_schedule_irqoff(irq_work->napi);
+	napi_schedule(irq_work->napi);
 }
 
 void atl_clear_datapath(struct atl_nic *nic)
