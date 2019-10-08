@@ -279,6 +279,8 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 
 }
 
+static int atl_macsec_apply_cfg(struct atl_hw *hw);
+
 int atl_init_macsec(struct atl_hw *hw)
 {
 	struct macsec_msg_fw_request msg = { 0 };
@@ -324,19 +326,23 @@ int atl_init_macsec(struct atl_hw *hw)
 		}
 	}
 
-	return 0;
+	return atl_macsec_apply_cfg(hw);
 }
+
+static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int sc_idx);
 
 static int atl_mdo_dev_open(struct macsec_context *ctx)
 {
 	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	struct atl_hw *hw = &nic->hw;
+	int sc_idx = atl_get_sc_idx_from_secy(ctx);
 	int ret = 0;
 
+	if (netif_carrier_ok(nic->ndev))
+		ret = atl_macsec_apply_secy_cfg(&nic->hw, sc_idx);
 
-	return 0;
+	return ret;
 }
 
 static int atl_mdo_dev_stop(struct macsec_context *ctx)
@@ -344,17 +350,21 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	int sc_idx = atl_get_sc_idx_from_secy(ctx);
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
+	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
 
-	return 0;
+	matchSCRecord.fresh = 1;
+	ret = AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
+
+	return ret;
 }
 
-static int atl_update_secy(struct atl_nic *nic, int sc_idx)
+static int atl_update_secy(struct atl_hw *hw, int sc_idx)
 {
-	const struct macsec_secy *secy = nic->hw.macsec_cfg.secys[sc_idx].secy;
-	struct atl_hw *hw = &nic->hw;
+	const struct macsec_secy *secy = hw->macsec_cfg.secys[sc_idx].secy;
 	int ret = 0;
 
 	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = {0};
@@ -452,8 +462,8 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 	hw->macsec_cfg.secys[sc_idx].sc_idx = sc_idx;
 	hw->macsec_cfg.secys[sc_idx].secy = secy;
 
-	if (netif_carrier_ok(nic->ndev) && netif_carrier_ok(secy->netdev))
-		ret = atl_update_secy(nic, sc_idx);
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		ret = atl_update_secy(hw, sc_idx);
 
 	set_bit(sc_idx, &hw->macsec_cfg.sc_idx_busy);
 
@@ -476,8 +486,8 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	if (ctx->prepare)
 		return 0;
 
-	if (netif_carrier_ok(nic->ndev) && netif_carrier_ok(secy->netdev))
-		ret = atl_update_secy(nic, sc_idx);
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		ret = atl_update_secy(hw, sc_idx);
 
 	return ret;
 }
@@ -506,13 +516,12 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 	return ret;
 }
 
-static int atl_update_txsa(struct atl_nic *nic,
+static int atl_update_txsa(struct atl_hw *hw,
 			   const struct macsec_secy *secy,
 			   const struct macsec_tx_sa *tx_sa,
 			   const unsigned char *key,
 			   int sa_idx)
 {
-	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
 	AQ_API_SEC_EgressSARecord matchSARecord = {0};
@@ -553,8 +562,8 @@ static int atl_mdo_add_txsa(struct macsec_context *ctx)
 	memcpy(nic->hw.macsec_cfg.secys[sc_idx].tx_sa_key[ctx->sa.assoc_num],
 	       ctx->sa.key, secy->key_len);
 
-	if (netif_carrier_ok(nic->ndev) && netif_carrier_ok(secy->netdev))
-		return atl_update_txsa(nic, secy,
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		return atl_update_txsa(&nic->hw, secy,
 				       ctx->sa.tx_sa,
 				       ctx->sa.key,
 				       ctx->sa.assoc_num);
@@ -576,8 +585,8 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 	memcpy(nic->hw.macsec_cfg.secys[sc_idx].tx_sa_key[ctx->sa.assoc_num],
 	       ctx->sa.key, secy->key_len);
 
-	if (netif_carrier_ok(nic->ndev) && netif_carrier_ok(secy->netdev))
-		return atl_update_txsa(nic, secy,
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		return atl_update_txsa(&nic->hw, secy,
 				       ctx->sa.tx_sa,
 				       ctx->sa.key,
 				       ctx->sa.assoc_num);
@@ -647,6 +656,43 @@ static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 {
 	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	return 0;
+}
+
+static int atl_macsec_apply_cfg(struct atl_hw *hw)
+{
+	int i;
+	int ret = 0;
+	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+		if (hw->macsec_cfg.sc_idx_busy & BIT(i))
+			if (netif_running(hw->macsec_cfg.secys[i].secy->netdev))
+				ret = atl_macsec_apply_secy_cfg(hw, i);
+		if (ret)
+			break;
+	}
+
+	return ret;
+}
+
+static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int sc_idx)
+{
+	const struct macsec_secy *secy = hw->macsec_cfg.secys[sc_idx].secy;
+	int i;
+	int ret = 0;
+
+	atl_update_secy(hw, sc_idx);
+
+	if (!netif_running(secy->netdev))
+		return ret;
+
+	for (i = 0; i < MACSEC_NUM_AN; i++) {
+		if (secy->tx_sc.sa[i])
+			ret =  atl_update_txsa(hw, secy,
+				secy->tx_sc.sa[i],
+				hw->macsec_cfg.secys[sc_idx].tx_sa_key[i],
+				i);
+	}
+
+	return ret;
 }
 
 const struct macsec_ops atl_macsec_ops = {
