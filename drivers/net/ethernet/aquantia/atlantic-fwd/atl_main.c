@@ -260,19 +260,19 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 	memset(*key, 0, sizeof(*key));
 
 	if (key_len == 16) {
-		(*key)[0] = tmp[3];
-		(*key)[1] = tmp[2];
-		(*key)[2] = tmp[1];
-		(*key)[3] = tmp[0];
+		(*key)[0] = swab32(tmp[3]);
+		(*key)[1] = swab32(tmp[2]);
+		(*key)[2] = swab32(tmp[1]);
+		(*key)[3] = swab32(tmp[0]);
 	} else if (key_len == 32) {
-		(*key)[0] = tmp[7];
-		(*key)[1] = tmp[6];
-		(*key)[2] = tmp[5];
-		(*key)[3] = tmp[4];
-		(*key)[4] = tmp[3];
-		(*key)[5] = tmp[2];
-		(*key)[6] = tmp[1];
-		(*key)[7] = tmp[0];
+		(*key)[0] = swab32(tmp[7]);
+		(*key)[1] = swab32(tmp[6]);
+		(*key)[2] = swab32(tmp[5]);
+		(*key)[3] = swab32(tmp[4]);
+		(*key)[4] = swab32(tmp[3]);
+		(*key)[5] = swab32(tmp[2]);
+		(*key)[6] = swab32(tmp[1]);
+		(*key)[7] = swab32(tmp[0]);
 	} else {
 		pr_warn("Rotate_keys: invalid key_len\n");
 	}
