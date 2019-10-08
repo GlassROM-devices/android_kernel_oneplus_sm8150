@@ -374,8 +374,8 @@ static int atl_update_secy(struct atl_hw *hw, int sc_idx)
 			  secy->netdev->dev_addr);
 //	ether_addr_copy(matchEgressClassRecord.mac_da, &param->d_mac);
 
-	matchEgressClassRecord.sci[0] = secy->sci & 0xffffffff;
-	matchEgressClassRecord.sci[1] = secy->sci >> 32;
+	matchEgressClassRecord.sci[1] = swab32(secy->sci & 0xffffffff);
+	matchEgressClassRecord.sci[0] = swab32(secy->sci >> 32);
 	matchEgressClassRecord.sci_mask = 0;
 
 	matchEgressClassRecord.sa_mask = 0x3f; /*  enable/disable (1/0)  mac sa comparison  */
@@ -395,7 +395,7 @@ static int atl_update_secy(struct atl_hw *hw, int sc_idx)
 	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
 
 	matchSCRecord.protect = secy->protect_frames;
-	matchSCRecord.tci = 0;
+	matchSCRecord.tci = 0xb; /* SC + E + C */
 	matchSCRecord.an_roll = 0;
 
 	switch (secy->key_len) {
