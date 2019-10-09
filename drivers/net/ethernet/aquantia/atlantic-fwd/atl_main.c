@@ -354,6 +354,9 @@ static int atl_mdo_dev_open(struct macsec_context *ctx)
 	int sc_idx = atl_get_sc_idx_from_secy(&nic->hw, ctx->secy);
 	int ret = 0;
 
+	if (ctx->prepare)
+		return 0;
+
 	if (netif_carrier_ok(nic->ndev))
 		ret = atl_macsec_apply_secy_cfg(&nic->hw, sc_idx);
 
