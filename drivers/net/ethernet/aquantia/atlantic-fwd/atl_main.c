@@ -410,7 +410,20 @@ static int atl_update_secy(struct atl_hw *hw, int sc_idx)
 	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
 
 	matchSCRecord.protect = secy->protect_frames;
-	matchSCRecord.tci = 0xb; /* SC + E + C */
+	if (secy->tx_sc.encrypt)
+		matchSCRecord.tci |=  BIT(1);
+	if (secy->tx_sc.scb)
+		matchSCRecord.tci |=  BIT(2);
+	if (secy->tx_sc.send_sci)
+		matchSCRecord.tci |=  BIT(3);
+	if (secy->tx_sc.end_station)
+		matchSCRecord.tci |=  BIT(4);
+	/* The C bit is clear if and only if the Secure Data is
+	 * exactly the same as the User Data and the ICV is 16 octets long.
+	 */
+	if (!(secy->icv_len == 16 && !secy->tx_sc.encrypt))
+		matchSCRecord.tci |=  BIT(0);
+
 	matchSCRecord.an_roll = 0;
 
 	switch (secy->key_len) {
