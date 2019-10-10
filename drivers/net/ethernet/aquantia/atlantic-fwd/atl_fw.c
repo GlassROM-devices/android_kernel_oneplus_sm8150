@@ -647,7 +647,7 @@ static int atl_fw2_send_macsec_request(struct atl_hw *hw,
 	uint32_t low_status, low_req = 0;
 
 	if (!req || !response)
-		return 0;
+		return -EINVAL;
 
 	if ((hw->mcp.caps_low & atl_fw2_macsec) == 0)
 		return -EOPNOTSUPP;

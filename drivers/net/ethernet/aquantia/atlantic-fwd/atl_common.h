@@ -265,6 +265,9 @@ enum atl_priv_flag_bits {
 extern const char atl_driver_name[];
 
 extern const struct ethtool_ops atl_ethtool_ops;
+#ifdef NETIF_F_HW_MACSEC
+extern const struct macsec_ops atl_macsec_ops;
+#endif
 
 extern unsigned int atl_max_queues;
 extern unsigned int atl_max_queues_non_msi;
