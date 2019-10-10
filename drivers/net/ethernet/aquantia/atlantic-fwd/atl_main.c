@@ -13,7 +13,7 @@
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/pm_runtime.h>
-#if IS_ENABLED(CONFIG_MACSEC)
+#ifdef NETIF_F_HW_MACSEC
 #include <net/macsec.h>
 #endif
 
@@ -225,7 +225,7 @@ static const struct net_device_ops atl_ndev_ops = {
 #endif
 };
 
-#if IS_ENABLED(CONFIG_MACSEC)
+#ifdef NETIF_F_HW_MACSEC
 static void ether_addr_to_mac(uint32_t mac[2], unsigned char *emac)
 {
 	uint32_t tmp[2] = {0};
@@ -1036,7 +1036,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	atl_setup_rss(nic);
 
 	ndev->features |= NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 |
-#if IS_ENABLED(CONFIG_MACSEC)
+#ifdef NETIF_F_HW_MACSEC
 	NETIF_F_HW_MACSEC |
 #endif
 		NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
@@ -1059,7 +1059,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hw->non_ring_intr_mask = BIT(ATL_NUM_NON_RING_IRQS) - 1;
 	ndev->netdev_ops = &atl_ndev_ops;
-#if IS_ENABLED(CONFIG_MACSEC)
+#ifdef NETIF_F_HW_MACSEC
 	ndev->macsec_ops = &atl_macsec_ops,
 #endif
 	ndev->mtu = 1500;

@@ -14,7 +14,7 @@
 #include <linux/if_ether.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
-#if IS_ENABLED(CONFIG_MACSEC)
+#ifdef NETIF_F_HW_MACSEC
 #include <net/macsec.h>
 #endif
 
@@ -73,7 +73,7 @@ enum atl_nic_state {
 	ATL_ST_START_NEEDED,
 	ATL_ST_DETACHED,
 };
-#if IS_ENABLED(CONFIG_MACSEC)
+#ifdef NETIF_F_HW_MACSEC
 #define ATL_MACSEC_MAX_SECY 32
 enum ast_macsec_sc_sa {
 	atl_macses_sa_sc_4sa_8sc,
@@ -109,7 +109,7 @@ struct atl_hw {
 	struct atl_thermal thermal;
 #define ATL_FW_CFG_DUMP_SIZE 2
 	uint32_t fw_cfg_dump[ATL_FW_CFG_DUMP_SIZE];
-#if IS_ENABLED(CONFIG_MACSEC)
+#ifdef NETIF_F_HW_MACSEC
 	struct atl_macsec_cfg macsec_cfg;
 #endif
 };
