@@ -1623,11 +1623,18 @@ static int doit_ring_status(struct sk_buff *skb, struct genl_info *info)
 static int get_rx_queue_index(struct net_device *ndev, struct genl_info *info,
 			      struct atl_fwd_ring *ring)
 {
-	struct sk_buff *msg = nl_reply_create();
-	void *hdr = nl_reply_init(msg, info, ATL_FWD_CMD_GET_RX_QUEUE);
+	struct sk_buff *msg = NULL;
+	void *hdr = NULL;
 
+	if (unlikely(!is_rx_ring(ring))) {
+		ATLFWD_NL_SET_ERR_MSG(info, "Expected RX ring, got a not-RX one.");
+		return -EINVAL;
+	}
+
+	msg = nl_reply_create();
 	if (unlikely(msg == NULL))
 		return -ENOBUFS;
+	hdr = nl_reply_init(msg, info, ATL_FWD_CMD_GET_RX_QUEUE);
 	if (unlikely(hdr == NULL))
 		return -EMSGSIZE;
 
