@@ -1625,7 +1625,7 @@ static int doit_ring_status(struct sk_buff *skb, struct genl_info *info)
 
 /* ATL_FWD_CMD_GET_RX_QUEUE/ATL_FWD_CMD_GET_TX_QUEUE processor */
 static int get_queue_index(struct net_device *ndev, struct genl_info *info,
-			      struct atl_fwd_ring *ring)
+			   struct atl_fwd_ring *ring)
 {
 	struct sk_buff *msg = nl_reply_create();
 	void *hdr = nl_reply_init(msg, info);
@@ -1635,8 +1635,8 @@ static int get_queue_index(struct net_device *ndev, struct genl_info *info,
 	if (unlikely(hdr == NULL))
 		return -EMSGSIZE;
 
-	if (unlikely(!nl_reply_add_attr(
-		    msg, hdr, info, ATL_FWD_ATTR_QUEUE_INDEX, ring->idx)))
+	if (unlikely(!nl_reply_add_attr(msg, hdr, info,
+					ATL_FWD_ATTR_QUEUE_INDEX, ring->idx)))
 		return -EMSGSIZE;
 
 	return nl_reply_send(msg, hdr, info);
