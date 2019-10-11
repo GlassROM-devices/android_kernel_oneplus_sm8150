@@ -37,6 +37,7 @@ static const char *cmd_str[NUM_ATL_FWD_CMD] = {
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_ENABLE_EVENT),
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_DISABLE_EVENT),
 	ATL_FWD_CMD_STR(ATL_FWD_CMD_GET_RX_QUEUE),
+	ATL_FWD_CMD_STR(ATL_FWD_CMD_GET_TX_QUEUE),
 };
 #define ATL_FWD_ATTR_STR(attr)\
 [attr] = #attr
@@ -369,6 +370,8 @@ int main(int argc, char **argv)
 						 (uint32_t)args->ring_index);
 		break;
 	case ATL_FWD_CMD_GET_RX_QUEUE:
+		/* fall through */
+	case ATL_FWD_CMD_GET_TX_QUEUE:
 		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd,
 						 atlnl_getqueue_cb, 1,
 						 ATL_FWD_ATTR_RING_INDEX,

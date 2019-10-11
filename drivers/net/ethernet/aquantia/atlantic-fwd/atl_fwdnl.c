@@ -27,7 +27,9 @@
 /* Forward declaration, actual definition is at the bottom of the file */
 static struct genl_family atlfwd_nl_family;
 static bool is_tx_ring_index(const int ring_index);
+static bool is_rx_ring_index(const int ring_index);
 static bool is_tx_ring(const struct atl_fwd_ring *ring);
+static bool is_rx_ring(const struct atl_fwd_ring *ring);
 static struct atl_fwd_ring *get_fwd_ring(struct net_device *netdev,
 					 const int ring_index,
 					 struct genl_info *info,
@@ -432,6 +434,11 @@ static int atlfwd_attr_to_s32_optional(struct genl_info *info,
 static bool is_tx_ring_index(const int ring_index)
 {
 	return ring_index % 2;
+}
+
+static bool is_rx_ring_index(const int ring_index)
+{
+	return !(is_tx_ring_index(ring_index));
 }
 
 static bool is_tx_ring(const struct atl_fwd_ring *ring)
@@ -1616,22 +1623,15 @@ static int doit_ring_status(struct sk_buff *skb, struct genl_info *info)
 				 OPTIONAL_ATTR, ring_status);
 }
 
-/* ATL_FWD_CMD_GET_RX_QUEUE processor */
-static int get_rx_queue_index(struct net_device *ndev, struct genl_info *info,
+/* ATL_FWD_CMD_GET_RX_QUEUE/ATL_FWD_CMD_GET_TX_QUEUE processor */
+static int get_queue_index(struct net_device *ndev, struct genl_info *info,
 			      struct atl_fwd_ring *ring)
 {
-	struct sk_buff *msg = NULL;
-	void *hdr = NULL;
+	struct sk_buff *msg = nl_reply_create();
+	void *hdr = nl_reply_init(msg, info);
 
-	if (unlikely(!is_rx_ring(ring))) {
-		ATLFWD_NL_SET_ERR_MSG(info, "Expected RX ring, got a not-RX one.");
-		return -EINVAL;
-	}
-
-	msg = nl_reply_create();
 	if (unlikely(msg == NULL))
 		return -ENOBUFS;
-	hdr = nl_reply_init(msg, info);
 	if (unlikely(hdr == NULL))
 		return -EMSGSIZE;
 
@@ -1641,14 +1641,12 @@ static int get_rx_queue_index(struct net_device *ndev, struct genl_info *info,
 
 	return nl_reply_send(msg, hdr, info);
 }
-static int doit_get_rx_queue(struct sk_buff *skb, struct genl_info *info)
+static int doit_get_queue(struct sk_buff *skb, struct genl_info *info)
 {
-	return cmd_with_ring_index_attr(skb, info, get_rx_queue_index);
+	return cmd_with_ring_index_attr(skb, info, get_queue_index);
 }
 
 /* This handler is called before the actual command handler.
- *
- * At the moment we simply check that all mandatory attributes are present.
  *
  * Returns 0 on success, error otherwise.
  */
@@ -1656,8 +1654,10 @@ static int atlfwd_nl_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 			      struct genl_info *info)
 {
 	enum atlfwd_nl_attribute missing_attr = ATL_FWD_ATTR_INVALID;
+	int ring_index = S32_MIN;
 	int ret = 0;
 
+	/* First, check that all mandatory attributes are present */
 	switch (ops->cmd) {
 	case ATL_FWD_CMD_REQUEST_RING:
 		if (!info->attrs[ATL_FWD_ATTR_FLAGS])
@@ -1680,6 +1680,7 @@ static int atlfwd_nl_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 	case ATL_FWD_CMD_FORCE_ICMP_TX_VIA:
 	case ATL_FWD_CMD_FORCE_TX_VIA:
 	case ATL_FWD_CMD_GET_RX_QUEUE:
+	case ATL_FWD_CMD_GET_TX_QUEUE:
 		if (!info->attrs[ATL_FWD_ATTR_RING_INDEX])
 			missing_attr = ATL_FWD_ATTR_RING_INDEX;
 		break;
@@ -1702,8 +1703,28 @@ static int atlfwd_nl_pre_doit(const struct genl_ops *ops, struct sk_buff *skb,
 		pr_warn(ATL_FWDNL_PREFIX "Required attribute is missing: %d\n",
 			missing_attr);
 		ATLFWD_NL_SET_ERR_MSG(info, "Required attribute is missing");
-		ret = -EINVAL;
+		return -EINVAL;
 	}
+
+	/* Now, check additional pre-conditions (if any) */
+	if (info->attrs[ATL_FWD_ATTR_RING_INDEX])
+		ring_index = nla_get_s32(info->attrs[ATL_FWD_ATTR_RING_INDEX]);
+
+	switch (ops->cmd) {
+	case ATL_FWD_CMD_GET_RX_QUEUE:
+		if (!is_rx_ring_index(ring_index)) {
+			ATLFWD_NL_SET_ERR_MSG(info, "Expected RX ring.");
+			return -EINVAL;
+		}
+		break;
+	case ATL_FWD_CMD_GET_TX_QUEUE:
+		if (!is_tx_ring_index(ring_index)) {
+			ATLFWD_NL_SET_ERR_MSG(info, "Expected TX ring.");
+			return -EINVAL;
+		}
+		break;
+	}
+
 	return ret;
 }
 
@@ -1769,7 +1790,10 @@ static const struct genl_ops atlfwd_nl_ops[] = {
 	  .doit = doit_ring_status,
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 	{ .cmd = ATL_FWD_CMD_GET_RX_QUEUE,
-	  .doit = doit_get_rx_queue,
+	  .doit = doit_get_queue,
+	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
+	{ .cmd = ATL_FWD_CMD_GET_TX_QUEUE,
+	  .doit = doit_get_queue,
 	  ATLFWD_NL_OP_POLICY(atlfwd_nl_policy) },
 };
 

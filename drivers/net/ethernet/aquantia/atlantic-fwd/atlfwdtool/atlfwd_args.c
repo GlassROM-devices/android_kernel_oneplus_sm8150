@@ -39,6 +39,7 @@ static void print_usage(const char *binname)
 	fprintf(stderr, "\t%s\n", "enable_event <ring_index>");
 	fprintf(stderr, "\t%s\n", "disable_event <ring_index>");
 	fprintf(stderr, "\t%s\n", "get_rx_queue_index <ring_index>");
+	fprintf(stderr, "\t%s\n", "get_tx_queue_index <ring_index>");
 	fprintf(stderr, "%s\n", "");
 	fprintf(stderr, "\t%s\n", "force_icmp_tx_via <ring_index>");
 	fprintf(stderr, "\t%s\n", "force_tx_via <ring_index>");
@@ -62,6 +63,7 @@ static enum atlfwd_nl_command get_command(const char *str)
 	static const char cmd_disable_event[] = "disable_event";
 	static const char cmd_dump_ring[] = "dump_ring";
 	static const char cmd_get_rx_queue[] = "get_rx_queue_index";
+	static const char cmd_get_tx_queue[] = "get_tx_queue_index";
 	static const char cmd_disable_redirections[] = "disable_redirections";
 	static const char cmd_force_icmp_tx_via[] = "force_icmp_tx_via";
 	static const char cmd_force_tx_via[] = "force_tx_via";
@@ -85,6 +87,9 @@ static enum atlfwd_nl_command get_command(const char *str)
 
 	if (STR_EQUAL(str, cmd_get_rx_queue))
 		return ATL_FWD_CMD_GET_RX_QUEUE;
+
+	if (STR_EQUAL(str, cmd_get_tx_queue))
+		return ATL_FWD_CMD_GET_TX_QUEUE;
 
 	if (STR_EQUAL(str, cmd_req_event))
 		return ATL_FWD_CMD_REQUEST_EVENT;
@@ -192,6 +197,8 @@ struct atlfwd_args *parse_args(const int argc, char **argv)
 	case ATL_FWD_CMD_DISABLE_EVENT:
 		/* fall through */
 	case ATL_FWD_CMD_GET_RX_QUEUE:
+		/* fall through */
+	case ATL_FWD_CMD_GET_TX_QUEUE:
 		/* fall through */
 	case ATL_FWD_CMD_FORCE_ICMP_TX_VIA:
 		/* fall through */

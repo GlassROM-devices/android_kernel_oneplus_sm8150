@@ -37,6 +37,7 @@ enum atlfwd_nl_command {
 	ATL_FWD_CMD_DISABLE_EVENT,
 
 	ATL_FWD_CMD_GET_RX_QUEUE,
+	ATL_FWD_CMD_GET_TX_QUEUE,
 
 	/* keep last */
 	NUM_ATL_FWD_CMD,
@@ -66,7 +67,7 @@ enum atlfwd_nl_attribute {
 	/* ATL_FWD_CMD_SET_TX_BUNCH atributes */
 	ATL_FWD_ATTR_TX_BUNCH_SIZE,
 
-	/* ATL_FWD_CMD_GET_RX_QUEUE attributes */
+	/* ATL_FWD_CMD_GET_(RX|TX)_QUEUE attributes */
 	ATL_FWD_ATTR_QUEUE_INDEX,
 
 	/* keep last */
