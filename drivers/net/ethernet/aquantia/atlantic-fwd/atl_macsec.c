@@ -12,6 +12,9 @@
 #include <net/macsec.h>
 
 #include "macsec/macsec_api.h"
+#define ATL_MACSEC_KEY_LEN_128_BIT 16
+#define ATL_MACSEC_KEY_LEN_192_BIT 24
+#define ATL_MACSEC_KEY_LEN_256_BIT 32
 
 static void ether_addr_to_mac(uint32_t mac[2], unsigned char *emac)
 {
@@ -45,12 +48,19 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 	memcpy(&tmp, key, sizeof(tmp));
 	memset(*key, 0, sizeof(*key));
 
-	if (key_len == 16) {
+	if (key_len == ATL_MACSEC_KEY_LEN_128_BIT) {
 		(*key)[0] = swab32(tmp[3]);
 		(*key)[1] = swab32(tmp[2]);
 		(*key)[2] = swab32(tmp[1]);
 		(*key)[3] = swab32(tmp[0]);
-	} else if (key_len == 32) {
+	} else if (key_len == ATL_MACSEC_KEY_LEN_192_BIT) {
+		(*key)[0] = swab32(tmp[5]);
+		(*key)[1] = swab32(tmp[4]);
+		(*key)[2] = swab32(tmp[3]);
+		(*key)[3] = swab32(tmp[0]);
+		(*key)[4] = swab32(tmp[1]);
+		(*key)[5] = swab32(tmp[0]);
+	} else if (key_len == ATL_MACSEC_KEY_LEN_256_BIT) {
 		(*key)[0] = swab32(tmp[7]);
 		(*key)[1] = swab32(tmp[6]);
 		(*key)[2] = swab32(tmp[5]);
@@ -95,8 +105,8 @@ int atl_init_macsec(struct atl_hw *hw)
 		struct macsec_cfg cfg = { 0 };
 
 		cfg.enabled = 1;
-		cfg.egress_threshold = 4294967295;
-		cfg.ingress_threshold = 4294967295;
+		cfg.egress_threshold = 0xffffffff;
+		cfg.ingress_threshold = 0xffffffff;
 		cfg.interrupts_enabled = 1;
 
 		msg.msg_type = macsec_cfg_msg;
