@@ -67,7 +67,7 @@ enum atlfwd_nl_attribute {
 	ATL_FWD_ATTR_TX_BUNCH_SIZE,
 
 	/* ATL_FWD_CMD_GET_RX_QUEUE attributes */
-	ATL_FWD_ATTR_RX_QUEUE_INDEX,
+	ATL_FWD_ATTR_QUEUE_INDEX,
 
 	/* keep last */
 	NUM_ATL_FWD_ATTR,

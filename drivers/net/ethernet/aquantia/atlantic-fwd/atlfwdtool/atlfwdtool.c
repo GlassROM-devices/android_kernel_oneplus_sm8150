@@ -88,26 +88,26 @@ static int atlnl_reqring_cb(const struct nlmsghdr *nlhdr, void *data)
 	return MNL_CB_OK;
 }
 
-static int atlnl_getrxqueue_cb(const struct nlmsghdr *nlhdr, void *data)
+static int atlnl_getqueue_cb(const struct nlmsghdr *nlhdr, void *data)
 {
 	const struct nlattr *attr;
-	int rx_queue = -1;
+	int queue = -1;
 
 	mnl_attr_for_each(attr, nlhdr, GENL_HDRLEN)
 	{
-		if (mnl_attr_get_type(attr) == ATL_FWD_ATTR_RX_QUEUE_INDEX) {
-			rx_queue = (int)mnl_attr_get_u32(attr);
+		if (mnl_attr_get_type(attr) == ATL_FWD_ATTR_QUEUE_INDEX) {
+			queue = (int)mnl_attr_get_u32(attr);
 			break;
 		}
 	}
 
-	if (rx_queue == -1) {
+	if (queue == -1) {
 		fprintf(stderr, "Error: %s\n",
-			"RX_QUEUE_INDEX attribute is missing in reply");
+			"QUEUE_INDEX attribute is missing in reply");
 		return MNL_CB_ERROR;
 	}
 
-	printf("%d\n", rx_queue);
+	printf("%d\n", queue);
 	return MNL_CB_OK;
 }
 
@@ -243,7 +243,7 @@ static const char *attr_str[NUM_ATL_FWD_ATTR] = {
 	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_RING_IS_TX),
 	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_RING_FLAGS),
 	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_TX_BUNCH_SIZE),
-	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_RX_QUEUE_INDEX),
+	ATL_FWD_ATTR_STR(ATL_FWD_ATTR_QUEUE_INDEX),
 };
 
 static int atlnl_cmd_generic_u32_args(struct nl_context *ctx,
@@ -370,7 +370,7 @@ int main(int argc, char **argv)
 		break;
 	case ATL_FWD_CMD_GET_RX_QUEUE:
 		ret = atlnl_cmd_generic_u32_args(&nlctx, args->cmd,
-						 atlnl_getrxqueue_cb, 1,
+						 atlnl_getqueue_cb, 1,
 						 ATL_FWD_ATTR_RING_INDEX,
 						 (uint32_t)args->ring_index);
 		break;

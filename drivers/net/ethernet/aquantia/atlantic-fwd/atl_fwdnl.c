@@ -1639,7 +1639,7 @@ static int get_rx_queue_index(struct net_device *ndev, struct genl_info *info,
 		return -EMSGSIZE;
 
 	if (unlikely(!nl_reply_add_attr(
-		    msg, hdr, info, ATL_FWD_ATTR_RX_QUEUE_INDEX, ring->idx)))
+		    msg, hdr, info, ATL_FWD_ATTR_QUEUE_INDEX, ring->idx)))
 		return -EMSGSIZE;
 
 	return nl_reply_send(msg, hdr, info);
@@ -1719,7 +1719,7 @@ static const struct nla_policy atlfwd_nl_policy[NUM_ATL_FWD_ATTR] = {
 	[ATL_FWD_ATTR_PAGE_ORDER] = { .type = NLA_S32 },
 	[ATL_FWD_ATTR_RING_INDEX] = { .type = NLA_S32 },
 	[ATL_FWD_ATTR_TX_BUNCH_SIZE] = { .type = NLA_S32 },
-	[ATL_FWD_ATTR_RX_QUEUE_INDEX] = { .type = NLA_S32 },
+	[ATL_FWD_ATTR_QUEUE_INDEX] = { .type = NLA_S32 },
 };
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0)
