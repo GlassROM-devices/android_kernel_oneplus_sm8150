@@ -483,8 +483,7 @@ static struct sk_buff *nl_reply_create(void)
 	return nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
 }
 
-static void *nl_reply_init(struct sk_buff *msg, struct genl_info *info,
-			   const enum atlfwd_nl_command reply_cmd)
+static void *nl_reply_init(struct sk_buff *msg, struct genl_info *info)
 {
 	void *hdr = NULL;
 
@@ -492,7 +491,7 @@ static void *nl_reply_init(struct sk_buff *msg, struct genl_info *info,
 		return NULL;
 
 	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq,
-			  &atlfwd_nl_family, 0, reply_cmd);
+			  &atlfwd_nl_family, 0, info->genlhdr->cmd);
 	if (hdr == NULL) {
 		ATLFWD_NL_SET_ERR_MSG(info, "Reply message creation failed");
 		nlmsg_free(msg);
@@ -527,12 +526,11 @@ static int nl_reply_send(struct sk_buff *msg, void *hdr, struct genl_info *info)
 }
 
 static int atlfwd_nl_send_reply(struct genl_info *info,
-				const enum atlfwd_nl_command reply_cmd,
 				const enum atlfwd_nl_attribute attr,
 				const int value)
 {
 	struct sk_buff *msg = nl_reply_create();
-	void *hdr = nl_reply_init(msg, info, reply_cmd);
+	void *hdr = nl_reply_init(msg, info);
 
 	if (unlikely(msg == NULL))
 		return -ENOBUFS;
@@ -1179,8 +1177,7 @@ static int request_ring(struct net_device *ndev, struct genl_info *info)
 	u64_stats_init(&ring_desc->syncp);
 	memset(&ring_desc->stats, 0, sizeof(ring_desc->stats));
 
-	return atlfwd_nl_send_reply(info, ATL_FWD_CMD_REQUEST_RING,
-				    ATL_FWD_ATTR_RING_INDEX, ring_index);
+	return atlfwd_nl_send_reply(info, ATL_FWD_ATTR_RING_INDEX, ring_index);
 
 err_relring:
 	atl_fwd_release_ring(ring);
@@ -1585,7 +1582,7 @@ static int ring_status(struct net_device *ndev, struct genl_info *info,
 		       const int ring_index)
 {
 	struct sk_buff *msg = nl_reply_create();
-	void *hdr = nl_reply_init(msg, info, ATL_FWD_CMD_RING_STATUS);
+	void *hdr = nl_reply_init(msg, info);
 	int last_idx = ATL_NUM_FWD_RINGS * 2;
 	int first_idx = 0;
 	int result = 0;
@@ -1634,7 +1631,7 @@ static int get_rx_queue_index(struct net_device *ndev, struct genl_info *info,
 	msg = nl_reply_create();
 	if (unlikely(msg == NULL))
 		return -ENOBUFS;
-	hdr = nl_reply_init(msg, info, ATL_FWD_CMD_GET_RX_QUEUE);
+	hdr = nl_reply_init(msg, info);
 	if (unlikely(hdr == NULL))
 		return -EMSGSIZE;
 
