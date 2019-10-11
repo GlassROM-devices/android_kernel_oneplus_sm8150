@@ -150,6 +150,8 @@ static int atl_close(struct atl_nic *nic, bool drop_link)
 
 	atl_stop(nic, drop_link);
 	atl_free_rings(nic);
+	if (drop_link)
+		atl_reconfigure(nic);
 
 	pm_runtime_put_sync(&nic->hw.pdev->dev);
 
