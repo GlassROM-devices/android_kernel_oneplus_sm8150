@@ -1244,10 +1244,12 @@ void atl_clear_datapath(struct atl_nic *nic)
 	if (!qvecs)
 		return;
 
-	kfree(to_irq_work(qvecs[0].work));
-
-	for (i = 0; i < nic->nvecs; i++)
+	for (i = 0; i < nic->nvecs; i++) {
+		cancel_work_sync(qvecs[i].work);
 		netif_napi_del(&qvecs[i].napi);
+	}
+
+	kfree(to_irq_work(qvecs[0].work));
 	kfree(qvecs);
 	nic->qvecs = NULL;
 }
