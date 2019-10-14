@@ -352,7 +352,9 @@ static void atl_work(struct work_struct *work)
 	if (ret)
 		goto out;
 	atl_refresh_link(nic);
-
+#ifdef NETIF_F_HW_MACSEC
+	atl_macsec_work(nic);
+#endif
 out:
 	if (test_bit(ATL_ST_ENABLED, &hw->state))
 	    mod_timer(&nic->work_timer, jiffies + HZ);

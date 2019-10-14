@@ -537,6 +537,78 @@ const struct macsec_ops atl_macsec_ops = {
 	.mdo_upd_txsa = atl_mdo_upd_txsa,
 	.mdo_del_txsa = atl_mdo_del_txsa,
 };
+
+static int atl_macsec_sa_from_sa_idx(enum ast_macsec_sc_sa sc_sa, int sa_idx,
+				     int *sc_idx, int *an)
+{
+	switch(sc_sa) {
+	case atl_macses_sa_sc_4sa_8sc:
+		*sc_idx = sa_idx >> 2;
+		*an = sa_idx & 3;
+		return 0;
+	case atl_macses_sa_sc_2sa_16sc:
+		*sc_idx = sa_idx >> 1;
+		*an = sa_idx & 1;
+		return 0;
+	case atl_macses_sa_sc_1sa_32sc:
+		*sc_idx = sa_idx;
+		*an = 0;
+		return 0;
+	default:
+		WARN_ONCE(1, "Invalid sc_sa");
+	}
+	return -EINVAL;
+}
+
+void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
+{
+	uint32_t egress_sa_expired, egress_sa_threshold_expired;
+	unsigned int sc_idx = 0, an = 0;
+	const struct macsec_secy *secy;
+	struct atl_hw *hw = &nic->hw;
+	struct macsec_tx_sa *tx_sa;
+	int i;
+
+	AQ_API_GetEgressSAExpired(hw, &egress_sa_expired);
+	AQ_API_GetEgressSAThresholdExpired(hw, &egress_sa_threshold_expired);
+
+	for (i = 0; i < 32; i++) {
+		if (egress_sa_expired & BIT(i)) {
+			atl_macsec_sa_from_sa_idx(hw->macsec_cfg.sc_sa,
+						  i, &sc_idx, &an);
+			if (!(hw->macsec_cfg.sc_idx_busy & BIT(sc_idx))) {
+				netdev_warn(nic->ndev, "PN threshold expired on invalid TX SC");
+				continue;
+			}
+			if (!netif_running(hw->macsec_cfg.secys[sc_idx].secy->netdev)) {
+				netdev_warn(nic->ndev, "PN threshold expired on donw TX SC");
+				continue;
+			}
+			secy = hw->macsec_cfg.secys[sc_idx].secy;
+
+			tx_sa = secy->tx_sc.sa[an];
+
+			spin_lock_bh(&tx_sa->lock);
+			tx_sa->next_pn = 0;
+			tx_sa->active = false;
+			netdev_dbg(nic->ndev, "PN wrapped, transitioning to !oper\n");
+			spin_unlock_bh(&tx_sa->lock);
+
+		}
+	}
+
+	AQ_API_SetEgressSAExpired(hw, egress_sa_expired);
+	AQ_API_SetEgressSAThresholdExpired(hw, egress_sa_threshold_expired);
+}
+
+void atl_macsec_work(struct atl_nic *nic)
+{
+	if (!netif_carrier_ok(nic->ndev))
+		return;
+
+	atl_macsec_check_txsa_expiration(nic);
+}
+
 #endif
 
 

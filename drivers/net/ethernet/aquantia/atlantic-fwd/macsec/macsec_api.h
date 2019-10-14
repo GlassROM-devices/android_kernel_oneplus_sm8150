@@ -219,6 +219,15 @@ int AQ_API_GetIngressCommonCounters(struct atl_hw *hw, AQ_API_SEC_IngressCommonC
 int AQ_API_ClearIngressCounters(struct atl_hw *hw);
 
 
+/* Get Egress SA expired. */
+int AQ_API_GetEgressSAExpired(struct atl_hw *hw, uint32_t *expired);
+/* Get Egress SA threshold expired. */
+int AQ_API_GetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t *expired);
+/* Set Egress SA expired. */
+int AQ_API_SetEgressSAExpired(struct atl_hw *hw, uint32_t expired);
+/* Set Egress SA threshold expired. */
+int AQ_API_SetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t expired);
+
 
 
 #endif /* __MACSEC_API_H__ */

@@ -1770,4 +1770,42 @@ int AQ_API_ClearIngressCounters(struct atl_hw *hw)
     return 0;
 }
 
+int AQ_API_GetEgressSAExpired(struct atl_hw *hw, uint32_t *expired)
+{
+  uint16_t val;
 
+  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR, &val);
+  *expired = val;
+  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR + 1, &val);
+  *expired |= val << 16;
+
+  return 0;
+}
+
+int AQ_API_GetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t *expired)
+{
+  uint16_t val;
+
+  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR, &val);
+  *expired = val;
+  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR + 1, &val);
+  *expired |= val << 16;
+
+  return 0;
+}
+
+int AQ_API_SetEgressSAExpired(struct atl_hw *hw, uint32_t expired)
+{
+  atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR, expired & 0xFFFF);
+  atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR + 1, expired >> 16);
+
+  return 0;
+}
+
+int AQ_API_SetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t expired)
+{
+  atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR, expired & 0xFFFF);
+  atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR + 1, expired >> 16);
+
+  return 0;
+}
