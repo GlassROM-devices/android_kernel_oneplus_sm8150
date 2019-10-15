@@ -510,9 +510,6 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	atl_setup_rss(nic);
 
 	ndev->features |= NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 |
-#ifdef NETIF_F_HW_MACSEC
-	NETIF_F_HW_MACSEC |
-#endif
 		NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 		NETIF_F_RXHASH;
 
@@ -525,6 +522,11 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (pci_64)
 		ndev->features |= NETIF_F_HIGHDMA;
 
+#ifdef NETIF_F_HW_MACSEC
+	if (hw->mcp.caps_low & atl_fw2_macsec)
+		ndev->features |= NETIF_F_HW_MACSEC;
+#endif
+
 	ndev->features |= NETIF_F_NTUPLE;
 
 	ndev->priv_flags |= IFF_UNICAST_FLT;
@@ -534,7 +536,8 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	hw->non_ring_intr_mask = BIT(ATL_NUM_NON_RING_IRQS) - 1;
 	ndev->netdev_ops = &atl_ndev_ops;
 #ifdef NETIF_F_HW_MACSEC
-	ndev->macsec_ops = &atl_macsec_ops,
+	if (hw->mcp.caps_low & atl_fw2_macsec)
+		ndev->macsec_ops = &atl_macsec_ops,
 #endif
 	ndev->mtu = 1500;
 #ifdef ATL_HAVE_MINMAX_MTU

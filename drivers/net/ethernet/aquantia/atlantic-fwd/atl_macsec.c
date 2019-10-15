@@ -113,6 +113,8 @@ int atl_init_macsec(struct atl_hw *hw)
 		msg.cfg = cfg;
 
 		ret = hw->mcp.ops->send_macsec_req(hw, &msg, &resp);
+		if (ret)
+			return ret;
 	}
 
 
@@ -603,6 +605,9 @@ void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 
 void atl_macsec_work(struct atl_nic *nic)
 {
+	if ((nic->hw.mcp.caps_low & atl_fw2_macsec) == 0)
+		return;
+
 	if (!netif_carrier_ok(nic->ndev))
 		return;
 
