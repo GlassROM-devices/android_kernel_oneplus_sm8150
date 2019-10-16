@@ -1245,7 +1245,8 @@ void atl_clear_datapath(struct atl_nic *nic)
 		return;
 
 	for (i = 0; i < nic->nvecs; i++) {
-		cancel_work_sync(qvecs[i].work);
+		if (unlikely(!(nic->flags & ATL_FL_MULTIPLE_VECTORS)))
+			cancel_work_sync(qvecs[i].work);
 		netif_napi_del(&qvecs[i].napi);
 	}
 
