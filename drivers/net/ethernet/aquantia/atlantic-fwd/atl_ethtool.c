@@ -635,6 +635,92 @@ static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(MediaDetect, MEDIA_DETECT),
 };
 
+#ifdef NETIF_F_HW_MACSEC
+
+#define ATL_MACSEC_STAT(_name, _field)					\
+{									\
+	.stat_name = #_name,						\
+	.idx = offsetof(struct atl_macsec_common_stats, _field) /	\
+		sizeof(uint64_t),					\
+}
+
+#define ATL_MACSEC_RX_SA_STAT(_name, _field)				\
+{									\
+	.stat_name = #_name,						\
+	.idx = offsetof(struct atl_macsec_rx_sa_stats, _field) /	\
+		sizeof(uint64_t),					\
+}
+
+#define ATL_MACSEC_TX_SA_STAT(_name, _field)				\
+{									\
+	.stat_name = #_name,						\
+	.idx = offsetof(struct atl_macsec_tx_sa_stats, _field) /	\
+		sizeof(uint64_t),				\
+}
+
+#define ATL_MACSEC_TX_SC_STAT(_name, _field)				\
+{									\
+	.stat_name = #_name,						\
+	.idx = offsetof(struct atl_macsec_tx_sc_stats, _field) /	\
+		sizeof(uint64_t),					\
+}
+
+static const struct atl_stat_desc macsec_stat_descs[] = {
+	ATL_MACSEC_STAT(in_ctl_pkts, in.ctl_pkts),
+	ATL_MACSEC_STAT(in_tagged_miss_pkts, in.tagged_miss_pkts),
+	ATL_MACSEC_STAT(in_untagged_miss_pkts, in.untagged_miss_pkts),
+	ATL_MACSEC_STAT(in_notag_pkts, in.notag_pkts),
+	ATL_MACSEC_STAT(in_untagged_pkts, in.untagged_pkts),
+	ATL_MACSEC_STAT(in_bad_tag_pkts, in.bad_tag_pkts),
+	ATL_MACSEC_STAT(in_no_sci_pkts, in.no_sci_pkts),
+	ATL_MACSEC_STAT(in_unknown_sci_pkts, in.unknown_sci_pkts),
+	ATL_MACSEC_STAT(in_ctrl_prt_pass_pkts, in.ctrl_prt_pass_pkts),
+	ATL_MACSEC_STAT(in_unctrl_prt_pass_pkts, in.unctrl_prt_pass_pkts),
+	ATL_MACSEC_STAT(in_ctrl_prt_fail_pkts, in.ctrl_prt_fail_pkts),
+	ATL_MACSEC_STAT(in_unctrl_prt_fail_pkts, in.unctrl_prt_fail_pkts),
+	ATL_MACSEC_STAT(in_too_long_pkts, in.too_long_pkts),
+	ATL_MACSEC_STAT(in_igpoc_ctl_pkts, in.igpoc_ctl_pkts),
+	ATL_MACSEC_STAT(in_ecc_error_pkts, in.ecc_error_pkts),
+	ATL_MACSEC_STAT(in_unctrl_hit_drop_redir, in.unctrl_hit_drop_redir),
+	ATL_MACSEC_STAT(out_ctl_pkts, out.ctl_pkts),
+	ATL_MACSEC_STAT(out_unknown_sa_pkts, out.unknown_sa_pkts),
+	ATL_MACSEC_STAT(out_untagged_pkts, out.untagged_pkts),
+	ATL_MACSEC_STAT(out_too_long, out.too_long),
+	ATL_MACSEC_STAT(out_ecc_error_pkts, out.ecc_error_pkts),
+	ATL_MACSEC_STAT(out_unctrl_hit_drop_redir, out.unctrl_hit_drop_redir),
+};
+
+static const struct atl_stat_desc macsec_rx_sa_stat_descs[] = {
+	ATL_MACSEC_RX_SA_STAT(untagged_hit_pkts, untagged_hit_pkts),
+	ATL_MACSEC_RX_SA_STAT(ctrl_hit_drop_redir_pkts, ctrl_hit_drop_redir_pkts),
+	ATL_MACSEC_RX_SA_STAT(not_using_sa, not_using_sa),
+	ATL_MACSEC_RX_SA_STAT(unused_sa, unused_sa),
+	ATL_MACSEC_RX_SA_STAT(not_valid_pkts, not_valid_pkts),
+	ATL_MACSEC_RX_SA_STAT(invalid_pkts, invalid_pkts),
+	ATL_MACSEC_RX_SA_STAT(ok_pkts, ok_pkts),
+	ATL_MACSEC_RX_SA_STAT(late_pkts, late_pkts),
+	ATL_MACSEC_RX_SA_STAT(delayed_pkts, delayed_pkts),
+	ATL_MACSEC_RX_SA_STAT(unchecked_pkts, unchecked_pkts),
+	ATL_MACSEC_RX_SA_STAT(validated_octets, validated_octets),
+	ATL_MACSEC_RX_SA_STAT(decrypted_octets, decrypted_octets),
+};
+
+static const struct atl_stat_desc macsec_tx_sa_stat_descs[] = {
+	ATL_MACSEC_TX_SA_STAT(hit_drop_redirect, sa_hit_drop_redirect),
+	ATL_MACSEC_TX_SA_STAT(protected2_pkts, sa_protected2_pkts),
+	ATL_MACSEC_TX_SA_STAT(protected_pkts, sa_protected_pkts),
+	ATL_MACSEC_TX_SA_STAT(encrypted_pkts, sa_encrypted_pkts),
+};
+
+
+static const struct atl_stat_desc macsec_tx_sc_stat_descs[] = {
+	ATL_MACSEC_TX_SC_STAT(protected_pkts, sc_protected_pkts),
+	ATL_MACSEC_TX_SC_STAT(encrypted_pkts, sc_encrypted_pkts),
+	ATL_MACSEC_TX_SC_STAT(protected_octets, sc_protected_octets),
+	ATL_MACSEC_TX_SC_STAT(encrypted_octets, sc_encrypted_octets),
+};
+#endif
+
 static int atl_get_sset_count(struct net_device *ndev, int sset)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
@@ -649,6 +735,15 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_TX])
 		       + ARRAY_SIZE(rx_stat_descs) *
 				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_RX])
+#endif
+#ifdef NETIF_F_HW_MACSEC
+		       + ARRAY_SIZE(macsec_stat_descs)
+		       + ARRAY_SIZE(macsec_tx_sa_stat_descs) *
+		       		atl_macsec_tx_sa_cnt(&nic->hw)
+		       + ARRAY_SIZE(macsec_rx_sa_stat_descs) *
+		       		atl_macsec_rx_sa_cnt(&nic->hw)
+		       + ARRAY_SIZE(macsec_tx_sc_stat_descs) *
+		       		hweight_long(nic->hw.macsec_cfg.secy_idx_busy)
 #endif
 			;
 
@@ -714,6 +809,40 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 					ARRAY_SIZE(rx_stat_descs));
 		}
 #endif
+#ifdef NETIF_F_HW_MACSEC
+		atl_copy_stats_strings(&p, "macsec_", macsec_stat_descs,
+			ARRAY_SIZE(macsec_stat_descs));
+
+		for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+			if (!(test_bit(i, &nic->hw.macsec_cfg.secy_idx_busy)))
+				continue;
+			struct atl_sc_idxs *secys = &nic->hw.macsec_cfg.secys[i];
+			int assoc_num;
+
+			snprintf(prefix, sizeof(prefix), "txsc%d_", secys->sc_idx);
+			atl_copy_stats_strings(&p, prefix,
+					macsec_tx_sc_stat_descs,
+					ARRAY_SIZE(macsec_tx_sc_stat_descs));
+			for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
+				if (!test_bit(assoc_num, &secys->tx_sa_idx_busy))
+					continue;
+				snprintf(prefix, sizeof(prefix),
+					"txsc%d_sa%d_", secys->sc_idx, assoc_num);
+				atl_copy_stats_strings(&p, prefix,
+						macsec_tx_sa_stat_descs,
+						ARRAY_SIZE(macsec_tx_sa_stat_descs));
+			}
+			for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
+				if (!test_bit(assoc_num, &secys->rx_sa_idx_busy))
+					continue;
+				snprintf(prefix, sizeof(prefix),
+					"rxsc%d_sa%d_", secys->sc_idx, assoc_num);
+				atl_copy_stats_strings(&p, prefix,
+					macsec_rx_sa_stat_descs,
+					ARRAY_SIZE(macsec_rx_sa_stat_descs));
+			}
+		}
+#endif
 		return;
 
 	case ETH_SS_PRIV_FLAGS:
@@ -740,7 +869,9 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 
 	atl_update_eth_stats(nic);
 	atl_update_global_stats(nic);
-
+#ifdef NETIF_F_HW_MACSEC
+	atl_macsec_update_stats(&nic->hw);
+#endif
 	atl_write_stats(&nic->stats.tx, tx_stat_descs, data, uint64_t);
 	atl_write_stats(&nic->stats.rx, rx_stat_descs, data, uint64_t);
 
@@ -769,6 +900,31 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 			atl_fwd_get_ring_stats(nic->fwd.rings[ATL_FWDIR_RX][i],
 					       &tmp);
 			atl_write_stats(&tmp.rx, rx_stat_descs, data, uint64_t);
+		}
+	}
+#endif
+#ifdef NETIF_F_HW_MACSEC
+	int assoc_num;
+	atl_write_stats(&nic->hw.macsec_cfg.stats, macsec_stat_descs, data, uint64_t);
+
+	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+		if (!(test_bit(i, &nic->hw.macsec_cfg.secy_idx_busy)))
+			continue;
+		struct atl_sc_idxs *secys = &nic->hw.macsec_cfg.secys[i];
+
+		atl_write_stats(&secys->stats, macsec_tx_sc_stat_descs, data, uint64_t);
+
+		for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
+			if (!test_bit(assoc_num, &secys->tx_sa_idx_busy))
+				continue;
+			atl_write_stats(&secys->tx_sa_stats[assoc_num],
+					macsec_tx_sa_stat_descs, data, uint64_t);
+		}
+		for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
+			if (!test_bit(assoc_num, &secys->rx_sa_idx_busy))
+				continue;
+			atl_write_stats(&secys->rx_sa_stats[assoc_num],
+					macsec_rx_sa_stat_descs, data, uint64_t);
 		}
 	}
 #endif
