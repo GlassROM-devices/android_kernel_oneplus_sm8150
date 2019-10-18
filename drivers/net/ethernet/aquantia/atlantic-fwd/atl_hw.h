@@ -75,15 +75,15 @@ enum atl_nic_state {
 };
 #ifdef NETIF_F_HW_MACSEC
 #define ATL_MACSEC_MAX_SECY 32
-enum ast_macsec_sc_sa {
+enum atl_macsec_sc_sa {
 	atl_macses_sa_sc_4sa_8sc,
 	atl_macses_sa_sc_not_used,
 	atl_macses_sa_sc_2sa_16sc,
 	atl_macses_sa_sc_1sa_32sc,
 };
 struct atl_macsec_cfg {
-	unsigned long int sc_idx_busy;
-	enum ast_macsec_sc_sa sc_sa;
+	unsigned long int secy_idx_busy;
+	enum atl_macsec_sc_sa sc_sa;
 	struct atl_sc_idxs {
 		uint32_t sc_idx;
 		const struct macsec_secy *secy;
