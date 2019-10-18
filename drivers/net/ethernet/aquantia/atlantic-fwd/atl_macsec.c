@@ -26,22 +26,8 @@ static void ether_addr_to_mac(uint32_t mac[2], unsigned char *emac)
 	mac[1] = swab32(tmp[0]);
 }
 
-int atl_get_sc_idx_from_secy(struct atl_hw *hw,
-			     const struct macsec_secy *secy)
-{
-	int i;
-
-	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
-		if (hw->macsec_cfg.secys[i].secy == secy) {
-			return hw->macsec_cfg.secys[i].sc_idx;
-			break;
-		}
-	}
-	return -1;
-}
-
-int atl_get_secy_idx_from_secy(struct atl_hw *hw,
-			       const struct macsec_secy *secy)
+static int atl_get_secy_idx_from_secy(struct atl_hw *hw,
+				      const struct macsec_secy *secy)
 {
 	int i;
 
@@ -54,17 +40,18 @@ int atl_get_secy_idx_from_secy(struct atl_hw *hw,
 	return -1;
 }
 
-static int atl_macsec_secy_idx_from_sc_idx(enum atl_macsec_sc_sa sc_sa, int sc_idx,
-				     int *secy_idx)
+static int atl_macsec_secy_idx_from_sc_idx(enum atl_macsec_sc_sa sc_sa,
+					   unsigned int sc_idx,
+					   unsigned int *secy_idx)
 {
 	switch(sc_sa) {
-	case atl_macses_sa_sc_4sa_8sc:
+	case atl_macsec_sa_sc_4sa_8sc:
 		*secy_idx = sc_idx >> 2;
 		return 0;
-	case atl_macses_sa_sc_2sa_16sc:
+	case atl_macsec_sa_sc_2sa_16sc:
 		*secy_idx = sc_idx >> 1;
 		return 0;
-	case atl_macses_sa_sc_1sa_32sc:
+	case atl_macsec_sa_sc_1sa_32sc:
 		*secy_idx = sc_idx;
 		return 0;
 	default:
@@ -136,7 +123,7 @@ int atl_init_macsec(struct atl_hw *hw)
 
 
 	/* Init Ethertype bypass filters */
-	uint32_t ctl_ether_types[1] = { 0x888e };
+	uint32_t ctl_ether_types[1] = { ETH_P_PAE };
 	for (index = 0; index < ARRAY_SIZE(ctl_ether_types); index++) {
 		if (ctl_ether_types[index] == 0) 
 			continue;
@@ -204,7 +191,7 @@ static int atl_update_secy(struct atl_hw *hw, int secy_idx)
 {
 	struct atl_sc_idxs *secys = &hw->macsec_cfg.secys[secy_idx];
 	const struct macsec_secy *secy= secys->secy;
-	int sc_idx = secys->sc_idx;
+	unsigned int sc_idx = secys->sc_idx;
 	int ret = 0;
 
 	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = {0};
@@ -253,13 +240,13 @@ static int atl_update_secy(struct atl_hw *hw, int secy_idx)
 	matchSCRecord.an_roll = 0;
 
 	switch (secy->key_len) {
-	case 16:
+	case ATL_MACSEC_KEY_LEN_128_BIT:
 		matchSCRecord.sak_len = 0;
 		break;
-	case 24:
+	case ATL_MACSEC_KEY_LEN_192_BIT:
 		matchSCRecord.sak_len = 1;
 		break;
-	case 32:
+	case ATL_MACSEC_KEY_LEN_256_BIT:
 		matchSCRecord.sak_len = 2;
 		break;
 	default:
@@ -286,17 +273,17 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 
 	switch(MACSEC_NUM_AN){
 		case 4:
-			hw->macsec_cfg.sc_sa = atl_macses_sa_sc_4sa_8sc;
+			hw->macsec_cfg.sc_sa = atl_macsec_sa_sc_4sa_8sc;
 			sc_idx_max = 8;
 			shift = 2;
 			break;
 		case 2:
-			hw->macsec_cfg.sc_sa = atl_macses_sa_sc_2sa_16sc;
+			hw->macsec_cfg.sc_sa = atl_macsec_sa_sc_2sa_16sc;
 			sc_idx_max = 16;
 			shift = 1;
 			break;
 		case 1:
-			hw->macsec_cfg.sc_sa = atl_macses_sa_sc_1sa_32sc;
+			hw->macsec_cfg.sc_sa = atl_macsec_sa_sc_1sa_32sc;
 			sc_idx_max = 32;
 			shift = 0;
 			break;
@@ -374,15 +361,14 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 	return ret;
 }
 
-static int atl_update_txsa(struct atl_hw *hw,
+static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
 			   const struct macsec_secy *secy,
 			   const struct macsec_tx_sa *tx_sa,
 			   const unsigned char *key,
-			   int an)
+			   unsigned char an)
 {
-	int sc_idx = atl_get_sc_idx_from_secy(hw, secy);
 	int ret = 0;
-	int sa_idx;
+	unsigned int sa_idx;
 
 	dev_dbg(&hw->pdev->dev, "set tx_sa %d: active=%d, next_pn=%d \n", an,
 			tx_sa->active, tx_sa->next_pn);
@@ -415,27 +401,6 @@ static int atl_update_txsa(struct atl_hw *hw,
 
 }
 
-static int atl_mdo_add_txsa(struct macsec_context *ctx)
-{
-	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, ctx->secy);
-	const struct macsec_secy *secy = ctx->secy;
-
-	if (ctx->prepare)
-		return 0;
-
-	memcpy(nic->hw.macsec_cfg.secys[secy_idx].tx_sa_key[ctx->sa.assoc_num],
-	       ctx->sa.key, secy->key_len);
-
-	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
-		return atl_update_txsa(&nic->hw, secy,
-				       ctx->sa.tx_sa,
-				       ctx->sa.key,
-				       ctx->sa.assoc_num);
-
-	return 0;
-}
-
 static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
@@ -449,7 +414,9 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 	       ctx->sa.key, secy->key_len);
 
 	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
-		return atl_update_txsa(&nic->hw, secy,
+		return atl_update_txsa(&nic->hw,
+				       nic->hw.macsec_cfg.secys[secy_idx].sc_idx,
+				       secy,
 				       ctx->sa.tx_sa,
 				       ctx->sa.key,
 				       ctx->sa.assoc_num);
@@ -550,7 +517,9 @@ static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
 
 	for (i = 0; i < MACSEC_NUM_AN; i++) {
 		if (secy->tx_sc.sa[i])
-			ret =  atl_update_txsa(hw, secy,
+			ret =  atl_update_txsa(hw,
+				hw->macsec_cfg.secys[secy_idx].sc_idx,
+				secy,
 				secy->tx_sc.sa[i],
 				hw->macsec_cfg.secys[secy_idx].tx_sa_key[i],
 				i);
@@ -571,24 +540,24 @@ const struct macsec_ops atl_macsec_ops = {
 	.mdo_add_rxsa = atl_mdo_add_rxsa,
 	.mdo_upd_rxsa = atl_mdo_upd_rxsa,
 	.mdo_del_rxsa = atl_mdo_del_rxsa,
-	.mdo_add_txsa = atl_mdo_add_txsa,
+	.mdo_add_txsa = atl_mdo_upd_txsa,
 	.mdo_upd_txsa = atl_mdo_upd_txsa,
 	.mdo_del_txsa = atl_mdo_del_txsa,
 };
 
 static int atl_macsec_sa_from_sa_idx(enum atl_macsec_sc_sa sc_sa, int sa_idx,
-				     int *sc_idx, int *an)
+				     unsigned int *sc_idx, unsigned char *an)
 {
 	switch(sc_sa) {
-	case atl_macses_sa_sc_4sa_8sc:
+	case atl_macsec_sa_sc_4sa_8sc:
 		*sc_idx = sa_idx & ~3;
 		*an = sa_idx & 3;
 		return 0;
-	case atl_macses_sa_sc_2sa_16sc:
+	case atl_macsec_sa_sc_2sa_16sc:
 		*sc_idx = sa_idx & ~1;
 		*an = sa_idx & 1;
 		return 0;
-	case atl_macses_sa_sc_1sa_32sc:
+	case atl_macsec_sa_sc_1sa_32sc:
 		*sc_idx = sa_idx;
 		*an = 0;
 		return 0;
@@ -601,7 +570,8 @@ static int atl_macsec_sa_from_sa_idx(enum atl_macsec_sc_sa sc_sa, int sa_idx,
 void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 {
 	uint32_t egress_sa_expired, egress_sa_threshold_expired;
-	unsigned int sc_idx = 0, an = 0, secy_idx = 0;
+	unsigned int sc_idx = 0, secy_idx = 0;
+	unsigned char an = 0;
 	const struct macsec_secy *secy;
 	struct atl_hw *hw = &nic->hw;
 	struct macsec_tx_sa *tx_sa;
