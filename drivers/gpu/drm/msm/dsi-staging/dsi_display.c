@@ -2869,11 +2869,20 @@ error:
 	return rc;
 }
 
-static int dsi_display_set_clk_src(struct dsi_display *display)
+static int dsi_display_set_clk_src(struct dsi_display *display, bool on)
 {
 	int rc = 0;
 	int i;
 	struct dsi_display_ctrl *m_ctrl, *ctrl;
+	struct dsi_clk_link_set *src;
+
+	/* if XO clk is defined, select XO clk src when DSI is disabled */
+	if (on)
+		src = &display->clock_info.mux_clks;
+	else if (display->clock_info.xo_clks.byte_clk)
+		src = &display->clock_info.xo_clks;
+	else
+		return 0;
 
 	/*
 	 * In case of split DSI usecases, the clock for master controller should
@@ -2882,8 +2891,7 @@ static int dsi_display_set_clk_src(struct dsi_display *display)
 	 */
 	m_ctrl = &display->ctrl[display->clk_master_idx];
 
-	rc = dsi_ctrl_set_clock_source(m_ctrl->ctrl,
-		   &display->clock_info.mux_clks);
+	rc = dsi_ctrl_set_clock_source(m_ctrl->ctrl, src);
 	if (rc) {
 		pr_err("[%s] failed to set source clocks for master, rc=%d\n",
 			   display->name, rc);
@@ -2896,8 +2904,7 @@ static int dsi_display_set_clk_src(struct dsi_display *display)
 		if (!ctrl->ctrl || (ctrl == m_ctrl))
 			continue;
 
-		rc = dsi_ctrl_set_clock_source(ctrl->ctrl,
-			   &display->clock_info.mux_clks);
+		rc = dsi_ctrl_set_clock_source(ctrl->ctrl, src);
 		if (rc) {
 			pr_err("[%s] failed to set source clocks, rc=%d\n",
 				   display->name, rc);
@@ -3587,11 +3594,16 @@ static int dsi_display_clocks_init(struct dsi_display *display)
 	struct dsi_clk_link_set *src = &display->clock_info.src_clks;
 	struct dsi_clk_link_set *mux = &display->clock_info.mux_clks;
 	struct dsi_clk_link_set *shadow = &display->clock_info.shadow_clks;
+	struct dsi_clk_link_set *xo = &display->clock_info.xo_clks;
 	struct dsi_dyn_clk_caps *dyn_clk_caps = &(display->panel->dyn_clk_caps);
 
 	num_clk = dsi_display_get_clocks_count(display);
 
 	pr_debug("clk count=%d\n", num_clk);
+
+	dsi_clk = devm_clk_get(&display->pdev->dev, "xo_clk");
+	if (!IS_ERR_OR_NULL(dsi_clk))
+		xo->byte_clk = xo->pixel_clk = dsi_clk;
 
 	for (i = 0; i < num_clk; i++) {
 		dsi_display_get_clock_name(display, i, &clk_name);
@@ -7276,7 +7288,7 @@ static int dsi_display_pre_switch(struct dsi_display *display)
 		goto error_ctrl_clk_off;
 	}
 
-	rc = dsi_display_set_clk_src(display);
+	rc = dsi_display_set_clk_src(display, true);
 	if (rc) {
 		pr_err("[%s] failed to set DSI link clock source, rc=%d\n",
 			display->name, rc);
@@ -7668,7 +7680,7 @@ int dsi_display_prepare(struct dsi_display *display)
 		}
 	}
 
-	rc = dsi_display_set_clk_src(display);
+	rc = dsi_display_set_clk_src(display, true);
 	if (rc) {
 		pr_err("[%s] failed to set DSI link clock source, rc=%d\n",
 			display->name, rc);
@@ -8604,7 +8616,6 @@ int dsi_display_read_serial_number(struct dsi_display *dsi_display,
 
 	if ((strcmp(dsi_display->panel->name, "samsung dsc cmd mode oneplus dsi panel") == 0) ||
 		(strcmp(dsi_display->panel->name, "samsung sofef03f_m fhd cmd mode dsc dsi panel") == 0)) {
-
 		flags = 0;
 		cmds = mode->priv_info->cmd_sets[DSI_CMD_SET_CODE_INFO].cmds;
 		if (cmds->last_command) {
@@ -10561,6 +10572,8 @@ int dsi_display_unprepare(struct dsi_display *display)
 	if (rc)
 		pr_err("[%s] panel post-unprepare failed, rc=%d\n",
 		       display->name, rc);
+
+	dsi_display_set_clk_src(display, false);
 
 	mutex_unlock(&display->display_lock);
 

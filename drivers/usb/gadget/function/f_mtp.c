@@ -1203,8 +1203,8 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 	if (ret)
 		mtp_req_put(dev, &dev->intr_idle, req);
 
-	mtp_log("exit: (%d)\n", ret);
 	mtp_unlock(&dev->ioctl_excl);
+	mtp_log("exit: (%d)\n", ret);
 	return ret;
 }
 
