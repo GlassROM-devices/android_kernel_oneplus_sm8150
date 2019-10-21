@@ -10,6 +10,7 @@
 #include "atl_common.h"
 #ifdef NETIF_F_HW_MACSEC
 #include <net/macsec.h>
+#include <linux/rtnetlink.h>
 
 #include "macsec/macsec_api.h"
 #define ATL_MACSEC_KEY_LEN_128_BIT 16
@@ -105,6 +106,8 @@ int atl_init_macsec(struct atl_hw *hw)
 	int index = 0, tbl_idx;
 	int ret;
 
+	rtnl_lock();
+
 	if (hw->mcp.ops->send_macsec_req != NULL) {
 		struct macsec_cfg cfg = { 0 };
 
@@ -118,9 +121,8 @@ int atl_init_macsec(struct atl_hw *hw)
 
 		ret = hw->mcp.ops->send_macsec_req(hw, &msg, &resp);
 		if (ret)
-			return ret;
+			goto unlock;
 	}
-
 
 	/* Init Ethertype bypass filters */
 	uint32_t ctl_ether_types[1] = { ETH_P_PAE };
@@ -147,7 +149,11 @@ int atl_init_macsec(struct atl_hw *hw)
 		num_ctl_ether_types++;
 	}
 
-	return atl_macsec_apply_cfg(hw);
+	ret = atl_macsec_apply_cfg(hw);
+
+unlock:
+	rtnl_unlock();
+	return ret;
 }
 
 static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx);
@@ -629,7 +635,9 @@ void atl_macsec_work(struct atl_nic *nic)
 	if (!netif_carrier_ok(nic->ndev))
 		return;
 
+	rtnl_lock();
 	atl_macsec_check_txsa_expiration(nic);
+	rtnl_unlock();
 }
 
 #endif
