@@ -545,22 +545,30 @@ const struct macsec_ops atl_macsec_ops = {
 	.mdo_del_txsa = atl_mdo_del_txsa,
 };
 
-static int atl_macsec_sa_from_sa_idx(enum atl_macsec_sc_sa sc_sa, int sa_idx,
-				     unsigned int *sc_idx, unsigned char *an)
+static int atl_macsec_sa_from_sa_idx(enum atl_macsec_sc_sa sc_sa, int sa_idx)
 {
 	switch(sc_sa) {
 	case atl_macsec_sa_sc_4sa_8sc:
-		*sc_idx = sa_idx & ~3;
-		*an = sa_idx & 3;
-		return 0;
+		return sa_idx & 3;
 	case atl_macsec_sa_sc_2sa_16sc:
-		*sc_idx = sa_idx & ~1;
-		*an = sa_idx & 1;
-		return 0;
+		return sa_idx & 1;
 	case atl_macsec_sa_sc_1sa_32sc:
-		*sc_idx = sa_idx;
-		*an = 0;
 		return 0;
+	default:
+		WARN_ONCE(1, "Invalid sc_sa");
+	}
+	return -EINVAL;
+}
+
+static int atl_macsec_sc_idx_from_sa_idx(enum atl_macsec_sc_sa sc_sa, int sa_idx)
+{
+	switch(sc_sa) {
+	case atl_macsec_sa_sc_4sa_8sc:
+		return sa_idx & ~3;
+	case atl_macsec_sa_sc_2sa_16sc:
+		return sa_idx & ~1;
+	case atl_macsec_sa_sc_1sa_32sc:
+		return sa_idx;
 	default:
 		WARN_ONCE(1, "Invalid sc_sa");
 	}
@@ -571,27 +579,29 @@ void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 {
 	uint32_t egress_sa_expired, egress_sa_threshold_expired;
 	unsigned int sc_idx = 0, secy_idx = 0;
-	unsigned char an = 0;
 	const struct macsec_secy *secy;
 	struct atl_hw *hw = &nic->hw;
+	enum atl_macsec_sc_sa sc_sa;
 	struct macsec_tx_sa *tx_sa;
+	unsigned char an = 0;
 	int i;
+
+	sc_sa = hw->macsec_cfg.sc_sa;
 
 	AQ_API_GetEgressSAExpired(hw, &egress_sa_expired);
 	AQ_API_GetEgressSAThresholdExpired(hw, &egress_sa_threshold_expired);
 
-	for (i = 0; i < 32; i++) {
+	for (i = 0; i < ATL_MACSEC_MAX_SA; i++) {
 		if (egress_sa_expired & BIT(i)) {
-			atl_macsec_sa_from_sa_idx(hw->macsec_cfg.sc_sa,
-						  i, &sc_idx, &an);
-			atl_macsec_secy_idx_from_sc_idx(hw->macsec_cfg.sc_sa,
-				sc_idx, &secy_idx);
+			an = atl_macsec_sa_from_sa_idx(sc_sa, i);
+			sc_idx = atl_macsec_sc_idx_from_sa_idx(sc_sa, i);
+			atl_macsec_secy_idx_from_sc_idx(sc_sa, sc_idx, &secy_idx);
 			if (!(hw->macsec_cfg.secy_idx_busy & BIT(secy_idx))) {
 				netdev_warn(nic->ndev, "PN threshold expired on invalid TX SC");
 				continue;
 			}
 			if (!netif_running(hw->macsec_cfg.secys[secy_idx].secy->netdev)) {
-				netdev_warn(nic->ndev, "PN threshold expired on donw TX SC");
+				netdev_warn(nic->ndev, "PN threshold expired on down TX SC");
 				continue;
 			}
 			secy = hw->macsec_cfg.secys[secy_idx].secy;

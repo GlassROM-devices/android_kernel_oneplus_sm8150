@@ -75,6 +75,7 @@ enum atl_nic_state {
 };
 #ifdef NETIF_F_HW_MACSEC
 #define ATL_MACSEC_MAX_SECY 32
+#define ATL_MACSEC_MAX_SA 32
 enum atl_macsec_sc_sa {
 	atl_macsec_sa_sc_4sa_8sc,
 	atl_macsec_sa_sc_not_used,
