@@ -459,39 +459,197 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_mdo_add_rxsc(struct macsec_context *ctx)
+static int atl_update_rxsc(struct atl_hw *hw,
+			   const struct macsec_secy *secy,
+			   const struct macsec_rx_sc *rx_sc)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
-	return 0;
+	const int secy_idx = atl_get_secy_idx_from_secy(hw, secy);
+	const unsigned int sc_idx = hw->macsec_cfg.secys[secy_idx].sc_idx;
+	int ret = 0;
+
+	dev_dbg(&hw->pdev->dev, "set rx_sc: sci %#llx, sc_idx=%d\n", secy->sci,
+		sc_idx);
+
+	AQ_API_SEC_IngressPreClassRecord matchIngressPreClassRecord = {0};
+
+	matchIngressPreClassRecord.sci[1] = swab32(secy->sci & 0xffffffff);
+	matchIngressPreClassRecord.sci[0] = swab32(secy->sci >> 32);
+	matchIngressPreClassRecord.sci_mask = 0;
+
+	ether_addr_to_mac(matchIngressPreClassRecord.mac_da,
+					  secy->netdev->dev_addr);
+
+	matchIngressPreClassRecord.da_mask = 0x3f;
+
+	matchIngressPreClassRecord.valid = 1;
+
+	matchIngressPreClassRecord.eth_type = ETH_P_MACSEC; //match all MACSEC ethertype packets
+	matchIngressPreClassRecord.eth_type_mask = 0x3;
+	matchIngressPreClassRecord.action = 0x0; //forward for decryption
+
+	matchIngressPreClassRecord.sc_idx = sc_idx;
+
+	// Num SA per SC: # 0: 4SA, 2: 2SA, 3: 1SA
+	switch (MACSEC_NUM_AN) {
+	case 4:
+		matchIngressPreClassRecord.an_mask = 0;
+		break;
+	case 2:
+		matchIngressPreClassRecord.an_mask = 2;
+		break;
+	case 1:
+		matchIngressPreClassRecord.an_mask = 3;
+		break;
+	default:
+		break;
+	}
+
+	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, secy_idx);
+	if (ret)
+		return ret;
+
+	AQ_API_SEC_IngressSCRecord matchSCRecord = {0};
+
+	matchSCRecord.validate_frames = 0;
+	matchSCRecord.valid = 1;
+	matchSCRecord.fresh = 1;
+
+	return AQ_API_SetIngressSCRecord(hw, &matchSCRecord, sc_idx);
 }
 
 static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const struct macsec_secy *secy = ctx->secy;
+
+	if (ctx->prepare)
+		return 0;
+
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		return atl_update_rxsc(&nic->hw,
+				       secy,
+				       ctx->rx_sc);
+
 	return 0;
 }
 
 static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, ctx->secy);
+	struct atl_hw *hw = &nic->hw;
+	const int sc_idx = hw->macsec_cfg.secys[secy_idx].sc_idx;
+
+	if (ctx->prepare)
+		return 0;
+
+	if (netif_carrier_ok(nic->ndev)) {
+		AQ_API_SEC_IngressSCRecord blankSCRecord = {0};
+		blankSCRecord.fresh = 1;
+		return AQ_API_SetIngressSCRecord(hw, &blankSCRecord, sc_idx);
+	}
+
 	return 0;
 }
 
-static int atl_mdo_add_rxsa(struct macsec_context *ctx)
+static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
+			   const struct macsec_secy *secy,
+			   const struct macsec_rx_sa *rx_sa,
+			   const unsigned char *key,
+			   const unsigned char an)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
-	return 0;
+	const int sa_idx = sc_idx | an;
+	int ret = 0;
+
+	dev_dbg(&hw->pdev->dev, "set rx_sa %d: active=%d, next_pn=%d \n", an,
+			rx_sa->active, rx_sa->next_pn);
+
+	AQ_API_SEC_IngressSARecord matchSARecord = {0};
+	matchSARecord.valid = rx_sa->active;
+	matchSARecord.fresh = 1;
+	matchSARecord.next_pn = rx_sa->next_pn;
+
+	ret = AQ_API_SetIngressSARecord(hw, &matchSARecord, sa_idx);
+	if (ret) {
+		dev_err(&hw->pdev->dev,
+			"AQ_API_SetIngressSARecord failed with %d\n", ret);
+		return ret;
+	}
+
+	AQ_API_SEC_IngressSAKeyRecord matchKeyRecord = {0};
+	memcpy(&matchKeyRecord.key, key, secy->key_len);
+
+	switch (secy->key_len) {
+	case ATL_MACSEC_KEY_LEN_128_BIT:
+		matchKeyRecord.key_len = 0;
+		break;
+	case ATL_MACSEC_KEY_LEN_192_BIT:
+		matchKeyRecord.key_len = 1;
+		break;
+	case ATL_MACSEC_KEY_LEN_256_BIT:
+		matchKeyRecord.key_len = 2;
+		break;
+	default:
+		return -1;
+	}
+
+	atl_rotate_keys(&matchKeyRecord.key, secy->key_len);
+
+	ret = AQ_API_SetIngressSAKeyRecord(hw, &matchKeyRecord, sa_idx);
+	if (ret)
+		dev_err(&hw->pdev->dev,
+			"AQ_API_SetIngressSAKeyRecord failed with %d\n", ret);
+
+	return ret;
 }
 
 static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const struct macsec_secy *secy = ctx->secy;
+	int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, secy);
+
+	if (ctx->prepare)
+		return 0;
+
+	memcpy(nic->hw.macsec_cfg.secys[secy_idx].rx_sa_key[ctx->sa.assoc_num],
+	       ctx->sa.key, secy->key_len);
+
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		return atl_update_rxsa(&nic->hw,
+				       nic->hw.macsec_cfg.secys[secy_idx].sc_idx,
+				       secy,
+				       ctx->sa.rx_sa,
+				       ctx->sa.key,
+				       ctx->sa.assoc_num);
+
 	return 0;
 }
 
 static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, ctx->secy);
+	struct atl_hw *hw = &nic->hw;
+	int sa_idx = hw->macsec_cfg.secys[secy_idx].sc_idx | ctx->sa.assoc_num;
+	int ret = 0;
+
+	if (ctx->prepare)
+		return 0;
+
+	if (netif_carrier_ok(nic->ndev)) {
+		AQ_API_SEC_IngressSARecord blankSARecord = {0};
+		blankSARecord.fresh = 1;
+
+		ret = AQ_API_SetIngressSARecord(hw, &blankSARecord, sa_idx);
+		if (ret)
+			return ret;
+
+		AQ_API_SEC_IngressSAKeyRecord blankSAKeyRecord = {0};
+
+		return AQ_API_SetIngressSAKeyRecord(hw, &blankSAKeyRecord, sa_idx);
+	}
+
 	return 0;
 }
 
@@ -513,6 +671,7 @@ static int atl_macsec_apply_cfg(struct atl_hw *hw)
 static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
 {
 	const struct macsec_secy *secy = hw->macsec_cfg.secys[secy_idx].secy;
+	struct macsec_rx_sc *rx_sc;
 	int i;
 	int ret = 0;
 
@@ -521,14 +680,36 @@ static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
 	if (!netif_running(secy->netdev))
 		return ret;
 
+	for (rx_sc = rcu_dereference_bh(secy->rx_sc); rx_sc && rx_sc->active ; rx_sc = rcu_dereference_bh(rx_sc->next)) {
+		ret = atl_update_rxsc(hw, secy, rx_sc);
+		if (ret)
+			return ret;
+
+		for (i = 0; i < MACSEC_NUM_AN; i++) {
+			if (rx_sc->sa[i]) {
+				ret =  atl_update_rxsa(hw,
+					hw->macsec_cfg.secys[secy_idx].sc_idx,
+					secy,
+					rx_sc->sa[i],
+					hw->macsec_cfg.secys[secy_idx].rx_sa_key[i],
+					i);
+				if (ret)
+					return ret;
+			}
+		}
+	}
+
 	for (i = 0; i < MACSEC_NUM_AN; i++) {
-		if (secy->tx_sc.sa[i])
-			ret =  atl_update_txsa(hw,
+		if (secy->tx_sc.sa[i]) {
+			ret = atl_update_txsa(hw,
 				hw->macsec_cfg.secys[secy_idx].sc_idx,
 				secy,
 				secy->tx_sc.sa[i],
 				hw->macsec_cfg.secys[secy_idx].tx_sa_key[i],
 				i);
+			if (ret)
+				break;
+		}
 	}
 
 	return ret;
@@ -540,10 +721,10 @@ const struct macsec_ops atl_macsec_ops = {
 	.mdo_add_secy = atl_mdo_add_secy,
 	.mdo_upd_secy = atl_mdo_upd_secy,
 	.mdo_del_secy = atl_mdo_del_secy,
-	.mdo_add_rxsc = atl_mdo_add_rxsc,
+	.mdo_add_rxsc = atl_mdo_upd_rxsc,
 	.mdo_upd_rxsc = atl_mdo_upd_rxsc,
 	.mdo_del_rxsc = atl_mdo_del_rxsc,
-	.mdo_add_rxsa = atl_mdo_add_rxsa,
+	.mdo_add_rxsa = atl_mdo_upd_rxsa,
 	.mdo_upd_rxsa = atl_mdo_upd_rxsa,
 	.mdo_del_rxsa = atl_mdo_del_rxsa,
 	.mdo_add_txsa = atl_mdo_upd_txsa,

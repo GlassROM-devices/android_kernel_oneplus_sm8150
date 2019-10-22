@@ -90,6 +90,7 @@ struct atl_macsec_cfg {
 		const struct macsec_secy *secy;
 		/* It is not OK to store key in driver but it is until ... */
 		u8 tx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
+		u8 rx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
 	} secys[ATL_MACSEC_MAX_SECY];
 };
 #endif
