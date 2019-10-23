@@ -476,10 +476,10 @@ static int atl_update_rxsc(struct atl_hw *hw,
 	matchIngressPreClassRecord.sci[0] = swab32(rx_sc->sci >> 32);
 	matchIngressPreClassRecord.sci_mask = 0xff;
 
-/*	ether_addr_to_mac(matchIngressPreClassRecord.mac_da,
+	ether_addr_to_mac(matchIngressPreClassRecord.mac_da,
 					  secy->netdev->dev_addr);
 
-	matchIngressPreClassRecord.da_mask = 0x3f;*/
+	matchIngressPreClassRecord.da_mask = 0x3f;
 
 	matchIngressPreClassRecord.valid = 1;
 
@@ -504,7 +504,14 @@ static int atl_update_rxsc(struct atl_hw *hw,
 		break;
 	}
 
-	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, secy_idx);
+	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*secy_idx);
+	if (ret)
+		return ret;
+
+	matchIngressPreClassRecord.mac_da[0] = 0xffffffff;
+	matchIngressPreClassRecord.mac_da[1] = 0xffffffff;
+
+	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*secy_idx + 1);
 	if (ret)
 		return ret;
 
