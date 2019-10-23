@@ -467,19 +467,19 @@ static int atl_update_rxsc(struct atl_hw *hw,
 	const unsigned int sc_idx = hw->macsec_cfg.secys[secy_idx].sc_idx;
 	int ret = 0;
 
-	dev_dbg(&hw->pdev->dev, "set rx_sc: sci %#llx, sc_idx=%d\n", secy->sci,
-		sc_idx);
+	dev_dbg(&hw->pdev->dev, "set rx_sc: secy_idx=%d, sci %#llx, sc_idx=%d\n",
+		secy_idx, rx_sc->sci, sc_idx);
 
 	AQ_API_SEC_IngressPreClassRecord matchIngressPreClassRecord = {0};
 
-	matchIngressPreClassRecord.sci[1] = swab32(secy->sci & 0xffffffff);
-	matchIngressPreClassRecord.sci[0] = swab32(secy->sci >> 32);
-	matchIngressPreClassRecord.sci_mask = 0;
+	matchIngressPreClassRecord.sci[1] = swab32(rx_sc->sci & 0xffffffff);
+	matchIngressPreClassRecord.sci[0] = swab32(rx_sc->sci >> 32);
+	matchIngressPreClassRecord.sci_mask = 0xff;
 
-	ether_addr_to_mac(matchIngressPreClassRecord.mac_da,
+/*	ether_addr_to_mac(matchIngressPreClassRecord.mac_da,
 					  secy->netdev->dev_addr);
 
-	matchIngressPreClassRecord.da_mask = 0x3f;
+	matchIngressPreClassRecord.da_mask = 0x3f;*/
 
 	matchIngressPreClassRecord.valid = 1;
 
