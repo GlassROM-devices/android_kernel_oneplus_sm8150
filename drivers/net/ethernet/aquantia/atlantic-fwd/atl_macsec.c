@@ -476,6 +476,9 @@ static int atl_update_rxsc(struct atl_hw *hw,
 	matchIngressPreClassRecord.sci[0] = swab32(rx_sc->sci >> 32);
 	matchIngressPreClassRecord.sci_mask = 0xff;
 
+	ether_addr_to_mac(matchIngressPreClassRecord.mac_sa, (char*)&rx_sc->sci);
+	matchIngressPreClassRecord.sa_mask = 0x3f;
+
 	ether_addr_to_mac(matchIngressPreClassRecord.mac_da,
 					  secy->netdev->dev_addr);
 
