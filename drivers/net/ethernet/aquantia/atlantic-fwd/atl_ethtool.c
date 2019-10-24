@@ -816,27 +816,39 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 		for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
 			if (!(test_bit(i, &nic->hw.macsec_cfg.secy_idx_busy)))
 				continue;
-			struct atl_sc_idxs *secys = &nic->hw.macsec_cfg.secys[i];
+			struct atl_macsec_secy *atl_secy =
+				&nic->hw.macsec_cfg.atl_secy[i];
 			int assoc_num;
 
-			snprintf(prefix, sizeof(prefix), "txsc%d_", secys->sc_idx);
+			snprintf(prefix, sizeof(prefix), "txsc%d_",
+				 atl_secy->sc_idx);
 			atl_copy_stats_strings(&p, prefix,
 					macsec_tx_sc_stat_descs,
 					ARRAY_SIZE(macsec_tx_sc_stat_descs));
 			for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
-				if (!test_bit(assoc_num, &secys->tx_sa_idx_busy))
+				if (!test_bit(assoc_num,
+					      &atl_secy->tx_sa_idx_busy))
 					continue;
-				snprintf(prefix, sizeof(prefix),
-					"txsc%d_sa%d_", secys->sc_idx, assoc_num);
+				snprintf(prefix, sizeof(prefix), "txsc%d_sa%d_",
+					 atl_secy->sc_idx, assoc_num);
 				atl_copy_stats_strings(&p, prefix,
 						macsec_tx_sa_stat_descs,
 						ARRAY_SIZE(macsec_tx_sa_stat_descs));
 			}
+		}
+		for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
+			if (!(test_bit(i, &nic->hw.macsec_cfg.rxsc_idx_busy)))
+				continue;
+			struct atl_macsec_rxsc *atl_rxsc =
+				&nic->hw.macsec_cfg.atl_rxsc[i];
+			int assoc_num;
+
 			for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
-				if (!test_bit(assoc_num, &secys->rx_sa_idx_busy))
+				if (!test_bit(assoc_num,
+					      &atl_rxsc->rx_sa_idx_busy))
 					continue;
-				snprintf(prefix, sizeof(prefix),
-					"rxsc%d_sa%d_", secys->sc_idx, assoc_num);
+				snprintf(prefix, sizeof(prefix), "rxsc%d_sa%d_",
+					 atl_rxsc->hw_sc_idx, assoc_num);
 				atl_copy_stats_strings(&p, prefix,
 					macsec_rx_sa_stat_descs,
 					ARRAY_SIZE(macsec_rx_sa_stat_descs));
@@ -910,20 +922,28 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
 		if (!(test_bit(i, &nic->hw.macsec_cfg.secy_idx_busy)))
 			continue;
-		struct atl_sc_idxs *secys = &nic->hw.macsec_cfg.secys[i];
+		struct atl_macsec_secy *atl_secy = &nic->hw.macsec_cfg.atl_secy[i];
 
-		atl_write_stats(&secys->stats, macsec_tx_sc_stat_descs, data, uint64_t);
+		atl_write_stats(&atl_secy->stats, macsec_tx_sc_stat_descs, data, uint64_t);
 
 		for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
-			if (!test_bit(assoc_num, &secys->tx_sa_idx_busy))
+			if (!test_bit(assoc_num, &atl_secy->tx_sa_idx_busy))
 				continue;
-			atl_write_stats(&secys->tx_sa_stats[assoc_num],
+			atl_write_stats(&atl_secy->tx_sa_stats[assoc_num],
 					macsec_tx_sa_stat_descs, data, uint64_t);
 		}
+	}
+	for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
+		if (!(test_bit(i, &nic->hw.macsec_cfg.rxsc_idx_busy)))
+			continue;
+		struct atl_macsec_rxsc *atl_rxsc =
+			&nic->hw.macsec_cfg.atl_rxsc[i];
+		int assoc_num;
+
 		for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
-			if (!test_bit(assoc_num, &secys->rx_sa_idx_busy))
+			if (!test_bit(assoc_num, &atl_rxsc->rx_sa_idx_busy))
 				continue;
-			atl_write_stats(&secys->rx_sa_stats[assoc_num],
+			atl_write_stats(&atl_rxsc->rx_sa_stats[assoc_num],
 					macsec_rx_sa_stat_descs, data, uint64_t);
 		}
 	}

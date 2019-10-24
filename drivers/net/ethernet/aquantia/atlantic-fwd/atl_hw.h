@@ -154,22 +154,22 @@ struct atl_macsec_cfg {
 	struct atl_macsec_secy {
 		uint32_t sc_idx;
 		unsigned long int tx_sa_idx_busy;
-		unsigned long int rx_sa_idx_busy;
 		const struct macsec_secy *sw_secy;
 		/* It is not OK to store key in driver but it is until ... */
 		u8 tx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
 		struct atl_macsec_tx_sc_stats stats;
 		struct atl_macsec_tx_sa_stats tx_sa_stats[MACSEC_NUM_AN];
-		struct atl_macsec_rx_sa_stats rx_sa_stats[MACSEC_NUM_AN];
 	} atl_secy[ATL_MACSEC_MAX_SECY];
 	/* Ingress channel configuration */
 	unsigned long rxsc_idx_busy;
 	struct atl_macsec_rxsc {
 		uint32_t hw_sc_idx;
+		unsigned long int rx_sa_idx_busy;
 		const struct macsec_secy *sw_secy;
 		const struct macsec_rx_sc *sw_rxsc;
 		/* TODO: we shouldn't store keys in the driver */
 		u8 rx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
+		struct atl_macsec_rx_sa_stats rx_sa_stats[MACSEC_NUM_AN];
 	} atl_rxsc[ATL_MACSEC_MAX_SC];
 	struct atl_macsec_common_stats stats;
 };
