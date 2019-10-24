@@ -229,5 +229,8 @@ int AQ_API_SetEgressSAExpired(struct atl_hw *hw, uint32_t expired);
 int AQ_API_SetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t expired);
 
 
+/* Disable replacement of ethertype with special ethertype */
+int AQ_API_DisableIngressSpecialEthertype(struct atl_hw *hw);
+
 
 #endif /* __MACSEC_API_H__ */

@@ -2,6 +2,7 @@
 #include "macsec_api.h"
 #include "MSS_Ingress_registers.h"
 #include "MSS_Egress_registers.h"
+#include "SEC_Ingress_registers.h"
 
 #define MMD_GLOBAL 0x1E
 
@@ -1808,4 +1809,26 @@ int AQ_API_SetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t expired)
   atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR + 1, expired >> 16);
 
   return 0;
+}
+
+int AQ_API_DisableIngressSpecialEthertype(struct atl_hw *hw)
+{
+    struct secIngressPacketEditControlRegister_t controlReg;
+
+    memset(&controlReg, 0, sizeof(struct secIngressPacketEditControlRegister_t));
+
+    /*Read register (EUR/CAL: 1E.7035) */
+    atl_mdio_read(hw, 0, MMD_GLOBAL, secIngressPacketEditControlRegister_ADDR, &controlReg.word_0);
+    /*Read register (EUR/CAL: 1E.7035 + 1) */
+    atl_mdio_read(hw, 0, MMD_GLOBAL, secIngressPacketEditControlRegister_ADDR + 4, &controlReg.word_1);
+
+    /*Assign to local representation of bitfield (EUR/CAL: 1E.7035.F) */
+    controlReg.bits_0.secIngressSpecialEthertypeEnable = 0;
+
+    /*Write register (EUR/CAL: 1E.7035) */
+    atl_mdio_write(hw, 0, MMD_GLOBAL, secIngressPacketEditControlRegister_ADDR, controlReg.word_0);
+    /*Write register (EUR/CAL: 1E.7035 + 1) */
+    atl_mdio_write(hw, 0, MMD_GLOBAL, secIngressPacketEditControlRegister_ADDR + 4, controlReg.word_1);
+
+    return 0;
 }
