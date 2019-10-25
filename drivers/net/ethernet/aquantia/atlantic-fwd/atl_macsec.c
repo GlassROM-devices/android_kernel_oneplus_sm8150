@@ -270,38 +270,84 @@ static int atl_update_secy(struct atl_hw *hw, int secy_idx)
 	return AQ_API_SetEgressSCRecord(hw, &matchSCRecord, sc_idx);
 }
 
+static uint32_t sc_idx_max(const enum atl_macsec_sc_sa sc_sa)
+{
+	uint32_t result = 0;
+
+	switch (sc_sa) {
+	case atl_macsec_sa_sc_4sa_8sc:
+		result = 8;
+		break;
+	case atl_macsec_sa_sc_2sa_16sc:
+		result = 16;
+		break;
+	case atl_macsec_sa_sc_1sa_32sc:
+		result = 32;
+		break;
+	default:
+		break;
+	};
+
+	return result;
+}
+
+static int sc_idx_shift(const enum atl_macsec_sc_sa sc_sa)
+{
+	int result = 0;
+
+	switch (sc_sa) {
+	case atl_macsec_sa_sc_4sa_8sc:
+		result = 2;
+		break;
+	case atl_macsec_sa_sc_2sa_16sc:
+		result = 1;
+		break;
+	case atl_macsec_sa_sc_1sa_32sc:
+		result = 0;
+		break;
+	default:
+		break;
+	};
+
+	return result;
+}
+
+
+static enum atl_macsec_sc_sa sc_sa_from_num_an(const int num_an)
+{
+	enum atl_macsec_sc_sa sc_sa = atl_macsec_sa_sc_not_used;
+
+	switch (num_an) {
+	case 4:
+		sc_sa = atl_macsec_sa_sc_4sa_8sc;
+		break;
+	case 2:
+		sc_sa = atl_macsec_sa_sc_2sa_16sc;
+		break;
+	case 1:
+		sc_sa = atl_macsec_sa_sc_1sa_32sc;
+		break;
+	default:
+		break;
+	}
+
+	return sc_sa;
+}
+
 static int atl_mdo_add_secy(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	const struct macsec_secy *secy = ctx->secy;
-	uint32_t sc_idx_max = ATL_MACSEC_MAX_SECY;
 	struct atl_hw *hw = &nic->hw;
+	enum atl_macsec_sc_sa sc_sa;
 	uint32_t secy_idx;
-	int shift;
 	int ret = 0;
 
-	switch(MACSEC_NUM_AN){
-		case 4:
-			hw->macsec_cfg.sc_sa = atl_macsec_sa_sc_4sa_8sc;
-			sc_idx_max = 8;
-			shift = 2;
-			break;
-		case 2:
-			hw->macsec_cfg.sc_sa = atl_macsec_sa_sc_2sa_16sc;
-			sc_idx_max = 16;
-			shift = 1;
-			break;
-		case 1:
-			hw->macsec_cfg.sc_sa = atl_macsec_sa_sc_1sa_32sc;
-			sc_idx_max = 32;
-			shift = 0;
-			break;
-		default:
-			return -EINVAL;
-			break;
-	}
+	sc_sa = sc_sa_from_num_an(MACSEC_NUM_AN);
+	if (sc_sa == atl_macsec_sa_sc_not_used)
+		return -EINVAL;
 
-	if (hweight32(hw->macsec_cfg.secy_idx_busy) >= sc_idx_max)
+	if (hweight32(hw->macsec_cfg.secy_idx_busy) >= sc_idx_max(sc_sa))
 		return -ENOSPC;
 
 	secy_idx = ffz (hw->macsec_cfg.secy_idx_busy);
@@ -311,7 +357,8 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 	if (ctx->prepare)
 		return 0;
 
-	hw->macsec_cfg.atl_secy[secy_idx].sc_idx = secy_idx << shift;
+	hw->macsec_cfg.sc_sa = sc_sa;
+	hw->macsec_cfg.atl_secy[secy_idx].sc_idx = secy_idx << sc_idx_shift(sc_sa);
 	hw->macsec_cfg.atl_secy[secy_idx].sw_secy = secy;
 	dev_dbg(&hw->pdev->dev, "add secy: secy_idx=%d, sc_idx=%d\n", secy_idx,
 		hw->macsec_cfg.atl_secy[secy_idx].sc_idx);
@@ -495,20 +542,7 @@ static int atl_update_rxsc(struct atl_hw *hw,
 
 	matchIngressPreClassRecord.sc_idx = sc_idx;
 
-	// Num SA per SC: # 0: 4SA, 2: 2SA, 3: 1SA
-	switch (MACSEC_NUM_AN) {
-	case 4:
-		matchIngressPreClassRecord.an_mask = 0;
-		break;
-	case 2:
-		matchIngressPreClassRecord.an_mask = 2;
-		break;
-	case 1:
-		matchIngressPreClassRecord.an_mask = 3;
-		break;
-	default:
-		break;
-	}
+	matchIngressPreClassRecord.an_mask = hw->macsec_cfg.sc_sa;
 
 	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*secy_idx);
 	if (ret)
