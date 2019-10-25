@@ -85,13 +85,13 @@ enum atl_macsec_sc_sa {
 struct atl_macsec_cfg {
 	unsigned long int secy_idx_busy;
 	enum atl_macsec_sc_sa sc_sa;
-	struct atl_sc_idxs {
+	struct atl_macsec_secy {
 		uint32_t sc_idx;
-		const struct macsec_secy *secy;
+		const struct macsec_secy *sw_secy;
 		/* It is not OK to store key in driver but it is until ... */
 		u8 tx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
 		u8 rx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
-	} secys[ATL_MACSEC_MAX_SECY];
+	} atl_secy[ATL_MACSEC_MAX_SECY];
 };
 #endif
 #define ATL_WAKE_SUPPORTED (WAKE_MAGIC | WAKE_PHY)
