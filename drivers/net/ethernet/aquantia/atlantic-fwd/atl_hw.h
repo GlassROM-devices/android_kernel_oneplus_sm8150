@@ -75,6 +75,7 @@ enum atl_nic_state {
 };
 #ifdef NETIF_F_HW_MACSEC
 #define ATL_MACSEC_MAX_SECY 32
+#define ATL_MACSEC_MAX_SC 32
 #define ATL_MACSEC_MAX_SA 32
 enum atl_macsec_sc_sa {
 	atl_macsec_sa_sc_4sa_8sc,
@@ -90,8 +91,16 @@ struct atl_macsec_cfg {
 		const struct macsec_secy *sw_secy;
 		/* It is not OK to store key in driver but it is until ... */
 		u8 tx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
-		u8 rx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
 	} atl_secy[ATL_MACSEC_MAX_SECY];
+	/* Ingress channel configuration */
+	unsigned long int rxsc_idx_busy;
+	struct atl_macsec_rxsc {
+		uint32_t hw_sc_idx;
+		const struct macsec_secy *sw_secy;
+		const struct macsec_rx_sc *sw_rxsc;
+		/* TODO: we shouldn't store keys in the driver */
+		u8 rx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
+	} atl_rxsc[ATL_MACSEC_MAX_SC];
 };
 #endif
 #define ATL_WAKE_SUPPORTED (WAKE_MAGIC | WAKE_PHY)
