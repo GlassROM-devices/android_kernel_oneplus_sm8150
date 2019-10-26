@@ -143,9 +143,6 @@ int atl_init_macsec(struct atl_hw *hw)
 			goto unlock;
 	}
 
-	/* Disable replacement of ethertype with special ethertype */
-	AQ_API_DisableIngressSpecialEthertype(hw);
-
 	/* Init Ethertype bypass filters */
 	uint32_t ctl_ether_types[1] = { ETH_P_PAE };
 	for (index = 0; index < ARRAY_SIZE(ctl_ether_types); index++) {
@@ -554,7 +551,7 @@ static int atl_set_rxsc(struct atl_hw *hw,
 
 	matchIngressPreClassRecord.eth_type = ETH_P_MACSEC; //match all MACSEC ethertype packets
 	matchIngressPreClassRecord.eth_type_mask = 0x3;
-	matchIngressPreClassRecord.action = 0x1; //keep SecTAG & forward for decryption
+	matchIngressPreClassRecord.action = 0x0; //forward for decryption
 
 	matchIngressPreClassRecord.sc_idx = hw_sc_idx;
 
