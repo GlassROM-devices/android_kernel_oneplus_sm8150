@@ -549,9 +549,9 @@ static int atl_set_rxsc(struct atl_hw *hw,
 
 	matchIngressPreClassRecord.valid = 1;
 
-	matchIngressPreClassRecord.eth_type = ETH_P_MACSEC; //match all MACSEC ethertype packets
+	matchIngressPreClassRecord.eth_type = ETH_P_MACSEC; /* match all MACSEC ethertype packets */
 	matchIngressPreClassRecord.eth_type_mask = 0x3;
-	matchIngressPreClassRecord.action = 0x0; //forward for decryption
+	matchIngressPreClassRecord.action = 0x0; /* strip SecTAG & forward for decryption */
 
 	matchIngressPreClassRecord.sc_idx = hw_sc_idx;
 
