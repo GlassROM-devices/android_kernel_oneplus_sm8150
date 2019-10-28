@@ -543,31 +543,33 @@ static int atl_set_rxsc(struct atl_hw *hw,
 			const uint32_t rxsc_idx)
 {
 	const struct atl_macsec_rxsc *atl_rxsc = &hw->macsec_cfg.atl_rxsc[rxsc_idx];
+	AQ_API_SEC_IngressPreClassRecord pre_class_record = {0};
 	const struct macsec_rx_sc *rx_sc = atl_rxsc->sw_rxsc;
 	const struct macsec_secy *secy = atl_rxsc->sw_secy;
 	const uint32_t hw_sc_idx = atl_rxsc->hw_sc_idx;
+	AQ_API_SEC_IngressSCRecord sc_record = {0};
 	int ret = 0;
 
 	dev_dbg(&hw->pdev->dev, "set rx_sc: rxsc_idx=%d, sci %#llx, hw_sc_idx=%d\n",
 		rxsc_idx, rx_sc->sci, hw_sc_idx);
 
-	AQ_API_SEC_IngressPreClassRecord matchIngressPreClassRecord = {0};
+	pre_class_record.sci[1] = swab32(rx_sc->sci & 0xffffffff);
+	pre_class_record.sci[0] = swab32(rx_sc->sci >> 32);
+	pre_class_record.sci_mask = 0xff;
+	/* match all MACSEC ethertype packets */
+	pre_class_record.eth_type = ETH_P_MACSEC;
+	pre_class_record.eth_type_mask = 0x3;
 
-	matchIngressPreClassRecord.sci[1] = swab32(rx_sc->sci & 0xffffffff);
-	matchIngressPreClassRecord.sci[0] = swab32(rx_sc->sci >> 32);
-	matchIngressPreClassRecord.sci_mask = 0xff;
-	matchIngressPreClassRecord.eth_type = ETH_P_MACSEC; /* match all MACSEC ethertype packets */
-	matchIngressPreClassRecord.eth_type_mask = 0x3;
+	ether_addr_to_mac(pre_class_record.mac_sa, (char *)&rx_sc->sci);
+	pre_class_record.sa_mask = 0x3f;
 
-	ether_addr_to_mac(matchIngressPreClassRecord.mac_sa, (char*)&rx_sc->sci);
-	matchIngressPreClassRecord.sa_mask = 0x3f;
+	pre_class_record.an_mask = hw->macsec_cfg.sc_sa;
+	pre_class_record.sc_idx = hw_sc_idx;
+	/* strip SecTAG & forward for decryption */
+	pre_class_record.action = 0x0;
+	pre_class_record.valid = 1;
 
-	matchIngressPreClassRecord.an_mask = hw->macsec_cfg.sc_sa;
-	matchIngressPreClassRecord.sc_idx = hw_sc_idx;
-	matchIngressPreClassRecord.action = 0x0; /* strip SecTAG & forward for decryption */
-	matchIngressPreClassRecord.valid = 1;
-
-	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*rxsc_idx+1);
+	ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record, 2*rxsc_idx+1);
 	if (ret) {
 		dev_err(&hw->pdev->dev,
 			"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
@@ -575,27 +577,25 @@ static int atl_set_rxsc(struct atl_hw *hw,
 	}
 
 	/* If SCI is absent, then match by SA alone */
-	matchIngressPreClassRecord.sci_mask = 0;
-	matchIngressPreClassRecord.sci_from_table = 1;
+	pre_class_record.sci_mask = 0;
+	pre_class_record.sci_from_table = 1;
 
-	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*rxsc_idx);
+	ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record, 2*rxsc_idx);
 	if (ret) {
 		dev_err(&hw->pdev->dev,
 			"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
 		return ret;
 	}
 
-	AQ_API_SEC_IngressSCRecord matchSCRecord = {0};
-
-	matchSCRecord.validate_frames = atl_rxsc_validate_frames(secy->validate_frames);
+	sc_record.validate_frames = atl_rxsc_validate_frames(secy->validate_frames);
 	if (secy->replay_protect) {
-		matchSCRecord.replay_protect = 1;
-		matchSCRecord.anti_replay_window = secy->replay_window;
+		sc_record.replay_protect = 1;
+		sc_record.anti_replay_window = secy->replay_window;
 	}
-	matchSCRecord.valid = 1;
-	matchSCRecord.fresh = 1;
+	sc_record.valid = 1;
+	sc_record.fresh = 1;
 
-	ret = AQ_API_SetIngressSCRecord(hw, &matchSCRecord, hw_sc_idx);
+	ret = AQ_API_SetIngressSCRecord(hw, &sc_record, hw_sc_idx);
 	if (ret) {
 		dev_err(&hw->pdev->dev,
 			"AQ_API_SetIngressSCRecord failed with %d\n", ret);
@@ -678,25 +678,25 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 	cfg->atl_rxsc[rxsc_idx].sw_rxsc = NULL;
 
 	if (netif_carrier_ok(nic->ndev)) {
-		AQ_API_SEC_IngressPreClassRecord blankPreClassRecord = {0};
+		AQ_API_SEC_IngressPreClassRecord pre_class_record = {0};
+		AQ_API_SEC_IngressSCRecord sc_record = {0};
 
-		ret = AQ_API_SetIngressPreClassRecord(hw, &blankPreClassRecord, 2*rxsc_idx);
+		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record, 2*rxsc_idx);
 		if (ret) {
 			dev_err(&hw->pdev->dev,
 				"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
 			return ret;
 		}
 
-		ret = AQ_API_SetIngressPreClassRecord(hw, &blankPreClassRecord, 2*rxsc_idx+1);
+		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record, 2*rxsc_idx+1);
 		if (ret) {
 			dev_err(&hw->pdev->dev,
 				"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
 			return ret;
 		}
 
-		AQ_API_SEC_IngressSCRecord blankSCRecord = {0};
-		blankSCRecord.fresh = 1;
-		return AQ_API_SetIngressSCRecord(hw, &blankSCRecord, hw_sc_idx);
+		sc_record.fresh = 1;
+		return AQ_API_SetIngressSCRecord(hw, &sc_record, hw_sc_idx);
 	}
 
 	return 0;
@@ -708,44 +708,44 @@ static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
 			   const unsigned char *key,
 			   const unsigned char an)
 {
+	AQ_API_SEC_IngressSAKeyRecord sa_key_record = {0};
+	AQ_API_SEC_IngressSARecord sa_record = {0};
 	const int sa_idx = sc_idx | an;
 	int ret = 0;
 
 	dev_dbg(&hw->pdev->dev, "set rx_sa %d: active=%d, next_pn=%d \n", an,
 			rx_sa->active, rx_sa->next_pn);
 
-	AQ_API_SEC_IngressSARecord matchSARecord = {0};
-	matchSARecord.valid = rx_sa->active;
-	matchSARecord.fresh = 1;
-	matchSARecord.next_pn = rx_sa->next_pn;
+	sa_record.valid = rx_sa->active;
+	sa_record.fresh = 1;
+	sa_record.next_pn = rx_sa->next_pn;
 
-	ret = AQ_API_SetIngressSARecord(hw, &matchSARecord, sa_idx);
+	ret = AQ_API_SetIngressSARecord(hw, &sa_record, sa_idx);
 	if (ret) {
 		dev_err(&hw->pdev->dev,
 			"AQ_API_SetIngressSARecord failed with %d\n", ret);
 		return ret;
 	}
 
-	AQ_API_SEC_IngressSAKeyRecord matchKeyRecord = {0};
-	memcpy(&matchKeyRecord.key, key, secy->key_len);
+	memcpy(&sa_key_record.key, key, secy->key_len);
 
 	switch (secy->key_len) {
 	case ATL_MACSEC_KEY_LEN_128_BIT:
-		matchKeyRecord.key_len = 0;
+		sa_key_record.key_len = 0;
 		break;
 	case ATL_MACSEC_KEY_LEN_192_BIT:
-		matchKeyRecord.key_len = 1;
+		sa_key_record.key_len = 1;
 		break;
 	case ATL_MACSEC_KEY_LEN_256_BIT:
-		matchKeyRecord.key_len = 2;
+		sa_key_record.key_len = 2;
 		break;
 	default:
 		return -1;
 	}
 
-	atl_rotate_keys(&matchKeyRecord.key, secy->key_len);
+	atl_rotate_keys(&sa_key_record.key, secy->key_len);
 
-	ret = AQ_API_SetIngressSAKeyRecord(hw, &matchKeyRecord, sa_idx);
+	ret = AQ_API_SetIngressSAKeyRecord(hw, &sa_key_record, sa_idx);
 	if (ret)
 		dev_err(&hw->pdev->dev,
 			"AQ_API_SetIngressSAKeyRecord failed with %d\n", ret);
@@ -796,16 +796,15 @@ static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 	sa_idx = hw->macsec_cfg.atl_rxsc[rxsc_idx].hw_sc_idx | ctx->sa.assoc_num;
 
 	if (netif_carrier_ok(nic->ndev)) {
-		AQ_API_SEC_IngressSARecord blankSARecord = {0};
-		blankSARecord.fresh = 1;
+		AQ_API_SEC_IngressSAKeyRecord sa_key_record = {0};
+		AQ_API_SEC_IngressSARecord sa_record = {0};
 
-		ret = AQ_API_SetIngressSARecord(hw, &blankSARecord, sa_idx);
+		sa_record.fresh = 1;
+		ret = AQ_API_SetIngressSARecord(hw, &sa_record, sa_idx);
 		if (ret)
 			return ret;
 
-		AQ_API_SEC_IngressSAKeyRecord blankSAKeyRecord = {0};
-
-		return AQ_API_SetIngressSAKeyRecord(hw, &blankSAKeyRecord, sa_idx);
+		return AQ_API_SetIngressSAKeyRecord(hw, &sa_key_record, sa_idx);
 	}
 
 	return 0;
