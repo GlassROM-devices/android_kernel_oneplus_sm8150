@@ -224,7 +224,7 @@ static int atl_update_secy(struct atl_hw *hw, int secy_idx)
 	ether_addr_to_mac(matchEgressClassRecord.mac_sa,
 			  secy->netdev->dev_addr);
 
-	dev_dbg(&hw->pdev->dev, "set secy: sci %#llx, sc_idx=%d, protect=%d, curr_an=%d \n",
+	dev_dbg(&hw->pdev->dev, "set secy: sci %#llx, sc_idx=%d, protect=%d, curr_an=%d\n",
 		secy->sci, sc_idx, secy->protect_frames,
 		secy->tx_sc.encoding_sa);
 
@@ -439,7 +439,7 @@ static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
 	int ret = 0;
 	unsigned int sa_idx;
 
-	dev_dbg(&hw->pdev->dev, "set tx_sa %d: active=%d, next_pn=%d \n", an,
+	dev_dbg(&hw->pdev->dev, "set tx_sa %d: active=%d, next_pn=%d\n", an,
 			tx_sa->active, tx_sa->next_pn);
 
 	sa_idx = sc_idx | an;
@@ -724,7 +724,7 @@ static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
 	const int sa_idx = sc_idx | an;
 	int ret = 0;
 
-	dev_dbg(&hw->pdev->dev, "set rx_sa %d: active=%d, next_pn=%d \n", an,
+	dev_dbg(&hw->pdev->dev, "set rx_sa %d: active=%d, next_pn=%d\n", an,
 		rx_sa->active, rx_sa->next_pn);
 
 	sa_record.valid = rx_sa->active;

@@ -93,7 +93,7 @@ struct atl_macsec_cfg {
 		u8 tx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
 	} atl_secy[ATL_MACSEC_MAX_SECY];
 	/* Ingress channel configuration */
-	unsigned long int rxsc_idx_busy;
+	unsigned long rxsc_idx_busy;
 	struct atl_macsec_rxsc {
 		uint32_t hw_sc_idx;
 		const struct macsec_secy *sw_secy;
