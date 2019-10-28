@@ -521,6 +521,24 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 	return 0;
 }
 
+static int atl_rxsc_validate_frames(const enum macsec_validation_type validate)
+{
+	switch (validate) {
+	case MACSEC_VALIDATE_DISABLED:
+		return 2;
+	case MACSEC_VALIDATE_CHECK:
+		return 1;
+	case MACSEC_VALIDATE_STRICT:
+		return 0;
+	default:
+		break;
+	}
+
+	/* should never be here */
+	WARN_ON(true);
+	return 0;
+}
+
 static int atl_set_rxsc(struct atl_hw *hw,
 			const uint32_t rxsc_idx)
 {
@@ -538,24 +556,27 @@ static int atl_set_rxsc(struct atl_hw *hw,
 	matchIngressPreClassRecord.sci[1] = swab32(rx_sc->sci & 0xffffffff);
 	matchIngressPreClassRecord.sci[0] = swab32(rx_sc->sci >> 32);
 	matchIngressPreClassRecord.sci_mask = 0xff;
+	matchIngressPreClassRecord.eth_type = ETH_P_MACSEC; /* match all MACSEC ethertype packets */
+	matchIngressPreClassRecord.eth_type_mask = 0x3;
 
 	ether_addr_to_mac(matchIngressPreClassRecord.mac_sa, (char*)&rx_sc->sci);
 	matchIngressPreClassRecord.sa_mask = 0x3f;
 
-	ether_addr_to_mac(matchIngressPreClassRecord.mac_da,
-					  secy->netdev->dev_addr);
-
-	matchIngressPreClassRecord.da_mask = 0x3f;
-
+	matchIngressPreClassRecord.an_mask = hw->macsec_cfg.sc_sa;
+	matchIngressPreClassRecord.sc_idx = hw_sc_idx;
+	matchIngressPreClassRecord.action = 0x0; /* strip SecTAG & forward for decryption */
 	matchIngressPreClassRecord.valid = 1;
 
-	matchIngressPreClassRecord.eth_type = ETH_P_MACSEC; /* match all MACSEC ethertype packets */
-	matchIngressPreClassRecord.eth_type_mask = 0x3;
-	matchIngressPreClassRecord.action = 0x0; /* strip SecTAG & forward for decryption */
+	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*rxsc_idx+1);
+	if (ret) {
+		dev_err(&hw->pdev->dev,
+			"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
+		return ret;
+	}
 
-	matchIngressPreClassRecord.sc_idx = hw_sc_idx;
-
-	matchIngressPreClassRecord.an_mask = hw->macsec_cfg.sc_sa;
+	/* If SCI is absent, then match by SA alone */
+	matchIngressPreClassRecord.sci_mask = 0;
+	matchIngressPreClassRecord.sci_from_table = 1;
 
 	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*rxsc_idx);
 	if (ret) {
@@ -564,19 +585,13 @@ static int atl_set_rxsc(struct atl_hw *hw,
 		return ret;
 	}
 
-	matchIngressPreClassRecord.mac_da[0] = 0xffffffff;
-	matchIngressPreClassRecord.mac_da[1] = 0xffffffff;
-
-	ret = AQ_API_SetIngressPreClassRecord(hw, &matchIngressPreClassRecord, 2*rxsc_idx + 1);
-	if (ret) {
-		dev_err(&hw->pdev->dev,
-			"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
-		return ret;
-	}
-
 	AQ_API_SEC_IngressSCRecord matchSCRecord = {0};
 
-	matchSCRecord.validate_frames = 0;
+	matchSCRecord.validate_frames = atl_rxsc_validate_frames(secy->validate_frames);
+	if (secy->replay_protect) {
+		matchSCRecord.replay_protect = 1;
+		matchSCRecord.anti_replay_window = secy->replay_window;
+	}
 	matchSCRecord.valid = 1;
 	matchSCRecord.fresh = 1;
 
@@ -647,7 +662,9 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, ctx->rx_sc);
 	struct atl_macsec_cfg *cfg = &nic->hw.macsec_cfg;
+	struct atl_hw *hw = &nic->hw;
 	uint32_t hw_sc_idx;
+	int ret = 0;
 
 	if (rxsc_idx < 0)
 		return -ENOENT;
@@ -661,9 +678,25 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 	cfg->atl_rxsc[rxsc_idx].sw_rxsc = NULL;
 
 	if (netif_carrier_ok(nic->ndev)) {
+		AQ_API_SEC_IngressPreClassRecord blankPreClassRecord = {0};
+
+		ret = AQ_API_SetIngressPreClassRecord(hw, &blankPreClassRecord, 2*rxsc_idx);
+		if (ret) {
+			dev_err(&hw->pdev->dev,
+				"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
+			return ret;
+		}
+
+		ret = AQ_API_SetIngressPreClassRecord(hw, &blankPreClassRecord, 2*rxsc_idx+1);
+		if (ret) {
+			dev_err(&hw->pdev->dev,
+				"AQ_API_SetIngressPreClassRecord failed with %d\n", ret);
+			return ret;
+		}
+
 		AQ_API_SEC_IngressSCRecord blankSCRecord = {0};
 		blankSCRecord.fresh = 1;
-		return AQ_API_SetIngressSCRecord(&nic->hw, &blankSCRecord, hw_sc_idx);
+		return AQ_API_SetIngressSCRecord(hw, &blankSCRecord, hw_sc_idx);
 	}
 
 	return 0;
