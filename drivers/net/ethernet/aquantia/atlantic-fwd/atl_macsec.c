@@ -286,7 +286,7 @@ int atl_macsec_update_stats(struct atl_hw *hw)
 		ret = atl_macsec_get_tx_sc_stats(hw, atl_secy->sc_idx,
 						 &atl_secy->stats);
 		if (ret)
-			break;
+			return ret;
 
 		for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
 			if (!test_bit(assoc_num, &atl_secy->tx_sa_idx_busy))
@@ -295,7 +295,7 @@ int atl_macsec_update_stats(struct atl_hw *hw)
 			ret = atl_macsec_get_tx_sa_stats(hw, sa_idx, 
 					&atl_secy->tx_sa_stats[assoc_num]);
 			if (ret)
-				break;
+				return ret;
 		}
 	}
 
@@ -312,7 +312,7 @@ int atl_macsec_update_stats(struct atl_hw *hw)
 			ret = atl_macsec_get_rx_sa_stats(hw, sa_idx, 
 					&atl_rxsc->rx_sa_stats[assoc_num]);
 			if (ret)
-				break;
+				return ret;
 		}
 	}
 
@@ -410,7 +410,8 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	matchSCRecord.fresh = 1;
 	ret = AQ_API_SetEgressSCRecord(hw, &matchSCRecord,
 				hw->macsec_cfg.atl_secy[secy_idx].sc_idx);
-
+	if (ret)
+		return ret;
 
 	struct macsec_rx_sc *rx_sc;
 	uint32_t rxsc_idx;
