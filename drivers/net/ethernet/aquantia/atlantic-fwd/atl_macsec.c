@@ -411,6 +411,37 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	ret = AQ_API_SetEgressSCRecord(hw, &matchSCRecord,
 				hw->macsec_cfg.atl_secy[secy_idx].sc_idx);
 
+
+	struct macsec_rx_sc *rx_sc;
+	uint32_t rxsc_idx;
+	for (rx_sc = rcu_dereference_bh(ctx->secy->rx_sc);
+	     rx_sc;
+	     rx_sc = rcu_dereference_bh(rx_sc->next)) {
+		rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
+		const struct atl_macsec_rxsc *atl_rxsc =
+			&hw->macsec_cfg.atl_rxsc[rxsc_idx];
+		WARN_ON(rxsc_idx < 0);
+		if (unlikely(rxsc_idx < 0))
+			continue;
+
+		AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
+		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
+						      2 * rxsc_idx + 1);
+		if (ret)
+			return ret;
+
+		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
+						      2 * rxsc_idx);
+		if (ret)
+			return ret;
+
+		AQ_API_SEC_IngressSCRecord sc_record = { 0 };
+		sc_record.fresh = 1;
+		ret = AQ_API_SetIngressSCRecord(hw, &sc_record, atl_rxsc->hw_sc_idx);
+		if (ret)
+			return ret;
+	}
+
 	return ret;
 }
 
