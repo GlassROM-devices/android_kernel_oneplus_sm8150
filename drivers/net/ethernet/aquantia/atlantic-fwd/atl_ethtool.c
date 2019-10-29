@@ -738,12 +738,12 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 #endif
 #ifdef NETIF_F_HW_MACSEC
 		       + ARRAY_SIZE(macsec_stat_descs)
+		       + ARRAY_SIZE(macsec_tx_sc_stat_descs) *
+		       		hweight_long(nic->hw.macsec_cfg.secy_idx_busy)
 		       + ARRAY_SIZE(macsec_tx_sa_stat_descs) *
 		       		atl_macsec_tx_sa_cnt(&nic->hw)
 		       + ARRAY_SIZE(macsec_rx_sa_stat_descs) *
 		       		atl_macsec_rx_sa_cnt(&nic->hw)
-		       + ARRAY_SIZE(macsec_tx_sc_stat_descs) *
-		       		hweight_long(nic->hw.macsec_cfg.secy_idx_busy)
 #endif
 			;
 

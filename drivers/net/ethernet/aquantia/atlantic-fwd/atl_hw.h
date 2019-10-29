@@ -149,11 +149,11 @@ struct atl_macsec_tx_sc_stats {
 };
 
 struct atl_macsec_cfg {
-	unsigned long int secy_idx_busy;
+	unsigned long secy_idx_busy;
 	enum atl_macsec_sc_sa sc_sa;
 	struct atl_macsec_secy {
 		uint32_t sc_idx;
-		unsigned long int tx_sa_idx_busy;
+		unsigned long tx_sa_idx_busy;
 		const struct macsec_secy *sw_secy;
 		/* It is not OK to store key in driver but it is until ... */
 		u8 tx_sa_key[MACSEC_NUM_AN][MACSEC_KEYID_LEN];
@@ -164,7 +164,7 @@ struct atl_macsec_cfg {
 	unsigned long rxsc_idx_busy;
 	struct atl_macsec_rxsc {
 		uint32_t hw_sc_idx;
-		unsigned long int rx_sa_idx_busy;
+		unsigned long rx_sa_idx_busy;
 		const struct macsec_secy *sw_secy;
 		const struct macsec_rx_sc *sw_rxsc;
 		/* TODO: we shouldn't store keys in the driver */

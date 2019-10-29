@@ -123,10 +123,8 @@ static int atl_macsec_apply_cfg(struct atl_hw *hw);
 static int atl_macsec_get_common_stats(struct atl_hw *hw,
 				       struct atl_macsec_common_stats *stats)
 {
-	AQ_API_SEC_EgressCommonCounters egress_counters = {
-		 {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0} };
-	AQ_API_SEC_IngressCommonCounters ingress_counters = {
-		 {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0} };
+	AQ_API_SEC_EgressCommonCounters egress_counters;
+	AQ_API_SEC_IngressCommonCounters ingress_counters;
 
 	/* MACSEC counters */
 	AQ_API_GetIngressCommonCounters(hw, &ingress_counters);
@@ -162,11 +160,12 @@ static int atl_macsec_get_common_stats(struct atl_hw *hw,
 static int atl_macsec_get_rx_sa_stats(struct atl_hw *hw, int sa_idx,
 				      struct atl_macsec_rx_sa_stats *stats)
 {
-	AQ_API_SEC_IngressSACounters i_sa_counters = {
-		{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0} };
+	AQ_API_SEC_IngressSACounters i_sa_counters;
 	int ret;
 
 	ret = AQ_API_GetIngressSACounters(hw, &i_sa_counters, sa_idx);
+	if (ret)
+		return ret;
 
 	stats->untagged_hit_pkts = STATS_2x32_TO_64(i_sa_counters.untagged_hit_pkts);
 	stats->ctrl_hit_drop_redir_pkts = STATS_2x32_TO_64(i_sa_counters.ctrl_hit_drop_redir_pkts);
@@ -181,29 +180,30 @@ static int atl_macsec_get_rx_sa_stats(struct atl_hw *hw, int sa_idx,
 	stats->validated_octets =  STATS_2x32_TO_64(i_sa_counters.validated_octets);
 	stats->decrypted_octets = STATS_2x32_TO_64(i_sa_counters.decrypted_octets);
 
-	return ret;
+	return 0;
 }
 
 static int atl_macsec_get_tx_sa_stats(struct atl_hw *hw, int sa_idx,
 				     struct atl_macsec_tx_sa_stats *stats)
 {
-	AQ_API_SEC_EgressSACounters e_sa_counters = {
-		 {0, 0}, {0, 0}, {0, 0}, {0, 0} };
+	AQ_API_SEC_EgressSACounters e_sa_counters;
 	int ret;
 
 	ret = AQ_API_GetEgressSACounters(hw, &e_sa_counters, sa_idx);
+	if (ret)
+		return ret;
 
 	stats->sa_hit_drop_redirect = STATS_2x32_TO_64(e_sa_counters.sa_hit_drop_redirect);
 	stats->sa_protected2_pkts = STATS_2x32_TO_64(e_sa_counters.sa_protected2_pkts);
 	stats->sa_protected_pkts =  STATS_2x32_TO_64(e_sa_counters.sa_protected_pkts);
 	stats->sa_encrypted_pkts = STATS_2x32_TO_64(e_sa_counters.sa_encrypted_pkts);
 
-	return ret;
+	return 0;
 }
 
 static int atl_macsec_get_tx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 {
-	AQ_API_SEC_EgressSARecord matchSARecord = {0};
+	AQ_API_SEC_EgressSARecord matchSARecord;
 	int ret;
 
 	ret = AQ_API_GetEgressSARecord(hw, &matchSARecord, sa_idx);
@@ -215,7 +215,7 @@ static int atl_macsec_get_tx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 
 static int atl_macsec_get_rx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 {
-	AQ_API_SEC_IngressSARecord matchSARecord = {0};
+	AQ_API_SEC_IngressSARecord matchSARecord;
 	int ret;
 
 	ret = AQ_API_GetIngressSARecord(hw, &matchSARecord, sa_idx);
@@ -228,9 +228,12 @@ static int atl_macsec_get_rx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 static int atl_macsec_get_tx_sc_stats(struct atl_hw *hw, int sc_idx,
 				     struct atl_macsec_tx_sc_stats *stats)
 {
-	AQ_API_SEC_EgressSCCounters e_sc_counters = {
-		{0, 0}, {0, 0}, {0, 0}, {0, 0} };
-	AQ_API_GetEgressSCCounters(hw, &e_sc_counters, sc_idx);
+	AQ_API_SEC_EgressSCCounters e_sc_counters ;
+	int ret;
+
+	ret = AQ_API_GetEgressSCCounters(hw, &e_sc_counters, sc_idx);
+	if (ret)
+		return ret;
 
 	stats->sc_protected_pkts = STATS_2x32_TO_64(e_sc_counters.sc_protected_pkts);
 	stats->sc_encrypted_pkts = STATS_2x32_TO_64(e_sc_counters.sc_encrypted_pkts);
@@ -279,8 +282,6 @@ int atl_macsec_update_stats(struct atl_hw *hw)
 		if (!(hw->macsec_cfg.secy_idx_busy & BIT(i)))
 			continue;
 		atl_secy = &hw->macsec_cfg.atl_secy[i];
-		if (!netif_running(atl_secy->sw_secy->netdev))
-			continue;
 
 		ret = atl_macsec_get_tx_sc_stats(hw, atl_secy->sc_idx,
 						 &atl_secy->stats);
@@ -709,6 +710,9 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 
 	sa_idx = hw->macsec_cfg.atl_secy[secy_idx].sc_idx | ctx->sa.assoc_num;
 
+	clear_bit(ctx->sa.assoc_num,
+		  &nic->hw.macsec_cfg.atl_secy[secy_idx].tx_sa_idx_busy);
+
 	if (netif_carrier_ok(nic->ndev)) {
 		AQ_API_SEC_EgressSARecord matchSARecord = {0};
 		matchSARecord.fresh = 1;
@@ -721,9 +725,6 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 
 		return AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord, sa_idx);
 	}
-
-	clear_bit(ctx->sa.assoc_num,
-		  &nic->hw.macsec_cfg.atl_secy[secy_idx].tx_sa_idx_busy);
 
 	return 0;
 }
@@ -1035,7 +1036,6 @@ static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 
 static int atl_mdo_get_dev_stats(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	struct atl_macsec_common_stats *stats = &hw->macsec_cfg.stats;
@@ -1059,7 +1059,6 @@ static int atl_mdo_get_dev_stats(struct macsec_context *ctx)
 
 static int atl_mdo_get_tx_sc_stats(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	int secy_idx = atl_get_secy_idx_from_secy(hw, ctx->secy);
@@ -1081,7 +1080,6 @@ static int atl_mdo_get_tx_sc_stats(struct macsec_context *ctx)
 
 static int atl_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	int secy_idx = atl_get_secy_idx_from_secy(hw, ctx->secy);
@@ -1111,8 +1109,6 @@ static int atl_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 
 static int atl_mdo_get_rx_sc_stats(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
-
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, ctx->rx_sc);
@@ -1120,6 +1116,7 @@ static int atl_mdo_get_rx_sc_stats(struct macsec_context *ctx)
 			&hw->macsec_cfg.atl_rxsc[rxsc_idx];
 	struct atl_macsec_rx_sa_stats *stats = NULL;
 	unsigned int sa_idx;
+	int ret = 0;
 	int i;
 
 	if (ctx->prepare)
@@ -1131,7 +1128,9 @@ static int atl_mdo_get_rx_sc_stats(struct macsec_context *ctx)
 
 		stats = &atl_rxsc->rx_sa_stats[i];
 		sa_idx = atl_rxsc->hw_sc_idx | i;
-		atl_macsec_get_rx_sa_stats(hw, sa_idx, stats);
+		ret = atl_macsec_get_rx_sa_stats(hw, sa_idx, stats);
+		if (ret)
+			break;
 
 		ctx->stats.rx_sc_stats->InOctetsValidated += stats->validated_octets;
 		ctx->stats.rx_sc_stats->InOctetsDecrypted += stats->decrypted_octets;
@@ -1145,13 +1144,11 @@ static int atl_mdo_get_rx_sc_stats(struct macsec_context *ctx)
 		ctx->stats.rx_sc_stats->InPktsUnusedSA += stats->unused_sa;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int atl_mdo_get_rx_sa_stats(struct macsec_context *ctx)
 {
-	pr_info("%s %s\n", __FUNCTION__, ctx->prepare?"prepare":"do");
-
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, ctx->rx_sc);
