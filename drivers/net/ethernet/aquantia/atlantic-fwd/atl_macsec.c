@@ -17,6 +17,9 @@
 #define ATL_MACSEC_KEY_LEN_192_BIT 24
 #define ATL_MACSEC_KEY_LEN_256_BIT 32
 
+static int atl_macsec_apply_cfg(struct atl_hw *hw);
+static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx);
+
 static void ether_addr_to_mac(uint32_t mac[2], unsigned char *emac)
 {
 	uint32_t tmp[2] = {0};
@@ -114,8 +117,6 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 	}
 
 }
-
-static int atl_macsec_apply_cfg(struct atl_hw *hw);
 
 #define STATS_2x32_TO_64(stat_field) \
 	(((uint64_t)stat_field[1] << 32) | stat_field[0])
@@ -376,8 +377,6 @@ unlock:
 	rtnl_unlock();
 	return ret;
 }
-
-static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx);
 
 static int atl_mdo_dev_open(struct macsec_context *ctx)
 {
