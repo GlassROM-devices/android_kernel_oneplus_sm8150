@@ -17,6 +17,7 @@
 #define ATL_MACSEC_KEY_LEN_192_BIT 24
 #define ATL_MACSEC_KEY_LEN_256_BIT 32
 
+static int atl_clear_txsc(struct atl_hw *hw, const struct atl_macsec_txsc *tx_sc);
 static int atl_macsec_apply_cfg(struct atl_hw *hw);
 static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, const struct macsec_secy *secy);
 
@@ -405,15 +406,7 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
-	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = {0};
-	ret = AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord, txsc_idx);
-	if (ret)
-		return ret;
-
-	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
-	matchSCRecord.fresh = 1;
-	ret = AQ_API_SetEgressSCRecord(hw, &matchSCRecord,
-				hw->macsec_cfg.atl_txsc[txsc_idx].hw_sc_idx);
+	ret = atl_clear_txsc(hw, &hw->macsec_cfg.atl_txsc[txsc_idx]);
 	if (ret)
 		return ret;
 
@@ -644,6 +637,21 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	return ret;
 }
 
+static int atl_clear_txsc(struct atl_hw *hw, const struct atl_macsec_txsc *tx_sc)
+{
+	int txsc_idx = atl_get_txsc_idx_from_secy(hw, tx_sc->sw_secy);
+	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = {0};
+	AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
+	int ret;
+
+	ret = AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord, txsc_idx);
+	if (ret)
+		return ret;
+
+	matchSCRecord.fresh = 1;
+	return AQ_API_SetEgressSCRecord(hw, &matchSCRecord, tx_sc->hw_sc_idx);
+}
+
 static int atl_mdo_del_secy(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
@@ -667,13 +675,6 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 
 	hw->macsec_cfg.atl_txsc[txsc_idx].sw_secy = NULL;
 
-	if (netif_carrier_ok(nic->ndev)) {
-		AQ_API_SEC_EgressSCRecord matchSCRecord = {0};
-
-		matchSCRecord.fresh = 1;
-		ret = AQ_API_SetEgressSCRecord(hw, &matchSCRecord,
-				hw->macsec_cfg.atl_txsc[txsc_idx].hw_sc_idx);
-	}
 	return ret;
 }
 
