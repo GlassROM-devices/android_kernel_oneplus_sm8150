@@ -404,6 +404,7 @@ int atl_set_media_detect(struct atl_nic *nic, bool on);
 int atl_init_macsec(struct atl_hw *hw);
 void atl_macsec_work(struct atl_nic *nic);
 int atl_macsec_rx_sa_cnt(struct atl_hw *hw);
+int atl_macsec_tx_sc_cnt(struct atl_hw *hw);
 int atl_macsec_tx_sa_cnt(struct atl_hw *hw);
 int atl_macsec_update_stats(struct atl_hw *hw);
 

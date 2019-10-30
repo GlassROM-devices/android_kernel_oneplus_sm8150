@@ -149,8 +149,9 @@ struct atl_macsec_tx_sc_stats {
 };
 
 struct atl_macsec_cfg {
-	unsigned long secy_idx_busy;
 	enum atl_macsec_sc_sa sc_sa;
+	/* Egress channel configuration */
+	unsigned long txsc_idx_busy;
 	struct atl_macsec_secy {
 		uint32_t sc_idx;
 		unsigned long tx_sa_idx_busy;

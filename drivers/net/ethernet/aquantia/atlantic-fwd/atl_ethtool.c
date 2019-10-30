@@ -739,7 +739,7 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 #ifdef NETIF_F_HW_MACSEC
 		       + ARRAY_SIZE(macsec_stat_descs)
 		       + ARRAY_SIZE(macsec_tx_sc_stat_descs) *
-		       		hweight_long(nic->hw.macsec_cfg.secy_idx_busy)
+		       		atl_macsec_tx_sc_cnt(&nic->hw)
 		       + ARRAY_SIZE(macsec_tx_sa_stat_descs) *
 		       		atl_macsec_tx_sa_cnt(&nic->hw)
 		       + ARRAY_SIZE(macsec_rx_sa_stat_descs) *
@@ -814,7 +814,7 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 			ARRAY_SIZE(macsec_stat_descs));
 
 		for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
-			if (!(test_bit(i, &nic->hw.macsec_cfg.secy_idx_busy)))
+			if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
 				continue;
 			struct atl_macsec_secy *atl_secy =
 				&nic->hw.macsec_cfg.atl_secy[i];
@@ -920,7 +920,7 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	atl_write_stats(&nic->hw.macsec_cfg.stats, macsec_stat_descs, data, uint64_t);
 
 	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
-		if (!(test_bit(i, &nic->hw.macsec_cfg.secy_idx_busy)))
+		if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
 			continue;
 		struct atl_macsec_secy *atl_secy = &nic->hw.macsec_cfg.atl_secy[i];
 
