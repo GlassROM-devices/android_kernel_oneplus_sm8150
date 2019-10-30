@@ -220,7 +220,7 @@ static int atl_macsec_get_rx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 
 	ret = AQ_API_GetIngressSARecord(hw, &matchSARecord, sa_idx);
 	if (!ret)
-		*pn = matchSARecord.next_pn;
+		*pn = (!matchSARecord.sat_nextpn) ? matchSARecord.next_pn : 0;
 
 	return ret;
 }
