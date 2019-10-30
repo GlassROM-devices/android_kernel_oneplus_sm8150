@@ -645,6 +645,8 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, ctx->secy);
 	struct atl_hw *hw = &nic->hw;
+	struct macsec_rx_sc *rx_sc;
+	int rxsc_idx;
 	int ret = 0;
 
 	if (ctx->prepare)
@@ -652,6 +654,13 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 
 	atl_mdo_dev_stop(ctx);
 	clear_bit(secy_idx, &hw->macsec_cfg.secy_idx_busy);
+	for (rx_sc = rcu_dereference_bh(ctx->secy->rx_sc);
+	     rx_sc;
+	     rx_sc = rcu_dereference_bh(rx_sc->next)) {
+		rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
+		clear_bit(rxsc_idx, &hw->macsec_cfg.rxsc_idx_busy);
+	}
+
 	hw->macsec_cfg.atl_secy[secy_idx].sw_secy = NULL;
 
 	if (netif_carrier_ok(nic->ndev)) {
