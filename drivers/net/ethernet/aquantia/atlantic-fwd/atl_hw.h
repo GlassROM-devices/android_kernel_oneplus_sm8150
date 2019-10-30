@@ -152,7 +152,7 @@ struct atl_macsec_cfg {
 	/* Egress channel configuration */
 	unsigned long txsc_idx_busy;
 	struct atl_macsec_txsc {
-		uint32_t sc_idx;
+		uint32_t hw_sc_idx;
 		unsigned long tx_sa_idx_busy;
 		const struct macsec_secy *sw_secy;
 		/* It is not OK to store key in driver but it is until ... */

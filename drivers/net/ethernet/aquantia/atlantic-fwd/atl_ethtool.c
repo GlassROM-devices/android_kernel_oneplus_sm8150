@@ -821,7 +821,7 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 			int assoc_num;
 
 			snprintf(prefix, sizeof(prefix), "txsc%d_",
-				 atl_txsc->sc_idx);
+				 atl_txsc->hw_sc_idx);
 			atl_copy_stats_strings(&p, prefix,
 					macsec_tx_sc_stat_descs,
 					ARRAY_SIZE(macsec_tx_sc_stat_descs));
@@ -830,7 +830,7 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 					      &atl_txsc->tx_sa_idx_busy))
 					continue;
 				snprintf(prefix, sizeof(prefix), "txsc%d_sa%d_",
-					 atl_txsc->sc_idx, assoc_num);
+					 atl_txsc->hw_sc_idx, assoc_num);
 				atl_copy_stats_strings(&p, prefix,
 						macsec_tx_sa_stat_descs,
 						ARRAY_SIZE(macsec_tx_sa_stat_descs));
