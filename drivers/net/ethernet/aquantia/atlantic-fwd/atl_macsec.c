@@ -445,7 +445,7 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	return ret;
 }
 
-static int atl_update_secy(struct atl_hw *hw, int secy_idx)
+static int atl_set_txsc(struct atl_hw *hw, int secy_idx)
 {
 	struct atl_macsec_secy *atl_secy = &hw->macsec_cfg.atl_secy[secy_idx];
 	const struct macsec_secy *secy = atl_secy->sw_secy;
@@ -610,7 +610,7 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 		hw->macsec_cfg.atl_secy[secy_idx].sc_idx);
 
 	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
-		ret = atl_update_secy(hw, secy_idx);
+		ret = atl_set_txsc(hw, secy_idx);
 
 	set_bit(secy_idx, &hw->macsec_cfg.secy_idx_busy);
 
@@ -634,7 +634,7 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	secy = hw->macsec_cfg.atl_secy[secy_idx].sw_secy;
 
 	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
-		ret = atl_update_secy(hw, secy_idx);
+		ret = atl_set_txsc(hw, secy_idx);
 
 	return ret;
 }
@@ -1320,7 +1320,7 @@ static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
 	int i;
 	int ret = 0;
 
-	atl_update_secy(hw, secy_idx);
+	atl_set_txsc(hw, secy_idx);
 
 	if (!netif_running(secy->netdev))
 		return ret;
