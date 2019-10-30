@@ -1281,6 +1281,36 @@ static int atl_macsec_apply_cfg(struct atl_hw *hw)
 	return ret;
 }
 
+static int atl_macsec_apply_txsc_cfg(struct atl_hw *hw, const int secy_idx)
+{
+	const struct macsec_secy *secy =
+		hw->macsec_cfg.atl_secy[secy_idx].sw_secy;
+	int ret = 0;
+	int i;
+
+	ret = atl_set_txsc(hw, secy_idx);
+	if (ret)
+		return ret;
+
+	if (!netif_running(secy->netdev))
+		return 0;
+
+	for (i = 0; i < MACSEC_NUM_AN; i++) {
+		if (secy->tx_sc.sa[i]) {
+			ret = atl_update_txsa(hw,
+				hw->macsec_cfg.atl_secy[secy_idx].sc_idx,
+				secy,
+				secy->tx_sc.sa[i],
+				hw->macsec_cfg.atl_secy[secy_idx].tx_sa_key[i],
+				i);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return ret;
+}
+
 static int atl_macsec_apply_rxsc_cfg(struct atl_hw *hw, const int rxsc_idx)
 {
 	const struct macsec_rx_sc *rx_sc =
@@ -1317,13 +1347,9 @@ static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
 	const struct macsec_secy *secy = hw->macsec_cfg.atl_secy[secy_idx].sw_secy;
 	struct macsec_rx_sc *rx_sc;
 	int rxsc_idx;
-	int i;
 	int ret = 0;
 
-	atl_set_txsc(hw, secy_idx);
-
-	if (!netif_running(secy->netdev))
-		return ret;
+	atl_macsec_apply_txsc_cfg(hw, secy_idx);
 
 	for (rx_sc = rcu_dereference_bh(secy->rx_sc); rx_sc && rx_sc->active;
 	     rx_sc = rcu_dereference_bh(rx_sc->next)) {
@@ -1335,19 +1361,6 @@ static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
 		ret = atl_macsec_apply_rxsc_cfg(hw, rxsc_idx);
 		if (ret)
 			return ret;
-	}
-
-	for (i = 0; i < MACSEC_NUM_AN; i++) {
-		if (secy->tx_sc.sa[i]) {
-			ret = atl_update_txsa(hw,
-				hw->macsec_cfg.atl_secy[secy_idx].sc_idx,
-				secy,
-				secy->tx_sc.sa[i],
-				hw->macsec_cfg.atl_secy[secy_idx].tx_sa_key[i],
-				i);
-			if (ret)
-				break;
-		}
 	}
 
 	return ret;
