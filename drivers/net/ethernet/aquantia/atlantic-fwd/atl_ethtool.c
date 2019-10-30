@@ -813,24 +813,24 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 		atl_copy_stats_strings(&p, "macsec_", macsec_stat_descs,
 			ARRAY_SIZE(macsec_stat_descs));
 
-		for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+		for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
 			if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
 				continue;
-			struct atl_macsec_secy *atl_secy =
-				&nic->hw.macsec_cfg.atl_secy[i];
+			struct atl_macsec_txsc *atl_txsc =
+				&nic->hw.macsec_cfg.atl_txsc[i];
 			int assoc_num;
 
 			snprintf(prefix, sizeof(prefix), "txsc%d_",
-				 atl_secy->sc_idx);
+				 atl_txsc->sc_idx);
 			atl_copy_stats_strings(&p, prefix,
 					macsec_tx_sc_stat_descs,
 					ARRAY_SIZE(macsec_tx_sc_stat_descs));
 			for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
 				if (!test_bit(assoc_num,
-					      &atl_secy->tx_sa_idx_busy))
+					      &atl_txsc->tx_sa_idx_busy))
 					continue;
 				snprintf(prefix, sizeof(prefix), "txsc%d_sa%d_",
-					 atl_secy->sc_idx, assoc_num);
+					 atl_txsc->sc_idx, assoc_num);
 				atl_copy_stats_strings(&p, prefix,
 						macsec_tx_sa_stat_descs,
 						ARRAY_SIZE(macsec_tx_sa_stat_descs));
@@ -919,17 +919,17 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	int assoc_num;
 	atl_write_stats(&nic->hw.macsec_cfg.stats, macsec_stat_descs, data, uint64_t);
 
-	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+	for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
 		if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
 			continue;
-		struct atl_macsec_secy *atl_secy = &nic->hw.macsec_cfg.atl_secy[i];
+		struct atl_macsec_txsc *atl_txsc = &nic->hw.macsec_cfg.atl_txsc[i];
 
-		atl_write_stats(&atl_secy->stats, macsec_tx_sc_stat_descs, data, uint64_t);
+		atl_write_stats(&atl_txsc->stats, macsec_tx_sc_stat_descs, data, uint64_t);
 
 		for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
-			if (!test_bit(assoc_num, &atl_secy->tx_sa_idx_busy))
+			if (!test_bit(assoc_num, &atl_txsc->tx_sa_idx_busy))
 				continue;
-			atl_write_stats(&atl_secy->tx_sa_stats[assoc_num],
+			atl_write_stats(&atl_txsc->tx_sa_stats[assoc_num],
 					macsec_tx_sa_stat_descs, data, uint64_t);
 		}
 	}
