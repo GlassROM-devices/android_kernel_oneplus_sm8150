@@ -18,7 +18,7 @@
 #define ATL_MACSEC_KEY_LEN_256_BIT 32
 
 static int atl_macsec_apply_cfg(struct atl_hw *hw);
-static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx);
+static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, const struct macsec_secy *secy);
 
 static void ether_addr_to_mac(uint32_t mac[2], unsigned char *emac)
 {
@@ -381,14 +381,13 @@ unlock:
 static int atl_mdo_dev_open(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, ctx->secy);
 	int ret = 0;
 
 	if (ctx->prepare)
 		return 0;
 
 	if (netif_carrier_ok(nic->ndev))
-		ret = atl_macsec_apply_secy_cfg(&nic->hw, secy_idx);
+		ret = atl_macsec_apply_secy_cfg(&nic->hw, ctx->secy);
 
 	return ret;
 }
@@ -1265,22 +1264,6 @@ static int atl_mdo_get_rx_sa_stats(struct macsec_context *ctx)
 	return ret;
 }
 
-static int atl_macsec_apply_cfg(struct atl_hw *hw)
-{
-	int i;
-	int ret = 0;
-
-	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
-		if (hw->macsec_cfg.secy_idx_busy & BIT(i))
-			if (netif_running(hw->macsec_cfg.atl_secy[i].sw_secy->netdev))
-				ret = atl_macsec_apply_secy_cfg(hw, i);
-		if (ret)
-			break;
-	}
-
-	return ret;
-}
-
 static int atl_macsec_apply_txsc_cfg(struct atl_hw *hw, const int secy_idx)
 {
 	const struct macsec_secy *secy =
@@ -1342,9 +1325,9 @@ static int atl_macsec_apply_rxsc_cfg(struct atl_hw *hw, const int rxsc_idx)
 	return ret;
 }
 
-static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
+static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, const struct macsec_secy *secy)
 {
-	const struct macsec_secy *secy = hw->macsec_cfg.atl_secy[secy_idx].sw_secy;
+	int secy_idx = atl_get_secy_idx_from_secy(hw, secy);
 	struct macsec_rx_sc *rx_sc;
 	int rxsc_idx;
 	int ret = 0;
@@ -1361,6 +1344,30 @@ static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, int secy_idx)
 		ret = atl_macsec_apply_rxsc_cfg(hw, rxsc_idx);
 		if (ret)
 			return ret;
+	}
+
+	return ret;
+}
+
+static int atl_macsec_apply_cfg(struct atl_hw *hw)
+{
+	int i;
+	int ret = 0;
+
+	for (i = 0; i < ATL_MACSEC_MAX_SECY; i++) {
+		if (hw->macsec_cfg.secy_idx_busy & BIT(i)) {
+			ret = atl_macsec_apply_txsc_cfg(hw, i);
+			if (ret)
+				return ret;
+		}
+	}
+
+	for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
+		if (hw->macsec_cfg.rxsc_idx_busy & BIT(i)) {
+			ret = atl_macsec_apply_rxsc_cfg(hw, i);
+			if (ret)
+				return ret;
+		}
 	}
 
 	return ret;
