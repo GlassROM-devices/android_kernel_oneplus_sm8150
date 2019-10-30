@@ -18,6 +18,7 @@
 #define ATL_MACSEC_KEY_LEN_256_BIT 32
 
 static int atl_clear_txsc(struct atl_hw *hw, const struct atl_macsec_txsc *tx_sc);
+static int atl_clear_rxsc(struct atl_hw *hw, const struct atl_macsec_rxsc *rx_sc);
 static int atl_macsec_apply_cfg(struct atl_hw *hw);
 static int atl_macsec_apply_secy_cfg(struct atl_hw *hw, const struct macsec_secy *secy);
 
@@ -416,26 +417,11 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	     rx_sc;
 	     rx_sc = rcu_dereference_bh(rx_sc->next)) {
 		rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
-		const struct atl_macsec_rxsc *atl_rxsc =
-			&hw->macsec_cfg.atl_rxsc[rxsc_idx];
 		WARN_ON(rxsc_idx < 0);
 		if (unlikely(rxsc_idx < 0))
 			continue;
 
-		AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
-		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
-						      2 * rxsc_idx + 1);
-		if (ret)
-			return ret;
-
-		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
-						      2 * rxsc_idx);
-		if (ret)
-			return ret;
-
-		AQ_API_SEC_IngressSCRecord sc_record = { 0 };
-		sc_record.fresh = 1;
-		ret = AQ_API_SetIngressSCRecord(hw, &sc_record, atl_rxsc->hw_sc_idx);
+		ret = atl_clear_rxsc(hw, &hw->macsec_cfg.atl_rxsc[rxsc_idx]);
 		if (ret)
 			return ret;
 	}
@@ -940,13 +926,41 @@ static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 	return 0;
 }
 
+static int atl_clear_rxsc(struct atl_hw *hw, const struct atl_macsec_rxsc *rx_sc)
+{
+	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc->sw_rxsc);
+	AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
+	AQ_API_SEC_IngressSCRecord sc_record = { 0 };
+	int ret;
+
+	ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
+					      2 * rxsc_idx);
+	if (ret) {
+		dev_err(&hw->pdev->dev,
+			"AQ_API_SetIngressPreClassRecord failed with %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
+					      2 * rxsc_idx + 1);
+	if (ret) {
+		dev_err(&hw->pdev->dev,
+			"AQ_API_SetIngressPreClassRecord failed with %d\n",
+			ret);
+		return ret;
+	}
+
+	sc_record.fresh = 1;
+	return AQ_API_SetIngressSCRecord(hw, &sc_record, rx_sc->hw_sc_idx);
+}
+
 static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, ctx->rx_sc);
 	struct atl_macsec_cfg *cfg = &nic->hw.macsec_cfg;
 	struct atl_hw *hw = &nic->hw;
-	uint32_t hw_sc_idx;
 	int ret = 0;
 
 	if (rxsc_idx < 0)
@@ -955,38 +969,15 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 	if (ctx->prepare)
 		return 0;
 
+	if (netif_carrier_ok(nic->ndev)) {
+		ret = atl_clear_rxsc(hw, &cfg->atl_rxsc[rxsc_idx]);
+	}
+
 	clear_bit(rxsc_idx, &cfg->rxsc_idx_busy);
-	hw_sc_idx = cfg->atl_rxsc[rxsc_idx].hw_sc_idx;
 	cfg->atl_rxsc[rxsc_idx].sw_secy = NULL;
 	cfg->atl_rxsc[rxsc_idx].sw_rxsc = NULL;
 
-	if (netif_carrier_ok(nic->ndev)) {
-		AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
-		AQ_API_SEC_IngressSCRecord sc_record = { 0 };
-
-		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
-						      2 * rxsc_idx);
-		if (ret) {
-			dev_err(&hw->pdev->dev,
-				"AQ_API_SetIngressPreClassRecord failed with %d\n",
-				ret);
-			return ret;
-		}
-
-		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
-						      2 * rxsc_idx + 1);
-		if (ret) {
-			dev_err(&hw->pdev->dev,
-				"AQ_API_SetIngressPreClassRecord failed with %d\n",
-				ret);
-			return ret;
-		}
-
-		sc_record.fresh = 1;
-		return AQ_API_SetIngressSCRecord(hw, &sc_record, hw_sc_idx);
-	}
-
-	return 0;
+	return ret;
 }
 
 static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
