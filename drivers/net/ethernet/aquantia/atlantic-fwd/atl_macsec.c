@@ -699,20 +699,21 @@ static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
 		return ret;
 	}
 
-	AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = {0};
-	memcpy(&matchKeyRecord.key, key, secy->key_len);
+	if (key) {
+		AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = {0};
+		memcpy(&matchKeyRecord.key, key, secy->key_len);
 
-	atl_rotate_keys(&matchKeyRecord.key, secy->key_len);
+		atl_rotate_keys(&matchKeyRecord.key, secy->key_len);
 
-	ret = AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord, sa_idx);
-	if (ret)
-		dev_err(&hw->pdev->dev,
-			"AQ_API_SetEgressSAKeyRecord failed with %d\n", ret);
-
+		ret = AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord, sa_idx);
+		if (ret)
+			dev_err(&hw->pdev->dev,
+				"AQ_API_SetEgressSAKeyRecord failed with %d\n", ret);
+	}
 	return ret;
 }
 
-static int atl_mdo_upd_txsa(struct macsec_context *ctx)
+static int atl_mdo_add_txsa(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, ctx->secy);
@@ -733,6 +734,26 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 				       secy,
 				       ctx->sa.tx_sa,
 				       ctx->sa.key,
+				       ctx->sa.assoc_num);
+
+	return 0;
+}
+
+static int atl_mdo_upd_txsa(struct macsec_context *ctx)
+{
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	int secy_idx = atl_get_secy_idx_from_secy(&nic->hw, ctx->secy);
+	const struct macsec_secy *secy = ctx->secy;
+
+	if (ctx->prepare)
+		return 0;
+
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		return atl_update_txsa(&nic->hw,
+				       nic->hw.macsec_cfg.atl_secy[secy_idx].sc_idx,
+				       secy,
+				       ctx->sa.tx_sa,
+				       NULL,
 				       ctx->sa.assoc_num);
 
 	return 0;
@@ -987,33 +1008,36 @@ static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
 		return ret;
 	}
 
-	memcpy(&sa_key_record.key, key, secy->key_len);
+	if (key) {
+		memcpy(&sa_key_record.key, key, secy->key_len);
 
-	switch (secy->key_len) {
-	case ATL_MACSEC_KEY_LEN_128_BIT:
-		sa_key_record.key_len = 0;
-		break;
-	case ATL_MACSEC_KEY_LEN_192_BIT:
-		sa_key_record.key_len = 1;
-		break;
-	case ATL_MACSEC_KEY_LEN_256_BIT:
-		sa_key_record.key_len = 2;
-		break;
-	default:
-		return -1;
+		switch (secy->key_len) {
+		case ATL_MACSEC_KEY_LEN_128_BIT:
+			sa_key_record.key_len = 0;
+			break;
+		case ATL_MACSEC_KEY_LEN_192_BIT:
+			sa_key_record.key_len = 1;
+			break;
+		case ATL_MACSEC_KEY_LEN_256_BIT:
+			sa_key_record.key_len = 2;
+			break;
+		default:
+			return -1;
+		}
+
+		atl_rotate_keys(&sa_key_record.key, secy->key_len);
+
+		ret = AQ_API_SetIngressSAKeyRecord(hw, &sa_key_record, sa_idx);
+		if (ret)
+			dev_err(&hw->pdev->dev,
+				"AQ_API_SetIngressSAKeyRecord failed with %d\n",
+				ret);
 	}
-
-	atl_rotate_keys(&sa_key_record.key, secy->key_len);
-
-	ret = AQ_API_SetIngressSAKeyRecord(hw, &sa_key_record, sa_idx);
-	if (ret)
-		dev_err(&hw->pdev->dev,
-			"AQ_API_SetIngressSAKeyRecord failed with %d\n", ret);
 
 	return ret;
 }
 
-static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
+static int atl_mdo_add_rxsa(struct macsec_context *ctx)
 {
 	const struct macsec_rx_sc *rx_sc = ctx->sa.rx_sa->sc;
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
@@ -1036,6 +1060,26 @@ static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 		return atl_update_rxsa(
 			hw, hw->macsec_cfg.atl_rxsc[rxsc_idx].hw_sc_idx, secy,
 			ctx->sa.rx_sa, ctx->sa.key, ctx->sa.assoc_num);
+
+	return 0;
+}
+static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
+{
+	const struct macsec_rx_sc *rx_sc = ctx->sa.rx_sa->sc;
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const struct macsec_secy *secy = ctx->secy;
+	struct atl_hw *hw = &nic->hw;
+	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
+
+	WARN_ON(rxsc_idx < 0);
+
+	if (ctx->prepare)
+		return 0;
+
+	if (netif_carrier_ok(nic->ndev) && netif_running(secy->netdev))
+		return atl_update_rxsa(
+			hw, hw->macsec_cfg.atl_rxsc[rxsc_idx].hw_sc_idx, secy,
+			ctx->sa.rx_sa, NULL, ctx->sa.assoc_num);
 
 	return 0;
 }
@@ -1319,10 +1363,10 @@ const struct macsec_ops atl_macsec_ops = {
 	.mdo_add_rxsc = atl_mdo_add_rxsc,
 	.mdo_upd_rxsc = atl_mdo_upd_rxsc,
 	.mdo_del_rxsc = atl_mdo_del_rxsc,
-	.mdo_add_rxsa = atl_mdo_upd_rxsa,
+	.mdo_add_rxsa = atl_mdo_add_rxsa,
 	.mdo_upd_rxsa = atl_mdo_upd_rxsa,
 	.mdo_del_rxsa = atl_mdo_del_rxsa,
-	.mdo_add_txsa = atl_mdo_upd_txsa,
+	.mdo_add_txsa = atl_mdo_add_txsa,
 	.mdo_upd_txsa = atl_mdo_upd_txsa,
 	.mdo_del_txsa = atl_mdo_del_txsa,
 	.mdo_get_dev_stats = atl_mdo_get_dev_stats,
