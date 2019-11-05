@@ -123,7 +123,7 @@ TRACE_EVENT(atl_sync_rx_range,
 
 #define DESCR_FIELD(DESCR, BIT_BEGIN, BIT_END) \
 	((DESCR >> BIT_END) &\
-		(BIT(BIT_BEGIN - BIT_END + 1) - 1))
+		(BIT_ULL(BIT_BEGIN - BIT_END + 1) - 1))
 
 TRACE_EVENT(atl_rx_descr,
 	TP_PROTO(int ring_idx, unsigned int pointer, u64 *descr),
