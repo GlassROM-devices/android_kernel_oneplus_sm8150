@@ -741,7 +741,7 @@ ifdef CONFIG_CC_STACKPROTECTOR_REGULAR
   stackp-name := REGULAR
 else
 ifdef CONFIG_CC_STACKPROTECTOR_STRONG
-  stackp-flag := -fstack-protector-strong
+  stackp-flag := -fstack-protector-all
   stackp-name := STRONG
 else
   # Force off for distro compilers that enable stack protector by default.
@@ -901,7 +901,7 @@ export DISABLE_CFI
 endif
 
 ifdef CONFIG_SHADOW_CALL_STACK
-scs-flags	:= -fsanitize=shadow-call-stack
+scs-flags	:= -fsanitize=shadow-call-stack -ffixed-x18
 KBUILD_CFLAGS	+= $(scs-flags)
 DISABLE_SCS	:= -fno-sanitize=shadow-call-stack
 export DISABLE_SCS
