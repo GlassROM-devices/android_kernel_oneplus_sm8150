@@ -1269,12 +1269,12 @@ static int atl_macsec_apply_txsc_cfg(struct atl_hw *hw, const int txsc_idx)
 	int ret = 0;
 	int i;
 
+	if (!netif_running(secy->netdev))
+		return ret;
+
 	ret = atl_set_txsc(hw, txsc_idx);
 	if (ret)
 		return ret;
-
-	if (!netif_running(secy->netdev))
-		return 0;
 
 	for (i = 0; i < MACSEC_NUM_AN; i++) {
 		if (secy->tx_sc.sa[i]) {
@@ -1301,12 +1301,12 @@ static int atl_macsec_apply_rxsc_cfg(struct atl_hw *hw, const int rxsc_idx)
 	int ret = 0;
 	int i;
 
+	if (!netif_running(secy->netdev))
+		return ret;
+
 	ret = atl_set_rxsc(hw, rxsc_idx);
 	if (ret)
 		return ret;
-
-	if (!netif_running(secy->netdev))
-		return 0;
 
 	for (i = 0; i < MACSEC_NUM_AN; i++) {
 		if (rx_sc->sa[i]) {
