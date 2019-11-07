@@ -1001,9 +1001,8 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 	if (ctx->prepare)
 		return 0;
 
-	if (netif_carrier_ok(nic->ndev)) {
+	if (netif_carrier_ok(nic->ndev))
 		ret = atl_clear_rxsc(hw, &cfg->atl_rxsc[rxsc_idx]);
-	}
 
 	clear_bit(rxsc_idx, &cfg->rxsc_idx_busy);
 	cfg->atl_rxsc[rxsc_idx].sw_secy = NULL;
