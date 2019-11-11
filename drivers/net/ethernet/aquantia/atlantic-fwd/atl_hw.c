@@ -604,9 +604,15 @@ void atl_start_hw_global(struct atl_nic *nic)
 		atl_set_bits(hw, ATL_INTR_AUTO_MASK, BIT(0));
 		/* Enable status auto-clear on link intr generation */
 		atl_set_bits(hw, ATL_INTR_AUTO_CLEAR, BIT(0));
-	} else
+	} else {
 		/* Enable legacy INTx mode and status clear-on-read */
 		atl_write(hw, ATL_INTR_CTRL, BIT(7));
+		/* Clear the registers, which might have been set on previous
+		 * driver load and might interfere with legacy IRQ handling
+		 */
+		atl_write(hw, ATL_INTR_AUTO_MASK, 0);
+		atl_write(hw, ATL_INTR_AUTO_CLEAR, 0);
+	}
 
 	/* Map link interrupt to cause 0 */
 	atl_write(hw, ATL_INTR_GEN_INTR_MAP4, BIT(7) | (0 << 0));
