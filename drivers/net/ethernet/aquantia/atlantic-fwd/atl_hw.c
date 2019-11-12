@@ -648,7 +648,7 @@ void atl_set_rx_mode(struct net_device *ndev)
 		all_multi_needed |= 1;
 
 
-	/* Enable promisc VLAN mode iff IFF_PROMISC explicitly
+	/* Enable promisc VLAN mode if IFF_PROMISC explicitly
 	 * requested or too many VIDs registered
 	 */
 	atl_set_vlan_promisc(hw,
@@ -661,13 +661,11 @@ void atl_set_rx_mode(struct net_device *ndev)
 	netdev_for_each_uc_addr(hwaddr, ndev)
 		atl_set_uc_flt(hw, i++, hwaddr->addr);
 
-	if (is_multicast_enabled) {
-		atl_set_all_multi(hw, all_multi_needed);
+	atl_set_all_multi(hw, is_multicast_enabled && all_multi_needed);
 
-		if (!all_multi_needed)
-			netdev_for_each_mc_addr(hwaddr, ndev)
-				atl_set_uc_flt(hw, i++, hwaddr->addr);
-	}
+	if (is_multicast_enabled && !all_multi_needed)
+		netdev_for_each_mc_addr(hwaddr, ndev)
+			atl_set_uc_flt(hw, i++, hwaddr->addr);
 
 	while (i < ATL_UC_FLT_NUM)
 		atl_disable_uc_flt(hw, i++);
