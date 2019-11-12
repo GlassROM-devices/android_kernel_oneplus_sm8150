@@ -624,7 +624,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 static void atl_set_all_multi(struct atl_hw *hw, bool all_multi)
 {
 	atl_write_bit(hw, ATL_RX_MC_FLT_MSK, 14, all_multi);
-	atl_write(hw, ATL_RX_MC_FLT(0), all_multi ? 0x80010000 : 0);
+	atl_write(hw, ATL_RX_MC_FLT(0), all_multi ? 0x80010FFF : 0x00010FFF);
 }
 
 void atl_set_rx_mode(struct net_device *ndev)
