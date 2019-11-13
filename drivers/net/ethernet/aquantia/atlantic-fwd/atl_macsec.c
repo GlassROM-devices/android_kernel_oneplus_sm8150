@@ -17,10 +17,16 @@
 #define ATL_MACSEC_KEY_LEN_192_BIT 24
 #define ATL_MACSEC_KEY_LEN_256_BIT 32
 
-static int atl_clear_txsc(struct atl_hw *hw,
-			  const struct atl_macsec_txsc *tx_sc);
-static int atl_clear_rxsc(struct atl_hw *hw,
-			  const struct atl_macsec_rxsc *rx_sc);
+static int atl_clear_txsc(struct atl_nic *nic,
+			  struct atl_macsec_txsc *atl_txsc);
+static int atl_clear_txsa(struct atl_nic *nic,
+			  struct atl_macsec_txsc *atl_txsc,
+			  const int sa_num);
+static int atl_clear_rxsc(struct atl_nic *nic,
+			  struct atl_macsec_rxsc *atl_rxsc);
+static int atl_clear_rxsa(struct atl_nic *nic,
+			  struct atl_macsec_rxsc *atl_rxsc,
+			  const int sa_num);
 static int atl_macsec_apply_cfg(struct atl_hw *hw);
 static int atl_macsec_apply_secy_cfg(struct atl_hw *hw,
 				     const struct macsec_secy *secy);
@@ -423,6 +429,8 @@ static int atl_mdo_dev_open(struct macsec_context *ctx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int ret = 0;
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	if (ctx->prepare)
 		return 0;
 
@@ -439,7 +447,9 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
-	ret = atl_clear_txsc(hw, &hw->macsec_cfg.atl_txsc[txsc_idx]);
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
+	ret = atl_clear_txsc(nic, &hw->macsec_cfg.atl_txsc[txsc_idx]);
 	if (ret)
 		return ret;
 
@@ -452,7 +462,7 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 		if (unlikely(rxsc_idx < 0))
 			continue;
 
-		ret = atl_clear_rxsc(hw, &hw->macsec_cfg.atl_rxsc[rxsc_idx]);
+		ret = atl_clear_rxsc(nic, &hw->macsec_cfg.atl_rxsc[rxsc_idx]);
 		if (ret)
 			return ret;
 	}
@@ -606,6 +616,8 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 	uint32_t txsc_idx;
 	int ret = 0;
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	sc_sa = sc_sa_from_num_an(MACSEC_NUM_AN);
 	if (sc_sa == atl_macsec_sa_sc_not_used)
 		return -EINVAL;
@@ -643,6 +655,8 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	if (txsc_idx < 0)
 		return -ENOENT;
 
@@ -657,13 +671,20 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	return ret;
 }
 
-static int atl_clear_txsc(struct atl_hw *hw,
-			  const struct atl_macsec_txsc *tx_sc)
+static int atl_clear_txsc(struct atl_nic *nic,
+			  struct atl_macsec_txsc *tx_sc)
 {
+	struct atl_hw *hw = &nic->hw;
 	int txsc_idx = atl_get_txsc_idx_from_secy(hw, tx_sc->sw_secy);
 	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = { 0 };
 	AQ_API_SEC_EgressSCRecord matchSCRecord = { 0 };
 	int ret;
+
+	while (tx_sc->tx_sa_idx_busy) {
+		ret = atl_clear_txsa(nic, tx_sc, ffs(tx_sc->tx_sa_idx_busy)-1);
+		if (ret)
+			return ret;
+	}
 
 	ret = AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord,
 					  txsc_idx);
@@ -682,6 +703,8 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 	struct macsec_rx_sc *rx_sc;
 	int rxsc_idx;
 	int ret = 0;
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -747,6 +770,8 @@ static int atl_mdo_add_txsa(struct macsec_context *ctx)
 	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	const struct macsec_secy *secy = ctx->secy;
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	if (ctx->prepare)
 		return 0;
 
@@ -771,6 +796,8 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	const struct macsec_secy *secy = ctx->secy;
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	if (ctx->prepare)
 		return 0;
 
@@ -781,21 +808,15 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_mdo_del_txsa(struct macsec_context *ctx)
+static int atl_clear_txsa(struct atl_nic *nic,
+			  struct atl_macsec_txsc *atl_txsc,
+			  const int sa_num)
 {
-	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	int txsc_idx = atl_get_txsc_idx_from_secy(&nic->hw, ctx->secy);
+	int sa_idx = atl_txsc->hw_sc_idx | sa_num;
 	struct atl_hw *hw = &nic->hw;
-	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
-	int sa_idx;
 	int ret = 0;
 
-	if (ctx->prepare)
-		return 0;
-
-	sa_idx = atl_txsc->hw_sc_idx | ctx->sa.assoc_num;
-
-	clear_bit(ctx->sa.assoc_num, &atl_txsc->tx_sa_idx_busy);
+	clear_bit(sa_num, &atl_txsc->tx_sa_idx_busy);
 
 	if (netif_carrier_ok(nic->ndev)) {
 		AQ_API_SEC_EgressSARecord matchSARecord = { 0 };
@@ -811,6 +832,19 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 	}
 
 	return 0;
+}
+
+static int atl_mdo_del_txsa(struct macsec_context *ctx)
+{
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	int txsc_idx = atl_get_txsc_idx_from_secy(&nic->hw, ctx->secy);
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
+	if (ctx->prepare)
+		return 0;
+
+	return atl_clear_txsa(nic, &nic->hw.macsec_cfg.atl_txsc[txsc_idx], ctx->sa.assoc_num);
 }
 
 static int atl_rxsc_validate_frames(const enum macsec_validation_type validate)
@@ -911,6 +945,8 @@ static int atl_mdo_add_rxsc(struct macsec_context *ctx)
 	uint32_t rxsc_idx;
 	int ret = 0;
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	if (hweight32(cfg->rxsc_idx_busy) >= rxsc_idx_max)
 		return -ENOSPC;
 
@@ -945,6 +981,8 @@ static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, ctx->rx_sc);
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	if (rxsc_idx < 0)
 		return -ENOENT;
 
@@ -957,13 +995,20 @@ static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_clear_rxsc(struct atl_hw *hw,
-			  const struct atl_macsec_rxsc *rx_sc)
+static int atl_clear_rxsc(struct atl_nic *nic,
+			  struct atl_macsec_rxsc *rx_sc)
 {
+	struct atl_hw *hw = &nic->hw;
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc->sw_rxsc);
 	AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
 	AQ_API_SEC_IngressSCRecord sc_record = { 0 };
 	int ret;
+
+	while (rx_sc->rx_sa_idx_busy) {
+		ret = atl_clear_rxsa(nic, rx_sc, ffs(rx_sc->rx_sa_idx_busy)-1);
+		if (ret)
+			return ret;
+	}
 
 	ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
 					      2 * rxsc_idx);
@@ -992,8 +1037,9 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, ctx->rx_sc);
 	struct atl_macsec_cfg *cfg = &nic->hw.macsec_cfg;
-	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (rxsc_idx < 0)
 		return -ENOENT;
@@ -1002,7 +1048,7 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 		return 0;
 
 	if (netif_carrier_ok(nic->ndev))
-		ret = atl_clear_rxsc(hw, &cfg->atl_rxsc[rxsc_idx]);
+		ret = atl_clear_rxsc(nic, &cfg->atl_rxsc[rxsc_idx]);
 
 	clear_bit(rxsc_idx, &cfg->rxsc_idx_busy);
 	cfg->atl_rxsc[rxsc_idx].sw_secy = NULL;
@@ -1072,6 +1118,8 @@ static int atl_mdo_add_rxsa(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	WARN_ON(rxsc_idx < 0);
 
 	if (ctx->prepare)
@@ -1098,6 +1146,8 @@ static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	WARN_ON(rxsc_idx < 0);
 
 	if (ctx->prepare)
@@ -1111,24 +1161,15 @@ static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_mdo_del_rxsa(struct macsec_context *ctx)
+static int atl_clear_rxsa(struct atl_nic *nic,
+			  struct atl_macsec_rxsc *atl_rxsc,
+			  const int sa_num)
 {
-	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	const struct macsec_rx_sc *rx_sc = ctx->sa.rx_sa->sc;
-	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, rx_sc);
+	int sa_idx = atl_rxsc->hw_sc_idx | sa_num;
 	struct atl_hw *hw = &nic->hw;
-	struct atl_macsec_rxsc *atl_rxsc = &hw->macsec_cfg.atl_rxsc[rxsc_idx];
-	int sa_idx;
 	int ret = 0;
 
-	WARN_ON(rxsc_idx < 0);
-
-	if (ctx->prepare)
-		return 0;
-
-	sa_idx = atl_rxsc->hw_sc_idx | ctx->sa.assoc_num;
-
-	clear_bit(ctx->sa.assoc_num, &atl_rxsc->rx_sa_idx_busy);
+	clear_bit(sa_num, &atl_rxsc->rx_sa_idx_busy);
 
 	if (netif_carrier_ok(nic->ndev)) {
 		AQ_API_SEC_IngressSAKeyRecord sa_key_record = { 0 };
@@ -1145,11 +1186,29 @@ static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 	return 0;
 }
 
+static int atl_mdo_del_rxsa(struct macsec_context *ctx)
+{
+	struct atl_nic *nic = netdev_priv(ctx->netdev);
+	const struct macsec_rx_sc *rx_sc = ctx->sa.rx_sa->sc;
+	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, rx_sc);
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
+	WARN_ON(rxsc_idx < 0);
+
+	if (ctx->prepare)
+		return 0;
+
+	return atl_clear_rxsa(nic, &nic->hw.macsec_cfg.atl_rxsc[rxsc_idx], ctx->sa.assoc_num);
+}
+
 static int atl_mdo_get_dev_stats(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	struct atl_macsec_common_stats *stats = &hw->macsec_cfg.stats;
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -1176,6 +1235,8 @@ static int atl_mdo_get_tx_sc_stats(struct macsec_context *ctx)
 	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	struct atl_macsec_tx_sc_stats *stats = &atl_txsc->stats;
 
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
+
 	if (ctx->prepare)
 		return 0;
 
@@ -1200,6 +1261,8 @@ static int atl_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 		&atl_txsc->tx_sa_stats[ctx->sa.assoc_num];
 	unsigned int sa_idx;
 	int ret;
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -1227,6 +1290,8 @@ static int atl_mdo_get_rx_sc_stats(struct macsec_context *ctx)
 	unsigned int sa_idx;
 	int ret = 0;
 	int i;
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -1270,6 +1335,8 @@ static int atl_mdo_get_rx_sa_stats(struct macsec_context *ctx)
 	struct macsec_rx_sa *rx_sa;
 	unsigned int sa_idx;
 	int ret;
+
+	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
