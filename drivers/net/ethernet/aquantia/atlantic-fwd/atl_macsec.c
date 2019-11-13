@@ -19,13 +19,11 @@
 
 static int atl_clear_txsc(struct atl_nic *nic,
 			  struct atl_macsec_txsc *atl_txsc);
-static int atl_clear_txsa(struct atl_nic *nic,
-			  struct atl_macsec_txsc *atl_txsc,
+static int atl_clear_txsa(struct atl_nic *nic, struct atl_macsec_txsc *atl_txsc,
 			  const int sa_num);
 static int atl_clear_rxsc(struct atl_nic *nic,
 			  struct atl_macsec_rxsc *atl_rxsc);
-static int atl_clear_rxsa(struct atl_nic *nic,
-			  struct atl_macsec_rxsc *atl_rxsc,
+static int atl_clear_rxsa(struct atl_nic *nic, struct atl_macsec_rxsc *atl_rxsc,
 			  const int sa_num);
 static int atl_macsec_apply_cfg(struct atl_hw *hw);
 static int atl_macsec_apply_secy_cfg(struct atl_hw *hw,
@@ -671,8 +669,7 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	return ret;
 }
 
-static int atl_clear_txsc(struct atl_nic *nic,
-			  struct atl_macsec_txsc *tx_sc)
+static int atl_clear_txsc(struct atl_nic *nic, struct atl_macsec_txsc *tx_sc)
 {
 	struct atl_hw *hw = &nic->hw;
 	int txsc_idx = atl_get_txsc_idx_from_secy(hw, tx_sc->sw_secy);
@@ -681,7 +678,8 @@ static int atl_clear_txsc(struct atl_nic *nic,
 	int ret;
 
 	while (tx_sc->tx_sa_idx_busy) {
-		ret = atl_clear_txsa(nic, tx_sc, ffs(tx_sc->tx_sa_idx_busy)-1);
+		ret = atl_clear_txsa(nic, tx_sc,
+				     ffs(tx_sc->tx_sa_idx_busy) - 1);
 		if (ret)
 			return ret;
 	}
@@ -808,8 +806,7 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_clear_txsa(struct atl_nic *nic,
-			  struct atl_macsec_txsc *atl_txsc,
+static int atl_clear_txsa(struct atl_nic *nic, struct atl_macsec_txsc *atl_txsc,
 			  const int sa_num)
 {
 	int sa_idx = atl_txsc->hw_sc_idx | sa_num;
@@ -844,7 +841,8 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 	if (ctx->prepare)
 		return 0;
 
-	return atl_clear_txsa(nic, &nic->hw.macsec_cfg.atl_txsc[txsc_idx], ctx->sa.assoc_num);
+	return atl_clear_txsa(nic, &nic->hw.macsec_cfg.atl_txsc[txsc_idx],
+			      ctx->sa.assoc_num);
 }
 
 static int atl_rxsc_validate_frames(const enum macsec_validation_type validate)
@@ -995,8 +993,7 @@ static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_clear_rxsc(struct atl_nic *nic,
-			  struct atl_macsec_rxsc *rx_sc)
+static int atl_clear_rxsc(struct atl_nic *nic, struct atl_macsec_rxsc *rx_sc)
 {
 	struct atl_hw *hw = &nic->hw;
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc->sw_rxsc);
@@ -1005,7 +1002,8 @@ static int atl_clear_rxsc(struct atl_nic *nic,
 	int ret;
 
 	while (rx_sc->rx_sa_idx_busy) {
-		ret = atl_clear_rxsa(nic, rx_sc, ffs(rx_sc->rx_sa_idx_busy)-1);
+		ret = atl_clear_rxsa(nic, rx_sc,
+				     ffs(rx_sc->rx_sa_idx_busy) - 1);
 		if (ret)
 			return ret;
 	}
@@ -1161,8 +1159,7 @@ static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_clear_rxsa(struct atl_nic *nic,
-			  struct atl_macsec_rxsc *atl_rxsc,
+static int atl_clear_rxsa(struct atl_nic *nic, struct atl_macsec_rxsc *atl_rxsc,
 			  const int sa_num)
 {
 	int sa_idx = atl_rxsc->hw_sc_idx | sa_num;
@@ -1199,7 +1196,8 @@ static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 	if (ctx->prepare)
 		return 0;
 
-	return atl_clear_rxsa(nic, &nic->hw.macsec_cfg.atl_rxsc[rxsc_idx], ctx->sa.assoc_num);
+	return atl_clear_rxsa(nic, &nic->hw.macsec_cfg.atl_rxsc[rxsc_idx],
+			      ctx->sa.assoc_num);
 }
 
 static int atl_mdo_get_dev_stats(struct macsec_context *ctx)
