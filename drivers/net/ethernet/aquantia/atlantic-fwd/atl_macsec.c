@@ -427,8 +427,6 @@ static int atl_mdo_dev_open(struct macsec_context *ctx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int ret = 0;
 
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
-
 	if (ctx->prepare)
 		return 0;
 
@@ -444,8 +442,6 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 	int txsc_idx = atl_get_txsc_idx_from_secy(&nic->hw, ctx->secy);
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	ret = atl_clear_txsc(nic, &hw->macsec_cfg.atl_txsc[txsc_idx]);
 	if (ret)
@@ -614,8 +610,6 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 	uint32_t txsc_idx;
 	int ret = 0;
 
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
-
 	sc_sa = sc_sa_from_num_an(MACSEC_NUM_AN);
 	if (sc_sa == atl_macsec_sa_sc_not_used)
 		return -EINVAL;
@@ -652,8 +646,6 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	const struct macsec_secy *secy;
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (txsc_idx < 0)
 		return -ENOENT;
@@ -701,8 +693,6 @@ static int atl_mdo_del_secy(struct macsec_context *ctx)
 	struct macsec_rx_sc *rx_sc;
 	int rxsc_idx;
 	int ret = 0;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -768,8 +758,6 @@ static int atl_mdo_add_txsa(struct macsec_context *ctx)
 	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	const struct macsec_secy *secy = ctx->secy;
 
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
-
 	if (ctx->prepare)
 		return 0;
 
@@ -793,8 +781,6 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	const struct macsec_secy *secy = ctx->secy;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -835,8 +821,6 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int txsc_idx = atl_get_txsc_idx_from_secy(&nic->hw, ctx->secy);
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -943,8 +927,6 @@ static int atl_mdo_add_rxsc(struct macsec_context *ctx)
 	uint32_t rxsc_idx;
 	int ret = 0;
 
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
-
 	if (hweight32(cfg->rxsc_idx_busy) >= rxsc_idx_max)
 		return -ENOSPC;
 
@@ -978,8 +960,6 @@ static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, ctx->rx_sc);
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (rxsc_idx < 0)
 		return -ENOENT;
@@ -1036,8 +1016,6 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, ctx->rx_sc);
 	struct atl_macsec_cfg *cfg = &nic->hw.macsec_cfg;
 	int ret = 0;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (rxsc_idx < 0)
 		return -ENOENT;
@@ -1116,8 +1094,6 @@ static int atl_mdo_add_rxsa(struct macsec_context *ctx)
 	struct atl_hw *hw = &nic->hw;
 	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
 
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
-
 	WARN_ON(rxsc_idx < 0);
 
 	if (ctx->prepare)
@@ -1143,8 +1119,6 @@ static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 	const struct macsec_secy *secy = ctx->secy;
 	struct atl_hw *hw = &nic->hw;
 	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	WARN_ON(rxsc_idx < 0);
 
@@ -1189,8 +1163,6 @@ static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 	const struct macsec_rx_sc *rx_sc = ctx->sa.rx_sa->sc;
 	const int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, rx_sc);
 
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
-
 	WARN_ON(rxsc_idx < 0);
 
 	if (ctx->prepare)
@@ -1205,8 +1177,6 @@ static int atl_mdo_get_dev_stats(struct macsec_context *ctx)
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	struct atl_hw *hw = &nic->hw;
 	struct atl_macsec_common_stats *stats = &hw->macsec_cfg.stats;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -1233,8 +1203,6 @@ static int atl_mdo_get_tx_sc_stats(struct macsec_context *ctx)
 	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	struct atl_macsec_tx_sc_stats *stats = &atl_txsc->stats;
 
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
-
 	if (ctx->prepare)
 		return 0;
 
@@ -1259,8 +1227,6 @@ static int atl_mdo_get_tx_sa_stats(struct macsec_context *ctx)
 		&atl_txsc->tx_sa_stats[ctx->sa.assoc_num];
 	unsigned int sa_idx;
 	int ret;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -1288,8 +1254,6 @@ static int atl_mdo_get_rx_sc_stats(struct macsec_context *ctx)
 	unsigned int sa_idx;
 	int ret = 0;
 	int i;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
@@ -1333,8 +1297,6 @@ static int atl_mdo_get_rx_sa_stats(struct macsec_context *ctx)
 	struct macsec_rx_sa *rx_sa;
 	unsigned int sa_idx;
 	int ret;
-
-	atl_nic_dbg("%s(%s)\n", __func__, ctx->prepare ? "prepare" : "do");
 
 	if (ctx->prepare)
 		return 0;
