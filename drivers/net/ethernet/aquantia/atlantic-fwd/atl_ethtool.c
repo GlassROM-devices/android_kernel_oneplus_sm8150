@@ -2206,8 +2206,10 @@ int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
 	if (idx == ATL_VIDX_NONE) {
 		/* VID not found and no unused filters */
 		vlan->promisc_count++;
-		atl_set_vlan_promisc(&nic->hw, (ndev->flags & IFF_PROMISC) ||
-					        vlan->promisc_count);
+		if (pm_runtime_active(&nic->hw.pdev->dev))
+			atl_set_vlan_promisc(&nic->hw,
+					     (ndev->flags & IFF_PROMISC) ||
+					     vlan->promisc_count);
 		return 0;
 	}
 
@@ -2253,8 +2255,10 @@ int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
 	if (!(idx & ATL_VIDX_FOUND)) {
 		/* VID not present in filters, decrease promisc count */
 		vlan->promisc_count--;
-		atl_set_vlan_promisc(&nic->hw, (ndev->flags & IFF_PROMISC) ||
-					       vlan->promisc_count);
+		if (pm_runtime_active(&nic->hw.pdev->dev))
+			atl_set_vlan_promisc(&nic->hw,
+					     (ndev->flags & IFF_PROMISC) ||
+					     vlan->promisc_count);
 		return 0;
 	}
 

@@ -645,6 +645,9 @@ void atl_set_rx_mode(struct net_device *ndev)
 	int i = 1; /* UC filter 0 reserved for MAC address */
 	struct netdev_hw_addr *hwaddr;
 
+	if (!pm_runtime_active(&nic->hw.pdev->dev))
+		return;
+
 	if (is_multicast_enabled)
 		mc_count = netdev_mc_count(ndev);
 
