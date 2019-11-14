@@ -120,6 +120,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 		desc->daddr = cpu_to_le64(daddr);
 		while (len > ATL_DATA_PER_TXD) {
 			desc->len = cpu_to_le16(ATL_DATA_PER_TXD);
+			trace_atl_tx_descr(ring->qvec->idx, idx, (u64 *)desc);
 			WRITE_ONCE(ring->hw.descs[idx].tx, *desc);
 			bump_ptr(idx, ring, 1);
 			daddr += ATL_DATA_PER_TXD;
@@ -131,6 +132,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 		if (!frags)
 			break;
 
+		trace_atl_tx_descr(ring->qvec->idx, idx, (u64 *)desc);
 		WRITE_ONCE(ring->hw.descs[idx].tx, *desc);
 		bump_ptr(idx, ring, 1);
 		txbuf = &ring->txbufs[idx];
@@ -148,6 +150,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 #if defined(ATL_TX_DESC_WB) || defined(ATL_TX_HEAD_WB)
 	desc->cmd |= tx_desc_cmd_wb;
 #endif
+	trace_atl_tx_descr(ring->qvec->idx, idx, (u64 *)desc);
 	WRITE_ONCE(ring->hw.descs[idx].tx, *desc);
 	first_buf->last = idx;
 	bump_ptr(idx, ring, 1);
@@ -230,6 +233,7 @@ static uint32_t atl_insert_context(struct atl_txbuf *txbuf,
 	if (tx_cmd) {
 		ctx->type = tx_desc_type_context;
 		ctx->idx = 0;
+		trace_atl_tx_context_descr(ring->qvec->idx, ring->tail, (u64 *)ctx);
 		COMMIT_DESC(ring, ring->tail, scratch);
 		bump_tail(ring, 1);
 	}
@@ -1068,6 +1072,8 @@ int atl_clean_rx(struct atl_desc_ring *ring, int budget,
 		if (!wb->dd)
 			break;
 		DESC_RMB();
+
+		trace_atl_rx_descr(ring->qvec->idx, ring->head, (u64 *)wb);
 
 		skb = atl_process_rx_frag(ring, rxbuf, wb);
 
