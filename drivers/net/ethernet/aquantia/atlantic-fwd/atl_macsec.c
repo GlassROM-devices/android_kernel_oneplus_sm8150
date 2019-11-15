@@ -719,15 +719,14 @@ static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
 			   const struct macsec_tx_sa *tx_sa,
 			   const unsigned char *key, unsigned char an)
 {
+	AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = { 0 };
+	AQ_API_SEC_EgressSARecord matchSARecord = { 0 };
+	unsigned int sa_idx = sc_idx | an;
 	int ret = 0;
-	unsigned int sa_idx;
 
 	atl_dev_dbg("set tx_sa %d: active=%d, next_pn=%d\n", an, tx_sa->active,
 		    tx_sa->next_pn);
 
-	sa_idx = sc_idx | an;
-
-	AQ_API_SEC_EgressSARecord matchSARecord = { 0 };
 	matchSARecord.valid = tx_sa->active;
 	matchSARecord.fresh = 1;
 	matchSARecord.next_pn = tx_sa->next_pn;
@@ -741,7 +740,6 @@ static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
 	if (!key)
 		return ret;
 
-	AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = { 0 };
 	memcpy(&matchKeyRecord.key, key, secy->key_len);
 
 	atl_rotate_keys(&matchKeyRecord.key, secy->key_len);

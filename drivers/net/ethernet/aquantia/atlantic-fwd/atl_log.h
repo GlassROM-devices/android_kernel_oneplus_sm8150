@@ -20,7 +20,8 @@
  * struct atl_hw *hw;
  *
  * atl_nic_xxx are for high-level contexts and implicitly reference
- * struct atl_nic *nic; */
+ * struct atl_nic *nic;
+ */
 #define atl_dev_dbg(fmt, args...)			\
 	dev_dbg(&hw->pdev->dev, fmt, ## args)
 #define atl_dev_info(fmt, args...)			\
@@ -45,7 +46,7 @@ do {									\
 		atl_dev_warn(fmt, ## args);				\
 	else								\
 		printk(KERN_WARNING "%s: " fmt, atl_driver_name, ##args); \
-} while(0)
+} while (0)
 
 #define atl_dev_init_err(fmt, args...)					\
 do {									\
@@ -53,7 +54,7 @@ do {									\
 		atl_dev_err(fmt, ## args);				\
 	else								\
 		printk(KERN_ERR "%s: " fmt, atl_driver_name, ##args);	\
-} while(0)
+} while (0)
 
 #else /* __KERNEL__ */
 

@@ -57,36 +57,36 @@ struct atl_macsec_common_stats {
 	} out;
 };
 
-    /* Ingress SA Counters */
+/* Ingress SA Counters */
 struct atl_macsec_rx_sa_stats {
-    uint64_t untagged_hit_pkts;
-    uint64_t ctrl_hit_drop_redir_pkts;
-    uint64_t not_using_sa;
-    uint64_t unused_sa;
-    uint64_t not_valid_pkts;
-    uint64_t invalid_pkts;
-    uint64_t ok_pkts;
-    uint64_t late_pkts;
-    uint64_t delayed_pkts;
-    uint64_t unchecked_pkts;
-    uint64_t validated_octets;
-    uint64_t decrypted_octets;
+	uint64_t untagged_hit_pkts;
+	uint64_t ctrl_hit_drop_redir_pkts;
+	uint64_t not_using_sa;
+	uint64_t unused_sa;
+	uint64_t not_valid_pkts;
+	uint64_t invalid_pkts;
+	uint64_t ok_pkts;
+	uint64_t late_pkts;
+	uint64_t delayed_pkts;
+	uint64_t unchecked_pkts;
+	uint64_t validated_octets;
+	uint64_t decrypted_octets;
 };
 
-    /* Egress SA Counters */
+/* Egress SA Counters */
 struct atl_macsec_tx_sa_stats {
-    uint64_t sa_hit_drop_redirect;
-    uint64_t sa_protected2_pkts;
-    uint64_t sa_protected_pkts;
-    uint64_t sa_encrypted_pkts;
+	uint64_t sa_hit_drop_redirect;
+	uint64_t sa_protected2_pkts;
+	uint64_t sa_protected_pkts;
+	uint64_t sa_encrypted_pkts;
 };
 
-    /* Egress SC Counters */
+/* Egress SC Counters */
 struct atl_macsec_tx_sc_stats {
-    uint64_t sc_protected_pkts;
-    uint64_t sc_encrypted_pkts;
-    uint64_t sc_protected_octets;
-    uint64_t sc_encrypted_octets;
+	uint64_t sc_protected_pkts;
+	uint64_t sc_encrypted_pkts;
+	uint64_t sc_protected_octets;
+	uint64_t sc_encrypted_octets;
 };
 
 struct atl_macsec_txsc {
