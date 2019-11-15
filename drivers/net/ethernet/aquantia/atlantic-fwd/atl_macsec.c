@@ -9,7 +9,7 @@
 
 #include "atl_common.h"
 #ifdef NETIF_F_HW_MACSEC
-#include <net/macsec.h>
+#include "atl_macsec.h"
 #include <linux/rtnetlink.h>
 
 #include "macsec/macsec_api.h"
