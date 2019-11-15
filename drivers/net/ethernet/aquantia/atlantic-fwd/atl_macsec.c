@@ -1511,6 +1511,13 @@ void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 				continue;
 			}
 
+			if (unlikely(!(atl_txsc->tx_sa_idx_busy & BIT(an)))) {
+				netdev_warn(
+					nic->ndev,
+					"PN threshold expired on invalid TX SA");
+				continue;
+			}
+
 			tx_sa = atl_txsc->sw_secy->tx_sc.sa[an];
 
 			spin_lock_bh(&tx_sa->lock);
