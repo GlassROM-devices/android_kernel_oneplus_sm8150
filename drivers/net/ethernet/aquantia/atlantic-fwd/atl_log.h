@@ -14,7 +14,7 @@
 
 #include <linux/device.h>
 
-/* Logging conviniency macros.
+/* Logging conveniency macros.
  *
  * atl_dev_xxx are for low-level contexts and implicitly reference
  * struct atl_hw *hw;
@@ -50,7 +50,7 @@ do {									\
 #define atl_dev_init_err(fmt, args...)					\
 do {									\
 	if (hw)								\
-		atl_dev_warn(fmt, ## args);				\
+		atl_dev_err(fmt, ## args);				\
 	else								\
 		printk(KERN_ERR "%s: " fmt, atl_driver_name, ##args);	\
 } while(0)
