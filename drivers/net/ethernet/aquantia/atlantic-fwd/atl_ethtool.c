@@ -11,6 +11,7 @@
 #include <linux/pm_runtime.h>
 
 #include "atl_common.h"
+#include "atl_mdio.h"
 #include "atl_ring.h"
 #include "atl_fwdnl.h"
 

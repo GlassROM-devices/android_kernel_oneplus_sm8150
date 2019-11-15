@@ -383,16 +383,6 @@ static inline int atl_fwd_suspend_rings(struct atl_nic *nic) { return 0; }
 static inline int atl_fwd_resume_rings(struct atl_nic *nic) { return 0; }
 #endif
 int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay);
-int atl_mdio_hwsem_get(struct atl_hw *hw);
-void atl_mdio_hwsem_put(struct atl_hw *hw);
-int __atl_mdio_read(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
-	uint16_t addr, uint16_t *val);
-int atl_mdio_read(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
-	uint16_t addr, uint16_t *val);
-int __atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
-	uint16_t addr, uint16_t val);
-int atl_mdio_write(struct atl_hw *hw, uint8_t prtad, uint8_t mmd,
-	uint16_t addr, uint16_t val);
 void atl_refresh_rxfs(struct atl_nic *nic);
 void atl_schedule_work(struct atl_nic *nic);
 int atl_hwmon_init(struct atl_nic *nic);

@@ -2,6 +2,7 @@
 #include "macsec_api.h"
 #include "MSS_Ingress_registers.h"
 #include "MSS_Egress_registers.h"
+#include "atl_mdio.h"
 
 #define MMD_GLOBAL 0x1E
 
