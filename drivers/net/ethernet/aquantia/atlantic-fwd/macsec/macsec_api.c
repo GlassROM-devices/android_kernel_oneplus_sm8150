@@ -1773,10 +1773,18 @@ int AQ_API_ClearIngressCounters(struct atl_hw *hw)
 int AQ_API_GetEgressSAExpired(struct atl_hw *hw, uint32_t *expired)
 {
   uint16_t val;
+  int ret;
 
-  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR, &val);
+  ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR, &val);
+  if (unlikely(ret))
+    return ret;
+
   *expired = val;
-  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR + 1, &val);
+
+  ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaExpiredStatusRegister_ADDR + 1, &val);
+  if (unlikely(ret))
+    return ret;
+
   *expired |= val << 16;
 
   return 0;

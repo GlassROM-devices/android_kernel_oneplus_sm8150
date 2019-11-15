@@ -1484,11 +1484,15 @@ void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 	enum atl_macsec_sc_sa sc_sa;
 	struct macsec_tx_sa *tx_sa;
 	unsigned char an = 0;
+	int ret;
 	int i;
 
 	sc_sa = hw->macsec_cfg.sc_sa;
 
-	AQ_API_GetEgressSAExpired(hw, &egress_sa_expired);
+	ret = AQ_API_GetEgressSAExpired(hw, &egress_sa_expired);
+	if (unlikely(ret))
+		return;
+
 	AQ_API_GetEgressSAThresholdExpired(hw, &egress_sa_threshold_expired);
 
 	for (i = 0; i < ATL_MACSEC_MAX_SA; i++) {
