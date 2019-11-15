@@ -661,7 +661,8 @@ void atl_set_rx_mode(struct net_device *ndev)
 	 * requested or too many VIDs registered
 	 */
 	atl_set_vlan_promisc(hw,
-		ndev->flags & IFF_PROMISC || nic->rxf_vlan.promisc_count);
+		ndev->flags & IFF_PROMISC || nic->rxf_vlan.promisc_count ||
+		!nic->rxf_vlan.vlans_active);
 
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, promisc_needed);
 	if (promisc_needed)

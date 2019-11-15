@@ -1968,7 +1968,8 @@ static void atl_refresh_rxf_desc(struct atl_nic *nic,
 		desc->update_rxf(nic, idx);
 
 	atl_set_vlan_promisc(&nic->hw, (nic->ndev->flags & IFF_PROMISC) ||
-				       nic->rxf_vlan.promisc_count);
+				       nic->rxf_vlan.promisc_count ||
+				       !nic->rxf_vlan.vlans_active);
 }
 
 void atl_refresh_rxfs(struct atl_nic *nic)
@@ -1979,7 +1980,8 @@ void atl_refresh_rxfs(struct atl_nic *nic)
 		atl_refresh_rxf_desc(nic, desc);
 
 	atl_set_vlan_promisc(&nic->hw, (nic->ndev->flags & IFF_PROMISC) ||
-				       nic->rxf_vlan.promisc_count);
+				       nic->rxf_vlan.promisc_count ||
+				       !nic->rxf_vlan.vlans_active);
 }
 
 static bool atl_vlan_pull_from_promisc(struct atl_nic *nic, uint32_t idx)
@@ -2020,7 +2022,8 @@ static bool atl_vlan_pull_from_promisc(struct atl_nic *nic, uint32_t idx)
 
 	kfree(map);
 	atl_set_vlan_promisc(&nic->hw, (nic->ndev->flags & IFF_PROMISC) ||
-				       vlan->promisc_count);
+				       vlan->promisc_count ||
+				       !vlan->vlans_active);
 	return true;
 }
 
@@ -2209,7 +2212,8 @@ int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
 		if (pm_runtime_active(&nic->hw.pdev->dev))
 			atl_set_vlan_promisc(&nic->hw,
 					     (ndev->flags & IFF_PROMISC) ||
-					     vlan->promisc_count);
+					     vlan->promisc_count ||
+					     !vlan->vlans_active);
 		return 0;
 	}
 
@@ -2218,8 +2222,7 @@ int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
 		idx &= ATL_VIDX_MASK;
 		vlan->cmd[idx] = ATL_VLAN_EN | ATL_RXF_ACT_TOHOST | vid;
 		vlan->count++;
-		atl_rxf_update_vlan(nic, idx);
-		return 0;
+		goto update_vlan;
 	}
 
 	idx &= ATL_VIDX_MASK;
@@ -2232,7 +2235,14 @@ int atl_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
 		__func__, vid, idx);
 
 	vlan->cmd[idx] = ATL_RXF_EN | ATL_RXF_ACT_TOHOST | vid;
+
+update_vlan:
 	atl_rxf_update_vlan(nic, idx);
+	if (pm_runtime_active(&nic->hw.pdev->dev))
+		atl_set_vlan_promisc(&nic->hw,
+				     (nic->ndev->flags & IFF_PROMISC) ||
+				     vlan->promisc_count ||
+				     !vlan->vlans_active);
 	return 0;
 }
 
@@ -2255,11 +2265,7 @@ int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
 	if (!(idx & ATL_VIDX_FOUND)) {
 		/* VID not present in filters, decrease promisc count */
 		vlan->promisc_count--;
-		if (pm_runtime_active(&nic->hw.pdev->dev))
-			atl_set_vlan_promisc(&nic->hw,
-					     (ndev->flags & IFF_PROMISC) ||
-					     vlan->promisc_count);
-		return 0;
+		goto update_vlan_promisc;
 	}
 
 	idx &= ATL_VIDX_MASK;
@@ -2275,6 +2281,11 @@ int atl_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
 	if (!atl_vlan_pull_from_promisc(nic, idx))
 		atl_rxf_update_vlan(nic, idx);
 
+update_vlan_promisc:
+	if (pm_runtime_active(&nic->hw.pdev->dev))
+		atl_set_vlan_promisc(&nic->hw, (ndev->flags & IFF_PROMISC) ||
+				     vlan->promisc_count ||
+				     !vlan->vlans_active);
 	return 0;
 }
 
