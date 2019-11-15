@@ -1793,10 +1793,18 @@ int AQ_API_GetEgressSAExpired(struct atl_hw *hw, uint32_t *expired)
 int AQ_API_GetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t *expired)
 {
   uint16_t val;
+  int ret;
 
-  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR, &val);
+  ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR, &val);
+  if (unlikely(ret))
+    return ret;
+
   *expired = val;
-  atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR + 1, &val);
+
+  ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressSaThresholdExpiredStatusRegister_ADDR + 1, &val);
+  if (unlikely(ret))
+    return ret;
+
   *expired |= val << 16;
 
   return 0;
