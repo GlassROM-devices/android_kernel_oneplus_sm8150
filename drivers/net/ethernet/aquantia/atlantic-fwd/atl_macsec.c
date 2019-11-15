@@ -1493,7 +1493,8 @@ void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 	if (unlikely(ret))
 		return;
 
-	ret = AQ_API_GetEgressSAThresholdExpired(hw, &egress_sa_threshold_expired);
+	ret = AQ_API_GetEgressSAThresholdExpired(hw,
+						 &egress_sa_threshold_expired);
 
 	for (i = 0; i < ATL_MACSEC_MAX_SA; i++) {
 		if (egress_sa_expired & BIT(i)) {
@@ -1535,7 +1536,8 @@ void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 
 	AQ_API_SetEgressSAExpired(hw, egress_sa_expired);
 	if (ret)
-		AQ_API_SetEgressSAThresholdExpired(hw, egress_sa_threshold_expired);
+		AQ_API_SetEgressSAThresholdExpired(hw,
+						   egress_sa_threshold_expired);
 }
 
 void atl_macsec_work(struct atl_nic *nic)
