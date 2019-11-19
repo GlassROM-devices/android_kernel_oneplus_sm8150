@@ -66,6 +66,7 @@ int GetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t* packedRecVal, uint8_t
 {
     struct mssIngressLutAddressControlRegister_t tableSelReg;
     struct mssIngressLutControlRegister_t readWriteReg;
+    int ret;
 
     unsigned int i;
 
@@ -101,8 +102,12 @@ int GetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t* packedRecVal, uint8_t
     /* Read the data buffer registers into the packed record words. */
     for (i = 0; i < numWords; i += 2)
     {
-        atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressLutDataControlRegister_ADDR + i, &packedRecVal[i]);
-        atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressLutDataControlRegister_ADDR + i + 1, &packedRecVal[i + 1]);
+        ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressLutDataControlRegister_ADDR + i, &packedRecVal[i]);
+        if (unlikely(ret))
+            return ret;
+        ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressLutDataControlRegister_ADDR + i + 1, &packedRecVal[i + 1]);
+        if (unlikely(ret))
+            return ret;
     }
 
     return 0;
@@ -169,6 +174,7 @@ int GetRawSECEgressRecordVal(struct atl_hw *hw, uint16_t* packedRecVal, uint8_t 
 {
     struct mssEgressLutAddressControlRegister_t tableSelReg;
     struct mssEgressLutControlRegister_t readWriteReg;
+    int ret;
 
     unsigned int i;
 
@@ -208,8 +214,12 @@ int GetRawSECEgressRecordVal(struct atl_hw *hw, uint16_t* packedRecVal, uint8_t 
     /* Read the data buffer registers into the packed record words. */
     for (i = 0; i < numWords; i += 2)
     {
-        atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressLutDataControlRegister_ADDR + i, &packedRecVal[i]);
-        atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressLutDataControlRegister_ADDR + i + 1, &packedRecVal[i + 1]);
+        ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressLutDataControlRegister_ADDR + i, &packedRecVal[i]);
+        if (unlikely(ret))
+            return ret;
+        ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressLutDataControlRegister_ADDR + i + 1, &packedRecVal[i + 1]);
+        if (unlikely(ret))
+            return ret;
     }
 
     return 0;
@@ -240,6 +250,7 @@ int AQ_API_SetIngressPreCTLFRecord(struct atl_hw *hw, const AQ_API_SEC_IngressPr
 int AQ_API_GetIngressPreCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreCTLFRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[6];
+    int ret;
 
     if (tableIndex >= NUMROWS_INGRESSPRECTLFRECORD)
         return -EINVAL;
@@ -251,12 +262,16 @@ int AQ_API_GetIngressPreCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreCTLFR
        * so don't bother; odd-numbered rows are not readable. */
     if ((tableIndex % 2) > 0)
     {
-        GetRawSECIngressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_INGRESSPRECTLFRECORD + tableIndex - 1);
+        ret = GetRawSECIngressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_INGRESSPRECTLFRECORD + tableIndex - 1);
+        if (unlikely(ret))
+            return ret;
     }
 
     memset(rec, 0, sizeof(AQ_API_SEC_IngressPreCTLFRecord));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_INGRESSPRECTLFRECORD + tableIndex);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_INGRESSPRECTLFRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->sa_da[0] = (rec->sa_da[0] & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->sa_da[0] = (rec->sa_da[0] & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -360,6 +375,7 @@ int AQ_API_SetIngressPreClassRecord(struct atl_hw *hw, const AQ_API_SEC_IngressP
 int AQ_API_GetIngressPreClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreClassRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[20];
+    int ret;
 
     if (tableIndex >= NUMROWS_INGRESSPRECLASSRECORD)
         return -EINVAL;
@@ -371,13 +387,17 @@ int AQ_API_GetIngressPreClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreClas
        * so don't bother; odd-numbered rows are not readable. */
     if ((tableIndex % 2) > 0)
     {
-        GetRawSECIngressRecordVal(hw, packedRecVal, 20, 1, 
-            ROWOFFSET_INGRESSPRECLASSRECORD + tableIndex - 1);
+        ret = GetRawSECIngressRecordVal(hw, packedRecVal, 20, 1, 
+                  ROWOFFSET_INGRESSPRECLASSRECORD + tableIndex - 1);
+        if (unlikely(ret))
+            return ret;
     }
 
     memset(rec, 0, sizeof(AQ_API_SEC_IngressPreClassRecord));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 20, 1, ROWOFFSET_INGRESSPRECLASSRECORD + tableIndex);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 20, 1, ROWOFFSET_INGRESSPRECLASSRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->sci[0] = (rec->sci[0] & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->sci[0] = (rec->sci[0] & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -494,13 +514,16 @@ int AQ_API_SetIngressSCRecord(struct atl_hw *hw, const AQ_API_SEC_IngressSCRecor
 int AQ_API_GetIngressSCRecord(struct atl_hw *hw, AQ_API_SEC_IngressSCRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[8];
+    int ret;
 
     if (tableIndex >= NUMROWS_INGRESSSCRECORD)
         return -EINVAL;
 
     memset(rec, 0, sizeof(AQ_API_SEC_IngressSCRecord));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 8, 3, ROWOFFSET_INGRESSSCRECORD + tableIndex);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 8, 3, ROWOFFSET_INGRESSSCRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->stop_time = (rec->stop_time & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->stop_time = (rec->stop_time & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -567,13 +590,16 @@ int AQ_API_SetIngressSARecord(struct atl_hw *hw, const AQ_API_SEC_IngressSARecor
 int AQ_API_GetIngressSARecord(struct atl_hw *hw, AQ_API_SEC_IngressSARecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[8];
+    int ret;
 
     if (tableIndex >= NUMROWS_INGRESSSARECORD)
         return -EINVAL;
 
     memset(rec, 0, sizeof(AQ_API_SEC_IngressSARecord));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 8, 3, ROWOFFSET_INGRESSSARECORD + tableIndex);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 8, 3, ROWOFFSET_INGRESSSARECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->stop_time = (rec->stop_time & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->stop_time = (rec->stop_time & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -641,13 +667,16 @@ int AQ_API_SetIngressSAKeyRecord(struct atl_hw *hw, const AQ_API_SEC_IngressSAKe
 int AQ_API_GetIngressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_IngressSAKeyRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[18];
+    int ret;
 
     if (tableIndex >= NUMROWS_INGRESSSAKEYRECORD)
         return -EINVAL;
 
     memset(rec, 0, sizeof(AQ_API_SEC_IngressSAKeyRecord));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 18, 2, ROWOFFSET_INGRESSSAKEYRECORD + tableIndex);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 18, 2, ROWOFFSET_INGRESSSAKEYRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->key[0] = (rec->key[0] & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->key[0] = (rec->key[0] & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -758,6 +787,7 @@ int AQ_API_SetIngressPostClassRecord(struct atl_hw *hw, const AQ_API_SEC_Ingress
 int AQ_API_GetIngressPostClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostClassRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[8];
+    int ret;
 
     if (tableIndex >= NUMROWS_INGRESSPOSTCLASSRECORD)
         return -EINVAL;
@@ -769,12 +799,16 @@ int AQ_API_GetIngressPostClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCl
        * so don't bother; odd-numbered rows are not readable. */
     if ((tableIndex % 2) > 0)
     {
-        GetRawSECIngressRecordVal(hw, packedRecVal, 8, 4, ROWOFFSET_INGRESSPOSTCLASSRECORD + tableIndex - 1);
+        ret = GetRawSECIngressRecordVal(hw, packedRecVal, 8, 4, ROWOFFSET_INGRESSPOSTCLASSRECORD + tableIndex - 1);
+        if (unlikely(ret))
+            return ret;
     }
 
     memset(rec, 0, sizeof(AQ_API_SEC_IngressPostClassRecord));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 8, 4, ROWOFFSET_INGRESSPOSTCLASSRECORD + tableIndex);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 8, 4, ROWOFFSET_INGRESSPOSTCLASSRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->byte0 = (rec->byte0 & 0xFFFFFF00) | (((packedRecVal[0] >> 0) & 0xFF) << 0);
 
@@ -873,6 +907,7 @@ int AQ_API_SetIngressPostCTLFRecord(struct atl_hw *hw, const AQ_API_SEC_IngressP
 int AQ_API_GetIngressPostCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCTLFRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[6];
+    int ret;
 
     if (tableIndex >= NUMROWS_INGRESSPOSTCTLFRECORD)
         return -EINVAL;
@@ -884,12 +919,16 @@ int AQ_API_GetIngressPostCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCTL
        * so don't bother; odd-numbered rows are not readable. */
     if ((tableIndex % 2) > 0)
     {
-        GetRawSECIngressRecordVal(hw, packedRecVal, 6, 5, ROWOFFSET_INGRESSPOSTCTLFRECORD + tableIndex - 1);
+        ret = GetRawSECIngressRecordVal(hw, packedRecVal, 6, 5, ROWOFFSET_INGRESSPOSTCTLFRECORD + tableIndex - 1);
+        if (unlikely(ret))
+            return ret;
     }
 
     memset(rec, 0, sizeof(AQ_API_SEC_IngressPostCTLFRecord));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 6, 5, ROWOFFSET_INGRESSPOSTCTLFRECORD + tableIndex);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 6, 5, ROWOFFSET_INGRESSPOSTCTLFRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->sa_da[0] = (rec->sa_da[0] & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->sa_da[0] = (rec->sa_da[0] & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -937,6 +976,7 @@ int AQ_API_SetEgressCTLFRecord(struct atl_hw *hw, const AQ_API_SEC_EgressCTLFRec
 int AQ_API_GetEgressCTLFRecord(struct atl_hw *hw, AQ_API_SEC_EgressCTLFRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[6];
+    int ret;
 
     if (tableIndex >= NUMROWS_EGRESSCTLFRECORD)
         return -EINVAL;
@@ -948,12 +988,16 @@ int AQ_API_GetEgressCTLFRecord(struct atl_hw *hw, AQ_API_SEC_EgressCTLFRecord* r
        * so don't bother; odd-numbered rows are not readable. */
     if ((tableIndex % 2) > 0)
     {
-        GetRawSECEgressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_EGRESSCTLFRECORD + tableIndex - 1);
+        ret = GetRawSECEgressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_EGRESSCTLFRECORD + tableIndex - 1);
+        if (unlikely(ret))
+            return ret;
     }
 
     memset(rec, 0, sizeof(AQ_API_SEC_EgressCTLFRecord));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_EGRESSCTLFRECORD + tableIndex);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_EGRESSCTLFRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->sa_da[0] = (rec->sa_da[0] & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->sa_da[0] = (rec->sa_da[0] & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -1102,6 +1146,7 @@ int AQ_API_SetEgressClassRecord(struct atl_hw *hw, const AQ_API_SEC_EgressClassR
 int AQ_API_GetEgressClassRecord(struct atl_hw *hw, AQ_API_SEC_EgressClassRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[28];
+    int ret;
 
     if (tableIndex >= NUMROWS_EGRESSCLASSRECORD)
         return -EINVAL;
@@ -1112,12 +1157,16 @@ int AQ_API_GetEgressClassRecord(struct atl_hw *hw, AQ_API_SEC_EgressClassRecord*
        * odd-numbered rows.  For HHD devices: this workaround will not work, 
        * so don't bother; odd-numbered rows are not readable. */
     if ((tableIndex % 2) > 0) {
-        GetRawSECEgressRecordVal(hw, packedRecVal, 28, 1, ROWOFFSET_EGRESSCLASSRECORD + tableIndex - 1);
+        ret = GetRawSECEgressRecordVal(hw, packedRecVal, 28, 1, ROWOFFSET_EGRESSCLASSRECORD + tableIndex - 1);
+        if (unlikely(ret))
+            return ret;
     }
 
     memset(rec, 0, sizeof(AQ_API_SEC_EgressClassRecord));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 28, 1, ROWOFFSET_EGRESSCLASSRECORD + tableIndex);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 28, 1, ROWOFFSET_EGRESSCLASSRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->vlan_id = (rec->vlan_id & 0xFFFFF000) | (((packedRecVal[0] >> 0) & 0xFFF) << 0);
 
@@ -1278,13 +1327,16 @@ int AQ_API_SetEgressSCRecord(struct atl_hw *hw, const AQ_API_SEC_EgressSCRecord*
 int AQ_API_GetEgressSCRecord(struct atl_hw *hw, AQ_API_SEC_EgressSCRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[8];
+    int ret;
 
     if (tableIndex >= NUMROWS_EGRESSSCRECORD)
         return -EINVAL;
 
     memset(rec, 0, sizeof(AQ_API_SEC_EgressSCRecord));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSCRECORD + tableIndex);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSCRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->start_time = (rec->start_time & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->start_time = (rec->start_time & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -1346,13 +1398,16 @@ int AQ_API_SetEgressSARecord(struct atl_hw *hw, const AQ_API_SEC_EgressSARecord*
 int AQ_API_GetEgressSARecord(struct atl_hw *hw, AQ_API_SEC_EgressSARecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[8];
+    int ret;
 
     if (tableIndex >= NUMROWS_EGRESSSARECORD)
         return -EINVAL;
 
     memset(rec, 0, sizeof(AQ_API_SEC_EgressSARecord));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSARECORD + tableIndex);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSARECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
 
     rec->start_time = (rec->start_time & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->start_time = (rec->start_time & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -1414,14 +1469,19 @@ int AQ_API_SetEgressSAKeyRecord(struct atl_hw *hw, const AQ_API_SEC_EgressSAKeyR
 int AQ_API_GetEgressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_EgressSAKeyRecord* rec, uint16_t tableIndex)
 {
     uint16_t packedRecVal[16];
+    int ret;
 
     if (tableIndex >= NUMROWS_EGRESSSAKEYRECORD)
         return -EINVAL;
 
     memset(rec, 0, sizeof(AQ_API_SEC_EgressSAKeyRecord));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSAKEYRECORD + tableIndex);
-    GetRawSECEgressRecordVal(hw, packedRecVal + 8, 8, 2, ROWOFFSET_EGRESSSAKEYRECORD + tableIndex - 32);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSAKEYRECORD + tableIndex);
+    if (unlikely(ret))
+        return ret;
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal + 8, 8, 2, ROWOFFSET_EGRESSSAKEYRECORD + tableIndex - 32);
+    if (unlikely(ret))
+        return ret;
 
     rec->key[0] = (rec->key[0] & 0xFFFF0000) | (((packedRecVal[0] >> 0) & 0xFFFF) << 0);
     rec->key[0] = (rec->key[0] & 0x0000FFFF) | (((packedRecVal[1] >> 0) & 0xFFFF) << 16);
@@ -1453,25 +1513,34 @@ int AQ_API_GetEgressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_EgressSAKeyRecord*
 int AQ_API_GetEgressSCCounters(struct atl_hw *hw, AQ_API_SEC_EgressSCCounters* counters, uint16_t SCIndex)
 {
     uint16_t packedRecVal[4];
+    int ret;
 
     if (SCIndex >= NUMROWS_EGRESSSCRECORD)
         return -EINVAL;
 
     memset(counters, 0, sizeof(AQ_API_SEC_EgressSCCounters));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 4);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 4);
+    if (unlikely(ret))
+        return ret;
     counters->sc_protected_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sc_protected_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 5);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 5);
+    if (unlikely(ret))
+        return ret;
     counters->sc_encrypted_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sc_encrypted_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 6);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 6);
+    if (unlikely(ret))
+        return ret;
     counters->sc_protected_octets[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sc_protected_octets[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 7);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 7);
+    if (unlikely(ret))
+        return ret;
     counters->sc_encrypted_octets[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sc_encrypted_octets[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
@@ -1481,25 +1550,34 @@ int AQ_API_GetEgressSCCounters(struct atl_hw *hw, AQ_API_SEC_EgressSCCounters* c
 int AQ_API_GetEgressSACounters(struct atl_hw *hw, AQ_API_SEC_EgressSACounters* counters, uint16_t SAIndex)
 {
     uint16_t packedRecVal[4];
+    int ret;
 
     if (SAIndex >= NUMROWS_EGRESSSARECORD)
         return -EINVAL;
 
     memset(counters, 0, sizeof(AQ_API_SEC_EgressSACounters));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 0);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 0);
+    if (unlikely(ret))
+        return ret;
     counters->sa_hit_drop_redirect[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sa_hit_drop_redirect[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 1);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 1);
+    if (unlikely(ret))
+        return ret;
     counters->sa_protected2_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sa_protected2_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 2);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 2);
+    if (unlikely(ret))
+        return ret;
     counters->sa_protected_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sa_protected_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 3);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 3);
+    if (unlikely(ret))
+        return ret;
     counters->sa_encrypted_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->sa_encrypted_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
@@ -1509,30 +1587,43 @@ int AQ_API_GetEgressSACounters(struct atl_hw *hw, AQ_API_SEC_EgressSACounters* c
 int AQ_API_GetEgressCommonCounters(struct atl_hw *hw, AQ_API_SEC_EgressCommonCounters* counters)
 {
     uint16_t packedRecVal[4];
+    int ret;
 
     memset(counters, 0, sizeof(AQ_API_SEC_EgressCommonCounters));
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 0);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 0);
+    if (unlikely(ret))
+        return ret;
     counters->ctl_pkt[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ctl_pkt[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 1);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 1);
+    if (unlikely(ret))
+        return ret;
     counters->unknown_sa_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unknown_sa_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 2);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 2);
+    if (unlikely(ret))
+        return ret;
     counters->untagged_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->untagged_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 3);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 3);
+    if (unlikely(ret))
+        return ret;
     counters->too_long[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->too_long[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 4);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 4);
+    if (unlikely(ret))
+        return ret;
     counters->ecc_error_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ecc_error_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 5);
+    ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 5);
+    if (unlikely(ret))
+        return ret;
     counters->unctrl_hit_drop_redir[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unctrl_hit_drop_redir[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
@@ -1542,6 +1633,7 @@ int AQ_API_GetEgressCommonCounters(struct atl_hw *hw, AQ_API_SEC_EgressCommonCou
 int AQ_API_ClearEgressCounters(struct atl_hw *hw)
 {
     struct mssEgressControlRegister_t controlReg;
+    int ret;
 
     memset(&controlReg, 0, sizeof(struct mssEgressControlRegister_t));
 
@@ -1556,9 +1648,13 @@ int AQ_API_ClearEgressCounters(struct atl_hw *hw)
   /* Toggle the Egress MIB clear bit 0->1->0 */
 
     /*Read register (EUR/CAL: 1E.5002) */
-    atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR, &controlReg.word_0);
+    ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR, &controlReg.word_0);
+    if (unlikely(ret))
+        return ret;
     /*Read register (EUR/CAL: 1E.5002 + 1) */
-    atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR + 4, &controlReg.word_1);
+    ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR + 4, &controlReg.word_1);
+    if (unlikely(ret))
+        return ret;
 
     /*Assign to local representation of bitfield (EUR/CAL: 1E.5002.B) */
     controlReg.bits_0.mssEgressClearCounter = 0;
@@ -1593,57 +1689,82 @@ int AQ_API_ClearEgressCounters(struct atl_hw *hw)
 int AQ_API_GetIngressSACounters(struct atl_hw *hw, AQ_API_SEC_IngressSACounters* counters, uint16_t SAIndex)
 {
     uint16_t packedRecVal[4];
+    int ret;
 
     if (SAIndex >= NUMROWS_INGRESSSARECORD)
         return -EINVAL;
 
     memset(counters, 0, sizeof(AQ_API_SEC_IngressSACounters));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 0);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 0);
+    if (unlikely(ret))
+        return ret;
     counters->untagged_hit_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->untagged_hit_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 1);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 1);
+    if (unlikely(ret))
+        return ret;
     counters->ctrl_hit_drop_redir_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ctrl_hit_drop_redir_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 2);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 2);
+    if (unlikely(ret))
+        return ret;
     counters->not_using_sa[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->not_using_sa[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 3);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 3);
+    if (unlikely(ret))
+        return ret;
     counters->unused_sa[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unused_sa[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 4);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 4);
+    if (unlikely(ret))
+        return ret;
     counters->not_valid_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->not_valid_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 5);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 5);
+    if (unlikely(ret))
+        return ret;
     counters->invalid_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->invalid_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 6);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 6);
+    if (unlikely(ret))
+        return ret;
     counters->ok_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ok_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 7);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 7);
+    if (unlikely(ret))
+        return ret;
     counters->late_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->late_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 8);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 8);
+    if (unlikely(ret))
+        return ret;
     counters->delayed_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->delayed_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 9);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 9);
+    if (unlikely(ret))
+        return ret;
     counters->unchecked_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unchecked_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 10);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 10);
+    if (unlikely(ret))
+        return ret;
     counters->validated_octets[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->validated_octets[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 11);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 11);
+    if (unlikely(ret))
+        return ret;
     counters->decrypted_octets[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->decrypted_octets[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
@@ -1653,70 +1774,103 @@ int AQ_API_GetIngressSACounters(struct atl_hw *hw, AQ_API_SEC_IngressSACounters*
 int AQ_API_GetIngressCommonCounters(struct atl_hw *hw, AQ_API_SEC_IngressCommonCounters* counters)
 {
     uint16_t packedRecVal[4];
+    int ret;
 
     memset(counters, 0, sizeof(AQ_API_SEC_IngressCommonCounters));
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 0);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 0);
+    if (unlikely(ret))
+        return ret;
     counters->ctl_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ctl_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 1);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 1);
+    if (unlikely(ret))
+        return ret;
     counters->tagged_miss_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->tagged_miss_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 2);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 2);
+    if (unlikely(ret))
+        return ret;
     counters->untagged_miss_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->untagged_miss_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 3);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 3);
+    if (unlikely(ret))
+        return ret;
     counters->notag_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->notag_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 4);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 4);
+    if (unlikely(ret))
+        return ret;
     counters->untagged_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->untagged_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 5);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 5);
+    if (unlikely(ret))
+        return ret;
     counters->bad_tag_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->bad_tag_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 6);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 6);
+    if (unlikely(ret))
+        return ret;
     counters->no_sci_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->no_sci_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 7);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 7);
+    if (unlikely(ret))
+        return ret;
     counters->unknown_sci_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unknown_sci_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 8);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 8);
+    if (unlikely(ret))
+        return ret;
     counters->ctrl_prt_pass_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ctrl_prt_pass_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 9);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 9);
+    if (unlikely(ret))
+        return ret;
     counters->unctrl_prt_pass_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unctrl_prt_pass_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 10);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 10);
+    if (unlikely(ret))
+        return ret;
     counters->ctrl_prt_fail_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ctrl_prt_fail_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 11);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 11);
+    if (unlikely(ret))
+        return ret;
     counters->unctrl_prt_fail_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unctrl_prt_fail_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 12);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 12);
+    if (unlikely(ret))
+        return ret;
     counters->too_long_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->too_long_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 13);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 13);
+    if (unlikely(ret))
+        return ret;
     counters->igpoc_ctl_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->igpoc_ctl_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 14);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 14);
+    if (unlikely(ret))
+        return ret;
     counters->ecc_error_pkts[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->ecc_error_pkts[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
-    GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 15);
+    ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 15);
+    if (unlikely(ret))
+        return ret;
     counters->unctrl_hit_drop_redir[0] = packedRecVal[0] | (packedRecVal[1] << 16);
     counters->unctrl_hit_drop_redir[1] = packedRecVal[2] | (packedRecVal[3] << 16);
 
@@ -1726,6 +1880,7 @@ int AQ_API_GetIngressCommonCounters(struct atl_hw *hw, AQ_API_SEC_IngressCommonC
 int AQ_API_ClearIngressCounters(struct atl_hw *hw)
 {
     struct mssIngressControlRegister_t controlReg;
+    int ret;
 
     memset(&controlReg, 0, sizeof(struct mssIngressControlRegister_t));
 
@@ -1739,9 +1894,13 @@ int AQ_API_ClearIngressCounters(struct atl_hw *hw)
 
     /* Toggle the Ingress MIB clear bit 0->1->0 */
     /*Read register (EUR/CAL: 1E.800E) */
-    atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressControlRegister_ADDR, &controlReg.word_0);
+    ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressControlRegister_ADDR, &controlReg.word_0);
+    if (unlikely(ret))
+        return ret;
     /*Read register (EUR/CAL: 1E.800E + 1) */
-    atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressControlRegister_ADDR +4, &controlReg.word_1);
+    ret = atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressControlRegister_ADDR +4, &controlReg.word_1);
+    if (unlikely(ret))
+        return ret;
 
     /*Assign to local representation of bitfield (EUR/CAL: 1E.800E.8) */
 

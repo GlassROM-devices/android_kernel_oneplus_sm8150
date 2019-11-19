@@ -135,9 +135,12 @@ static int atl_macsec_get_common_stats(struct atl_hw *hw,
 {
 	AQ_API_SEC_EgressCommonCounters egress_counters;
 	AQ_API_SEC_IngressCommonCounters ingress_counters;
+	int ret;
 
 	/* MACSEC counters */
-	AQ_API_GetIngressCommonCounters(hw, &ingress_counters);
+	ret = AQ_API_GetIngressCommonCounters(hw, &ingress_counters);
+	if (unlikely(ret))
+		return ret;
 
 	stats->in.ctl_pkts = STATS_2x32_TO_64(ingress_counters.ctl_pkts);
 	stats->in.tagged_miss_pkts =
@@ -169,7 +172,9 @@ static int atl_macsec_get_common_stats(struct atl_hw *hw,
 	stats->in.unctrl_hit_drop_redir =
 		STATS_2x32_TO_64(ingress_counters.unctrl_hit_drop_redir);
 
-	AQ_API_GetEgressCommonCounters(hw, &egress_counters);
+	ret = AQ_API_GetEgressCommonCounters(hw, &egress_counters);
+	if (unlikely(ret))
+		return ret;
 	stats->out.ctl_pkts = STATS_2x32_TO_64(egress_counters.ctl_pkt);
 	stats->out.unknown_sa_pkts =
 		STATS_2x32_TO_64(egress_counters.unknown_sa_pkts);
@@ -191,7 +196,7 @@ static int atl_macsec_get_rx_sa_stats(struct atl_hw *hw, int sa_idx,
 	int ret;
 
 	ret = AQ_API_GetIngressSACounters(hw, &i_sa_counters, sa_idx);
-	if (ret)
+	if (unlikely(ret))
 		return ret;
 
 	stats->untagged_hit_pkts =
@@ -221,7 +226,7 @@ static int atl_macsec_get_tx_sa_stats(struct atl_hw *hw, int sa_idx,
 	int ret;
 
 	ret = AQ_API_GetEgressSACounters(hw, &e_sa_counters, sa_idx);
-	if (ret)
+	if (unlikely(ret))
 		return ret;
 
 	stats->sa_hit_drop_redirect =
@@ -242,7 +247,7 @@ static int atl_macsec_get_tx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 	int ret;
 
 	ret = AQ_API_GetEgressSARecord(hw, &matchSARecord, sa_idx);
-	if (!ret)
+	if (likely(!ret))
 		*pn = matchSARecord.next_pn;
 
 	return ret;
@@ -254,7 +259,7 @@ static int atl_macsec_get_rx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 	int ret;
 
 	ret = AQ_API_GetIngressSARecord(hw, &matchSARecord, sa_idx);
-	if (!ret)
+	if (likely(!ret))
 		*pn = (!matchSARecord.sat_nextpn) ? matchSARecord.next_pn : 0;
 
 	return ret;
@@ -267,7 +272,7 @@ static int atl_macsec_get_tx_sc_stats(struct atl_hw *hw, int sc_idx,
 	int ret;
 
 	ret = AQ_API_GetEgressSCCounters(hw, &e_sc_counters, sc_idx);
-	if (ret)
+	if (unlikely(ret))
 		return ret;
 
 	stats->sc_protected_pkts =
@@ -1535,7 +1540,7 @@ void atl_macsec_check_txsa_expiration(struct atl_nic *nic)
 	}
 
 	AQ_API_SetEgressSAExpired(hw, egress_sa_expired);
-	if (ret)
+	if (likely(!ret))
 		AQ_API_SetEgressSAThresholdExpired(hw,
 						   egress_sa_threshold_expired);
 }
