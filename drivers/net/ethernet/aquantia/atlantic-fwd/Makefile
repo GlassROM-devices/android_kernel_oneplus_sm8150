@@ -43,4 +43,4 @@ atlantic-fwd-$(CONFIG_ATLFWD_FWD_NETLINK) += atl_fwdnl.o \
 					      atl_fwdnl_params.o
 atlantic-fwd-$(CONFIG_MACSEC) += atl_macsec.o macsec/macsec_api.o
 
-CFLAGS_atl_trace.o := -I$(src)
+ccflags-y += -I$(src)
