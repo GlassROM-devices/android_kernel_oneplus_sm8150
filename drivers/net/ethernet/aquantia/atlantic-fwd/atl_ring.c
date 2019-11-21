@@ -401,6 +401,7 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 /* work around HW bugs in checksum calculation:
  * - packets less than 60 octets
  * - ip, tcp or udp checksum is 0xFFFF
+ * - non-zero padding
  */
 static bool atl_checksum_workaround(struct sk_buff *skb,
 				    struct atl_rx_desc_wb *desc)
@@ -408,19 +409,25 @@ static bool atl_checksum_workaround(struct sk_buff *skb,
 	int ip_header_offset = 14;
 	int l4_header_offset = 0;
 	struct iphdr *ip;
+	struct ipv6hdr *ipv6;
 	struct tcphdr *tcp;
 	struct udphdr *udp;
 
 	if (desc->pkt_len <= 60)
 		return true;
 
-	if ((desc->pkt_type & atl_rx_pkt_type_vlan_msk) ==
-	    atl_rx_pkt_type_vlan)
-		ip_header_offset += 4;
+	if (((desc->pkt_type & atl_rx_pkt_type_vlan_msk) ==
+	    atl_rx_pkt_type_vlan) &&
+	    !(desc->rx_estat & atl_rx_estat_vlan_stripped)) 
+		ip_header_offset += sizeof(struct vlan_hdr);
 
 	if ((desc->pkt_type & atl_rx_pkt_type_vlan_msk) ==
-	    atl_rx_pkt_type_dbl_vlan)
-		ip_header_offset += 8;
+	    atl_rx_pkt_type_dbl_vlan) {
+	    	if (desc->rx_estat & atl_rx_estat_vlan_stripped)
+			ip_header_offset += sizeof(struct vlan_hdr);
+		else
+			ip_header_offset += sizeof(struct vlan_hdr) * 2;
+	}
 
 	switch (desc->pkt_type & atl_rx_pkt_type_l3_msk) {
 	case atl_rx_pkt_type_ipv4:
@@ -429,9 +436,17 @@ static bool atl_checksum_workaround(struct sk_buff *skb,
 		if (ip->check == 0xFFFF)
 			return true;
 		l4_header_offset = ip->ihl << 2;
+		/* padding inside Ethernet frame */
+		if (ntohs(ip->tot_len) + ip_header_offset < desc->pkt_len)
+			return true;
 		break;
 	case atl_rx_pkt_type_ipv6:
+		ipv6 = (struct ipv6hdr *) &skb->data[ip_header_offset];
 		l4_header_offset = ip_header_offset + sizeof(struct ipv6hdr);
+		/* padding inside Ethernet frame */
+		if (ip_header_offset + sizeof(struct ipv6hdr) +
+		    ntohs(ipv6->payload_len) < desc->pkt_len)
+			return true;
 		break;
 	default:
 		return false;
@@ -449,6 +464,9 @@ static bool atl_checksum_workaround(struct sk_buff *skb,
 		udp = (struct udphdr *) &skb->data[ip_header_offset +
 						  l4_header_offset];
 		if (udp->check == 0xFFFF)
+			return true;
+		/* padding inside IP frame */
+		if (l4_header_offset + ntohs(udp->len) < desc->pkt_len)
 			return true;
 		break;
 	default:
