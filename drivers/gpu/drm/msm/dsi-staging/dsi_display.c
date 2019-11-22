@@ -8616,6 +8616,7 @@ int dsi_display_read_serial_number(struct dsi_display *dsi_display,
 
 	if ((strcmp(dsi_display->panel->name, "samsung dsc cmd mode oneplus dsi panel") == 0) ||
 		(strcmp(dsi_display->panel->name, "samsung sofef03f_m fhd cmd mode dsc dsi panel") == 0)) {
+
 		flags = 0;
 		cmds = mode->priv_info->cmd_sets[DSI_CMD_SET_CODE_INFO].cmds;
 		if (cmds->last_command) {
