@@ -17,14 +17,23 @@
 #define ATL_MACSEC_KEY_LEN_192_BIT 24
 #define ATL_MACSEC_KEY_LEN_256_BIT 32
 
-static int atl_clear_txsc(struct atl_nic *nic,
-			  struct atl_macsec_txsc *atl_txsc);
+enum atl_clear_type {
+	/* update HW configuration */
+	ATL_CLEAR_HW = BIT(0),
+	/* update SW configuration (busy bits, pointers) */
+	ATL_CLEAR_SW = BIT(1),
+};
+
+static int atl_clear_txsc(struct atl_nic *nic, const int txsc_idx,
+			  enum atl_clear_type clear_type);
 static int atl_clear_txsa(struct atl_nic *nic, struct atl_macsec_txsc *atl_txsc,
-			  const int sa_num);
-static int atl_clear_rxsc(struct atl_nic *nic,
-			  struct atl_macsec_rxsc *atl_rxsc);
+			  const int sa_num, enum atl_clear_type clear_type);
+static int atl_clear_rxsc(struct atl_nic *nic, const int rxsc_idx,
+			  enum atl_clear_type clear_type);
 static int atl_clear_rxsa(struct atl_nic *nic, struct atl_macsec_rxsc *atl_rxsc,
-			  const int sa_num);
+			  const int sa_num, enum atl_clear_type clear_type);
+static int atl_clear_secy(struct atl_nic *nic, const struct macsec_secy *secy,
+			  enum atl_clear_type clear_type);
 static int atl_macsec_apply_cfg(struct atl_hw *hw);
 static int atl_macsec_apply_secy_cfg(struct atl_hw *hw,
 				     const struct macsec_secy *secy);
@@ -444,29 +453,8 @@ static int atl_mdo_dev_open(struct macsec_context *ctx)
 static int atl_mdo_dev_stop(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	int txsc_idx = atl_get_txsc_idx_from_secy(&nic->hw, ctx->secy);
-	struct atl_hw *hw = &nic->hw;
-	int ret = 0;
 
-	ret = atl_clear_txsc(nic, &hw->macsec_cfg.atl_txsc[txsc_idx]);
-	if (ret)
-		return ret;
-
-	struct macsec_rx_sc *rx_sc;
-	uint32_t rxsc_idx;
-	for (rx_sc = rcu_dereference_bh(ctx->secy->rx_sc); rx_sc;
-	     rx_sc = rcu_dereference_bh(rx_sc->next)) {
-		rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
-		WARN_ON(rxsc_idx < 0);
-		if (unlikely(rxsc_idx < 0))
-			continue;
-
-		ret = atl_clear_rxsc(nic, &hw->macsec_cfg.atl_rxsc[rxsc_idx]);
-		if (ret)
-			return ret;
-	}
-
-	return ret;
+	return atl_clear_secy(nic, ctx->secy, ATL_CLEAR_HW);
 }
 
 static int atl_set_txsc(struct atl_hw *hw, int txsc_idx)
@@ -665,53 +653,51 @@ static int atl_mdo_upd_secy(struct macsec_context *ctx)
 	return ret;
 }
 
-static int atl_clear_txsc(struct atl_nic *nic, struct atl_macsec_txsc *tx_sc)
+static int atl_clear_txsc(struct atl_nic *nic, const int txsc_idx,
+			  enum atl_clear_type clear_type)
 {
 	struct atl_hw *hw = &nic->hw;
-	int txsc_idx = atl_get_txsc_idx_from_secy(hw, tx_sc->sw_secy);
+	struct atl_macsec_txsc *tx_sc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	AQ_API_SEC_EgressClassRecord matchEgressClassRecord = { 0 };
 	AQ_API_SEC_EgressSCRecord matchSCRecord = { 0 };
-	int ret;
+	int ret = 0;
+	int sa_num;
 
-	while (tx_sc->tx_sa_idx_busy) {
-		ret = atl_clear_txsa(nic, tx_sc,
-				     ffs(tx_sc->tx_sa_idx_busy) - 1);
+	for_each_set_bit (sa_num, &tx_sc->tx_sa_idx_busy, ATL_MACSEC_MAX_SA) {
+		ret = atl_clear_txsa(nic, tx_sc, sa_num, clear_type);
 		if (ret)
 			return ret;
 	}
 
-	ret = AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord,
-					  txsc_idx);
-	if (ret)
-		return ret;
+	if (clear_type & ATL_CLEAR_HW) {
+		ret = AQ_API_SetEgressClassRecord(hw, &matchEgressClassRecord,
+						  txsc_idx);
+		if (ret)
+			return ret;
 
-	matchSCRecord.fresh = 1;
-	return AQ_API_SetEgressSCRecord(hw, &matchSCRecord, tx_sc->hw_sc_idx);
+		matchSCRecord.fresh = 1;
+		ret = AQ_API_SetEgressSCRecord(hw, &matchSCRecord,
+					       tx_sc->hw_sc_idx);
+		if (ret)
+			return ret;
+	}
+
+	if (clear_type & ATL_CLEAR_SW) {
+		clear_bit(txsc_idx, &hw->macsec_cfg.txsc_idx_busy);
+		hw->macsec_cfg.atl_txsc[txsc_idx].sw_secy = NULL;
+	}
+
+	return ret;
 }
 
 static int atl_mdo_del_secy(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
-	int txsc_idx = atl_get_txsc_idx_from_secy(&nic->hw, ctx->secy);
-	struct atl_hw *hw = &nic->hw;
-	struct macsec_rx_sc *rx_sc;
-	int rxsc_idx;
-	int ret = 0;
 
 	if (ctx->prepare)
 		return 0;
 
-	atl_mdo_dev_stop(ctx);
-	clear_bit(txsc_idx, &hw->macsec_cfg.txsc_idx_busy);
-	for (rx_sc = rcu_dereference_bh(ctx->secy->rx_sc); rx_sc;
-	     rx_sc = rcu_dereference_bh(rx_sc->next)) {
-		rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
-		clear_bit(rxsc_idx, &hw->macsec_cfg.rxsc_idx_busy);
-	}
-
-	hw->macsec_cfg.atl_txsc[txsc_idx].sw_secy = NULL;
-
-	return ret;
+	return atl_clear_secy(nic, ctx->secy, ATL_CLEAR_HW | ATL_CLEAR_SW);
 }
 
 static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
@@ -795,15 +781,16 @@ static int atl_mdo_upd_txsa(struct macsec_context *ctx)
 }
 
 static int atl_clear_txsa(struct atl_nic *nic, struct atl_macsec_txsc *atl_txsc,
-			  const int sa_num)
+			  const int sa_num, enum atl_clear_type clear_type)
 {
 	int sa_idx = atl_txsc->hw_sc_idx | sa_num;
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
-	clear_bit(sa_num, &atl_txsc->tx_sa_idx_busy);
+	if (clear_type & ATL_CLEAR_SW)
+		clear_bit(sa_num, &atl_txsc->tx_sa_idx_busy);
 
-	if (netif_carrier_ok(nic->ndev)) {
+	if ((clear_type & ATL_CLEAR_HW) && netif_carrier_ok(nic->ndev)) {
 		AQ_API_SEC_EgressSARecord matchSARecord = { 0 };
 		matchSARecord.fresh = 1;
 
@@ -828,7 +815,7 @@ static int atl_mdo_del_txsa(struct macsec_context *ctx)
 		return 0;
 
 	return atl_clear_txsa(nic, &nic->hw.macsec_cfg.atl_txsc[txsc_idx],
-			      ctx->sa.assoc_num);
+			      ctx->sa.assoc_num, ATL_CLEAR_HW | ATL_CLEAR_SW);
 }
 
 static int atl_rxsc_validate_frames(const enum macsec_validation_type validate)
@@ -970,47 +957,63 @@ static int atl_mdo_upd_rxsc(struct macsec_context *ctx)
 	return 0;
 }
 
-static int atl_clear_rxsc(struct atl_nic *nic, struct atl_macsec_rxsc *rx_sc)
+static int atl_clear_rxsc(struct atl_nic *nic, const int rxsc_idx,
+			  enum atl_clear_type clear_type)
 {
 	struct atl_hw *hw = &nic->hw;
-	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc->sw_rxsc);
-	AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
-	AQ_API_SEC_IngressSCRecord sc_record = { 0 };
-	int ret;
+	struct atl_macsec_rxsc *rx_sc = &hw->macsec_cfg.atl_rxsc[rxsc_idx];
+	int ret = 0;
+	int sa_num;
 
-	while (rx_sc->rx_sa_idx_busy) {
-		ret = atl_clear_rxsa(nic, rx_sc,
-				     ffs(rx_sc->rx_sa_idx_busy) - 1);
+	for_each_set_bit (sa_num, &rx_sc->rx_sa_idx_busy, ATL_MACSEC_MAX_SA) {
+		ret = atl_clear_rxsa(nic, rx_sc, sa_num, clear_type);
 		if (ret)
 			return ret;
 	}
 
-	ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
-					      2 * rxsc_idx);
-	if (ret) {
-		atl_dev_err("AQ_API_SetIngressPreClassRecord failed with %d\n",
-			    ret);
-		return ret;
+	if (clear_type & ATL_CLEAR_HW) {
+		AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
+		AQ_API_SEC_IngressSCRecord sc_record = { 0 };
+
+		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
+						      2 * rxsc_idx);
+		if (ret) {
+			atl_dev_err(
+				"AQ_API_SetIngressPreClassRecord failed with %d\n",
+				ret);
+			return ret;
+		}
+
+		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
+						      2 * rxsc_idx + 1);
+		if (ret) {
+			atl_dev_err(
+				"AQ_API_SetIngressPreClassRecord failed with %d\n",
+				ret);
+			return ret;
+		}
+
+		sc_record.fresh = 1;
+		ret = AQ_API_SetIngressSCRecord(hw, &sc_record,
+						rx_sc->hw_sc_idx);
+		if (ret)
+			return ret;
 	}
 
-	ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
-					      2 * rxsc_idx + 1);
-	if (ret) {
-		atl_dev_err("AQ_API_SetIngressPreClassRecord failed with %d\n",
-			    ret);
-		return ret;
+	if (clear_type & ATL_CLEAR_SW) {
+		clear_bit(rxsc_idx, &hw->macsec_cfg.rxsc_idx_busy);
+		hw->macsec_cfg.atl_rxsc[rxsc_idx].sw_secy = NULL;
+		hw->macsec_cfg.atl_rxsc[rxsc_idx].sw_rxsc = NULL;
 	}
 
-	sc_record.fresh = 1;
-	return AQ_API_SetIngressSCRecord(hw, &sc_record, rx_sc->hw_sc_idx);
+	return ret;
 }
 
 static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 	int rxsc_idx = atl_get_rxsc_idx_from_rxsc(&nic->hw, ctx->rx_sc);
-	struct atl_macsec_cfg *cfg = &nic->hw.macsec_cfg;
-	int ret = 0;
+	enum atl_clear_type clear_type = ATL_CLEAR_SW;
 
 	if (rxsc_idx < 0)
 		return -ENOENT;
@@ -1019,13 +1022,9 @@ static int atl_mdo_del_rxsc(struct macsec_context *ctx)
 		return 0;
 
 	if (netif_carrier_ok(nic->ndev))
-		ret = atl_clear_rxsc(nic, &cfg->atl_rxsc[rxsc_idx]);
+		clear_type |= ATL_CLEAR_HW;
 
-	clear_bit(rxsc_idx, &cfg->rxsc_idx_busy);
-	cfg->atl_rxsc[rxsc_idx].sw_secy = NULL;
-	cfg->atl_rxsc[rxsc_idx].sw_rxsc = NULL;
-
-	return ret;
+	return atl_clear_rxsc(nic, rxsc_idx, clear_type);
 }
 
 static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
@@ -1128,15 +1127,16 @@ static int atl_mdo_upd_rxsa(struct macsec_context *ctx)
 }
 
 static int atl_clear_rxsa(struct atl_nic *nic, struct atl_macsec_rxsc *atl_rxsc,
-			  const int sa_num)
+			  const int sa_num, enum atl_clear_type clear_type)
 {
 	int sa_idx = atl_rxsc->hw_sc_idx | sa_num;
 	struct atl_hw *hw = &nic->hw;
 	int ret = 0;
 
-	clear_bit(sa_num, &atl_rxsc->rx_sa_idx_busy);
+	if (clear_type & ATL_CLEAR_SW)
+		clear_bit(sa_num, &atl_rxsc->rx_sa_idx_busy);
 
-	if (netif_carrier_ok(nic->ndev)) {
+	if ((clear_type & ATL_CLEAR_HW) && netif_carrier_ok(nic->ndev)) {
 		AQ_API_SEC_IngressSAKeyRecord sa_key_record = { 0 };
 		AQ_API_SEC_IngressSARecord sa_record = { 0 };
 
@@ -1148,7 +1148,7 @@ static int atl_clear_rxsa(struct atl_nic *nic, struct atl_macsec_rxsc *atl_rxsc,
 		return AQ_API_SetIngressSAKeyRecord(hw, &sa_key_record, sa_idx);
 	}
 
-	return 0;
+	return ret;
 }
 
 static int atl_mdo_del_rxsa(struct macsec_context *ctx)
@@ -1163,7 +1163,7 @@ static int atl_mdo_del_rxsa(struct macsec_context *ctx)
 		return 0;
 
 	return atl_clear_rxsa(nic, &nic->hw.macsec_cfg.atl_rxsc[rxsc_idx],
-			      ctx->sa.assoc_num);
+			      ctx->sa.assoc_num, ATL_CLEAR_HW | ATL_CLEAR_SW);
 }
 
 static int atl_mdo_get_dev_stats(struct macsec_context *ctx)
@@ -1362,6 +1362,36 @@ static int atl_macsec_apply_rxsc_cfg(struct atl_hw *hw, const int rxsc_idx)
 			if (ret)
 				return ret;
 		}
+	}
+
+	return ret;
+}
+
+static int atl_clear_secy(struct atl_nic *nic, const struct macsec_secy *secy,
+			  enum atl_clear_type clear_type)
+{
+	int txsc_idx = atl_get_txsc_idx_from_secy(&nic->hw, secy);
+	struct atl_hw *hw = &nic->hw;
+	struct macsec_rx_sc *rx_sc;
+	int rxsc_idx;
+	int ret = 0;
+
+	if (txsc_idx >= 0) {
+		ret = atl_clear_txsc(nic, txsc_idx, clear_type);
+		if (ret)
+			return ret;
+	}
+
+	for (rx_sc = rcu_dereference_bh(secy->rx_sc); rx_sc;
+	     rx_sc = rcu_dereference_bh(rx_sc->next)) {
+		rxsc_idx = atl_get_rxsc_idx_from_rxsc(hw, rx_sc);
+		WARN_ON(rxsc_idx < 0);
+		if (rxsc_idx < 0)
+			continue;
+
+		ret = atl_clear_rxsc(nic, rxsc_idx, clear_type);
+		if (ret)
+			return ret;
 	}
 
 	return ret;
