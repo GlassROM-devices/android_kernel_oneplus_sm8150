@@ -30,9 +30,9 @@ static struct dump_info *dp_info;
 extern void *panic_info;
 
 static struct kobject *component_info;
-static ssize_t project_info_get(struct device *dev,
+static ssize_t __nocfi project_info_get(struct device *dev,
     struct device_attribute *attr, char *buf);
-static ssize_t component_info_get(struct device *dev,
+static ssize_t __nocfi component_info_get(struct device *dev,
     struct device_attribute *attr, char *buf);
 static int op_aboard_read_gpio(void);
 
@@ -140,7 +140,7 @@ uint8 get_secureboot_fuse_status(void)
     return secure_oem_config;
 }
 
-static ssize_t project_info_get(struct device *dev,
+static ssize_t __nocfi project_info_get(struct device *dev,
                 struct device_attribute *attr,
                 char *buf)
 {
@@ -336,7 +336,7 @@ static struct attribute_group component_info_attr_group = {
     .attrs  = component_info_sysfs_entries,
 };
 
-static ssize_t component_info_get(struct device *dev,
+static ssize_t __nocfi component_info_get(struct device *dev,
                 struct device_attribute *attr,
                 char *buf)
 {
