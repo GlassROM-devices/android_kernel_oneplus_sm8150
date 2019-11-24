@@ -773,7 +773,7 @@ void kset_init(struct kset *k)
 }
 
 /* default kobject attribute operations */
-static ssize_t kobj_attr_show(struct kobject *kobj, struct attribute *attr,
+static ssize_t __nocfi kobj_attr_show(struct kobject *kobj, struct attribute *attr,
 			      char *buf)
 {
 	struct kobj_attribute *kattr;
@@ -785,7 +785,7 @@ static ssize_t kobj_attr_show(struct kobject *kobj, struct attribute *attr,
 	return ret;
 }
 
-static ssize_t kobj_attr_store(struct kobject *kobj, struct attribute *attr,
+static ssize_t __nocfi kobj_attr_store(struct kobject *kobj, struct attribute *attr,
 			       const char *buf, size_t count)
 {
 	struct kobj_attribute *kattr;
