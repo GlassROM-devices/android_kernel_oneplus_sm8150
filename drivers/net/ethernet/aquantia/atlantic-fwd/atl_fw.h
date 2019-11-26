@@ -207,6 +207,7 @@ struct atl_fw_ops {
 	int (*restore_cfg)(struct atl_hw *hw);
 	int (*set_phy_loopback)(struct atl_nic *nic, u32 mode);
 	int (*set_mediadetect)(struct atl_hw *hw, bool on);
+	int (*set_pad_stripping)(struct atl_hw *hw, bool on);
 	int (*send_macsec_req)(struct atl_hw *hw,
 			       struct macsec_msg_fw_request *msg,
 			       struct macsec_msg_fw_response *resp);

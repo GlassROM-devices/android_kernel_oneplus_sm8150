@@ -614,6 +614,33 @@ unlock:
 	return ret;
 }
 
+static int atl_fw2_set_pad_stripping(struct atl_hw *hw, bool on)
+{
+	uint32_t msm_opts;
+	int ret = 0;
+
+	if (hw->mcp.fw_rev < 0x0300008e)
+		return -EOPNOTSUPP;
+
+	atl_lock_fw(hw);
+
+	ret = atl_read_fwsettings_word(hw, atl_fw2_setings_msm_opts,
+		&msm_opts);
+	if (ret)
+		goto unlock;
+
+	msm_opts &= ~atl_fw2_settings_msm_opts_strip_pad;
+	if (on)
+		msm_opts |= BIT(atl_fw2_settings_msm_opts_strip_pad_shift);
+
+	ret = atl_write_fwsettings_word(hw, atl_fw2_setings_msm_opts,
+		msm_opts);
+
+unlock:
+	atl_unlock_fw(hw);
+	return ret;
+}
+
 static int atl_fw2_send_macsec_request(struct atl_hw *hw,
 				struct macsec_msg_fw_request *req,
 				struct macsec_msg_fw_response *response)
@@ -799,6 +826,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.set_phy_loopback = (void *)atl_fw1_unsupported,
 		.set_mediadetect =  (void *)atl_fw1_unsupported,
 		.send_macsec_req = (void *)atl_fw1_unsupported,
+		.set_pad_stripping = (void *)atl_fw1_unsupported,
 		.__get_hbeat = (void *)atl_fw1_unsupported,
 		.get_mac_addr = atl_fw1_get_mac_addr,
 		.update_thermal = atl_fw1_unsupported,
@@ -818,6 +846,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.set_phy_loopback = atl_fw2_set_phy_loopback,
 		.set_mediadetect = atl_fw2_set_mediadetect,
 		.send_macsec_req = atl_fw2_send_macsec_request,
+		.set_pad_stripping = atl_fw2_set_pad_stripping,
 		.__get_hbeat = __atl_fw2_get_hbeat,
 		.get_mac_addr = atl_fw2_get_mac_addr,
 		.update_thermal = atl_fw2_update_thermal,
