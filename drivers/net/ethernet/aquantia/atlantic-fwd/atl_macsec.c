@@ -119,7 +119,7 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 		(*key)[0] = swab32(tmp[5]);
 		(*key)[1] = swab32(tmp[4]);
 		(*key)[2] = swab32(tmp[3]);
-		(*key)[3] = swab32(tmp[0]);
+		(*key)[3] = swab32(tmp[2]);
 		(*key)[4] = swab32(tmp[1]);
 		(*key)[5] = swab32(tmp[0]);
 	} else if (key_len == ATL_MACSEC_KEY_LEN_256_BIT) {
