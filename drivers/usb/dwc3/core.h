@@ -1164,11 +1164,11 @@ struct dwc3 {
 	unsigned		enable_bus_suspend:1;
 	unsigned		usb3_u1u2_disable:1;
 
+	unsigned		dis_metastability_quirk:1;
+
 	atomic_t		in_lpm;
 	bool			b_suspend;
 	unsigned int		vbus_draw;
-
-	unsigned		dis_metastability_quirk:1;
 
 	u16			imod_interval;
 	struct workqueue_struct *dwc_wq;

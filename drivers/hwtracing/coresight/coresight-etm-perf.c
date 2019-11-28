@@ -152,6 +152,7 @@ static void free_event_data(struct work_struct *work)
 
 	for_each_cpu(cpu, mask) {
 		struct list_head **ppath;
+		source = coresight_get_source(event_data->path[cpu]);
 
 		source = coresight_get_source(event_data->path[cpu]);
 		ppath = etm_event_cpu_path_ptr(event_data, cpu);
