@@ -46,6 +46,7 @@ enum atl_board {
 	ATL_AQC108,
 	ATL_AQC109,
 	ATL_AQC100,
+	ATL_AQC113,
 };
 
 struct atl_thermal {
@@ -77,6 +78,7 @@ struct atl_hw {
 	uint8_t __iomem *regs;
 	struct pci_dev *pdev;
 	unsigned long state;
+	enum atl_board brd_id;
 	struct atl_link_state link_state;
 	unsigned wol_mode;
 	struct atl_mcp mcp;

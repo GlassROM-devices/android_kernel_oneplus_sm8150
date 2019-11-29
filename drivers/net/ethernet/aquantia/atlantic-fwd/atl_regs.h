@@ -38,6 +38,7 @@
 #define ATL_GLOBAL_MDIO_WDATA 0x288
 #define ATL_GLOBAL_MDIO_ADDR 0x28c
 #define ATL_GLOBAL_MDIO_RDATA 0x290
+#define ATL2_MIF_BOOT_REG_ADR 0x3040
 /* Scratch pads numbered starting from 1 */
 #define ATL_MCP_SCRATCH(idx) ATL_REG_STRIDE(0x300 - 0x4, 0x4, idx)
 #define ATL_MCP_SEM(idx) ATL_REG_STRIDE(0x3a0, 0x4, idx)

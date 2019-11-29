@@ -387,6 +387,7 @@ static const struct pci_device_id atl_pci_tbl[] = {
 	{ PCI_VDEVICE(AQUANTIA, 0x91b1), ATL_AQC108},
 	{ PCI_VDEVICE(AQUANTIA, 0x12b1), ATL_AQC109},
 	{ PCI_VDEVICE(AQUANTIA, 0x92b1), ATL_AQC109},
+	{ PCI_VDEVICE(AQUANTIA, 0x00c0), ATL_AQC113},
 	{}
 };
 

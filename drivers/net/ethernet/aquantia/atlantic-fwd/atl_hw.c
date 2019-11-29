@@ -175,6 +175,11 @@ unlock:
 	return ret;
 }
 
+static int atl_hw_a2_reset(struct atl_hw *hw)
+{
+
+}
+
 /* Must be called either during early init when netdev isn't yet
  * registered, or with RTNL lock held */
 int atl_hw_reset(struct atl_hw *hw)
@@ -185,6 +190,8 @@ int atl_hw_reset(struct atl_hw *hw)
 	/* bool host_load_done = false; */
 	int ret;
 
+	if (hw->brd_id == ATL_AQC109)
+		return atl_hw_a2_reset(hw);
 	atl_lock_fw(hw);
 
 	reg = atl_read(hw, ATL_MCP_SCRATCH(RBL_STS));
@@ -288,6 +295,7 @@ int atl_hwinit(struct atl_hw *hw, enum atl_board brd_id)
 	struct atl_board_info *brd = &atl_boards[brd_id];
 	int ret;
 
+	hw->brd_id = brd_id;
 	/* Default supported speed set based on device id. */
 	hw->link_state.supported = brd->link_mask;
 
