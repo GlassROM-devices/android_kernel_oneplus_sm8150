@@ -409,8 +409,8 @@ static void atl_get_pauseparam(struct net_device *ndev,
 	struct atl_fc_state *fc = &nic->hw.link_state.fc;
 
 	pause->autoneg = 0;
-	pause->rx_pause = !!(fc->cur & atl_fc_rx);
-	pause->tx_pause = !!(fc->cur & atl_fc_tx);
+	pause->rx_pause = !!(fc->req & atl_fc_rx);
+	pause->tx_pause = !!(fc->req & atl_fc_tx);
 }
 
 static int atl_set_pauseparam(struct net_device *ndev,
