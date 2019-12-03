@@ -454,6 +454,9 @@ static int atl_mdo_dev_stop(struct macsec_context *ctx)
 {
 	struct atl_nic *nic = netdev_priv(ctx->netdev);
 
+	if (ctx->prepare)
+		return 0;
+
 	return atl_clear_secy(nic, ctx->secy, ATL_CLEAR_HW);
 }
 
