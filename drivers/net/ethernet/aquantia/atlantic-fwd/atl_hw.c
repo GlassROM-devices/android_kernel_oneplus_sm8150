@@ -275,17 +275,9 @@ unlock:
 
 static int atl_get_mac_addr(struct atl_hw *hw, uint8_t *buf)
 {
-	uint32_t efuse_shadow_addr =
-		atl_read(hw, hw->mcp.ops->efuse_shadow_addr_reg);
-	uint8_t tmp[8];
 	int ret;
 
-	if (!efuse_shadow_addr)
-		return false;
-
-	ret = atl_read_mcp_mem(hw, efuse_shadow_addr + 40 * 4, tmp, 8);
-	*(uint32_t *)buf = htonl(*(uint32_t *)tmp);
-	*(uint16_t *)&buf[4] = (uint16_t)htonl(*(uint32_t *)&tmp[4]);
+	ret = hw->mcp.ops->get_mac_addr(hw, buf);
 
 	return ret;
 }

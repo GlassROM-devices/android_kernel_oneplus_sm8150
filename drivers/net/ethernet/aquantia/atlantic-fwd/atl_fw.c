@@ -75,11 +75,26 @@ static int __atl_fw1_wait_fw_init(struct atl_hw *hw)
 static int __atl_fw2_wait_fw_init(struct atl_hw *hw)
 {
 	uint32_t reg;
+	int ret = 0;
 
 	busy_wait(1000, mdelay(1), reg, atl_read(hw, ATL_GLOBAL_FW_IMAGE_ID),
 		!reg);
 	if (!reg)
 		return -EIO;
+
+	hw->mcp.req_high = atl_read(hw,
+				 ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH));
+
+	ret = atl_read_fwstat_word(hw, atl_fw2_stat_settings_addr,
+		&hw->mcp.fw_settings_addr);
+	if (ret)
+		return ret;
+
+	ret = atl_read_fwstat_word(hw, atl_fw2_stat_settings_len,
+		&hw->mcp.fw_settings_len);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
@@ -680,41 +695,55 @@ static int atl_fw2_send_macsec_request(struct atl_hw *hw,
 	return ret;
 }
 
+/* fw lock must be held */
+static int __atl_fw2_get_hbeat(struct atl_hw *hw, uint16_t *hbeat)
+{
+	int ret;
+	uint32_t val;
 
-static struct atl_fw_ops atl_fw_ops[2] = {
-	[0] = {
-		.__wait_fw_init = __atl_fw1_wait_fw_init,
-		.set_link = atl_fw1_set_link,
-		.check_link = atl_fw1_check_link,
-		.__get_link_caps = __atl_fw1_get_link_caps,
-		.restart_aneg = atl_fw1_unsupported,
-		.set_default_link = atl_fw1_set_default_link,
-		.enable_wol = atl_fw1_enable_wol,
-		.get_phy_temperature = (void *)atl_fw1_unsupported,
-		.dump_cfg = atl_fw1_unsupported,
-		.restore_cfg = atl_fw1_unsupported,
-		.set_phy_loopback = (void *)atl_fw1_unsupported,
-		.set_mediadetect =  (void *)atl_fw1_unsupported,
-		.send_macsec_req = (void *)atl_fw1_unsupported,
-		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW),
-	},
-	[1] = {
-		.__wait_fw_init = __atl_fw2_wait_fw_init,
-		.set_link = atl_fw2_set_link,
-		.check_link = atl_fw2_check_link,
-		.__get_link_caps = __atl_fw2_get_link_caps,
-		.restart_aneg = atl_fw2_restart_aneg,
-		.set_default_link = atl_fw2_set_default_link,
-		.enable_wol = atl_fw2_enable_wol,
-		.get_phy_temperature = atl_fw2_get_phy_temperature,
-		.dump_cfg = atl_fw2_dump_cfg,
-		.restore_cfg = atl_fw2_restore_cfg,
-		.set_phy_loopback = atl_fw2_set_phy_loopback,
-		.set_mediadetect = atl_fw2_set_mediadetect,
-		.send_macsec_req = atl_fw2_send_macsec_request,
-		.efuse_shadow_addr_reg = ATL_MCP_SCRATCH(FW2_EFUSE_SHADOW),
-	},
-};
+	ret = atl_read_fwstat_word(hw, atl_fw2_stat_phy_hbeat, &val);
+	if (ret)
+		atl_dev_err("FW watchdog: failure reading PHY heartbeat: %d\n",
+			-ret);
+	else
+		*hbeat = val & 0xffff;
+
+	return ret;
+}
+
+static int atl_fw1_get_mac_addr(struct atl_hw *hw, uint8_t *buf)
+{
+	uint32_t efuse_shadow_addr =
+		atl_read(hw, ATL_MCP_SCRATCH(FW1_EFUSE_SHADOW));
+	uint8_t tmp[8];
+	int ret;
+
+	if (!efuse_shadow_addr)
+		return false;
+
+	ret = atl_read_mcp_mem(hw, efuse_shadow_addr + 40 * 4, tmp, 8);
+	*(uint32_t *)buf = htonl(*(uint32_t *)tmp);
+	*(uint16_t *)&buf[4] = (uint16_t)htonl(*(uint32_t *)&tmp[4]);
+
+	return ret;
+}
+
+static int atl_fw2_get_mac_addr(struct atl_hw *hw, uint8_t *buf)
+{
+	uint32_t efuse_shadow_addr =
+		atl_read(hw, ATL_MCP_SCRATCH(FW2_EFUSE_SHADOW));
+	uint8_t tmp[8];
+	int ret;
+
+	if (!efuse_shadow_addr)
+		return false;
+
+	ret = atl_read_mcp_mem(hw, efuse_shadow_addr + 40 * 4, tmp, 8);
+	*(uint32_t *)buf = htonl(*(uint32_t *)tmp);
+	*(uint16_t *)&buf[4] = (uint16_t)htonl(*(uint32_t *)&tmp[4]);
+
+	return ret;
+}
 
 /* fw lock must be held */
 static int __atl_fw2_set_thermal_monitor(struct atl_hw *hw, bool enable)
@@ -780,6 +809,45 @@ static int __atl_fw2_update_thermal(struct atl_hw *hw)
 	return ret;
 }
 
+static struct atl_fw_ops atl_fw_ops[2] = {
+	[0] = {
+		.__wait_fw_init = __atl_fw1_wait_fw_init,
+		.set_link = atl_fw1_set_link,
+		.check_link = atl_fw1_check_link,
+		.__get_link_caps = __atl_fw1_get_link_caps,
+		.restart_aneg = atl_fw1_unsupported,
+		.set_default_link = atl_fw1_set_default_link,
+		.enable_wol = atl_fw1_enable_wol,
+		.get_phy_temperature = (void *)atl_fw1_unsupported,
+		.dump_cfg = atl_fw1_unsupported,
+		.restore_cfg = atl_fw1_unsupported,
+		.set_phy_loopback = (void *)atl_fw1_unsupported,
+		.set_mediadetect =  (void *)atl_fw1_unsupported,
+		.send_macsec_req = (void *)atl_fw1_unsupported,
+		.__get_hbeat = (void *)atl_fw1_unsupported,
+		.get_mac_addr = atl_fw1_get_mac_addr,
+		.__update_thermal = atl_fw1_unsupported,
+	},
+	[1] = {
+		.__wait_fw_init = __atl_fw2_wait_fw_init,
+		.set_link = atl_fw2_set_link,
+		.check_link = atl_fw2_check_link,
+		.__get_link_caps = __atl_fw2_get_link_caps,
+		.restart_aneg = atl_fw2_restart_aneg,
+		.set_default_link = atl_fw2_set_default_link,
+		.enable_wol = atl_fw2_enable_wol,
+		.get_phy_temperature = atl_fw2_get_phy_temperature,
+		.dump_cfg = atl_fw2_dump_cfg,
+		.restore_cfg = atl_fw2_restore_cfg,
+		.set_phy_loopback = atl_fw2_set_phy_loopback,
+		.set_mediadetect = atl_fw2_set_mediadetect,
+		.send_macsec_req = atl_fw2_send_macsec_request,
+		.__get_hbeat = __atl_fw2_get_hbeat,
+		.get_mac_addr = atl_fw2_get_mac_addr,
+		.__update_thermal = __atl_fw2_update_thermal,
+	},
+};
+
 struct atl_thermal_limit {
 	uintptr_t offset;
 	const char *name;
@@ -840,7 +908,7 @@ int atl_update_thermal(struct atl_hw *hw)
 		return 0;
 
 	atl_lock_fw(hw);
-	ret = __atl_fw2_update_thermal(hw);
+	ret = hw->mcp.ops->__update_thermal(hw);
 	atl_unlock_fw(hw);
 
 	return ret;
@@ -852,7 +920,6 @@ int atl_update_thermal_flag(struct atl_hw *hw, int bit, bool val)
 	unsigned flags, changed;
 	int ret = 0;
 
-	atl_lock_fw(hw);
 	flags = thermal->flags;
 
 	switch (bit) {
@@ -882,7 +949,7 @@ int atl_update_thermal_flag(struct atl_hw *hw, int bit, bool val)
 		break;
 	}
 	if (ret)
-		goto unlock;
+		return ret;
 
 	flags &= ~BIT(bit);
 	flags |= val << bit;
@@ -893,36 +960,20 @@ int atl_update_thermal_flag(struct atl_hw *hw, int bit, bool val)
 	if (test_bit(ATL_ST_RESETTING, &hw->state))
 		/* After reset, atl_fw_init() will apply the settings
 		 * skipped here */
-		goto unlock;
+		return ret;
 
-	if (changed & atl_thermal_monitor)
-		ret = __atl_fw2_update_thermal(hw);
-	else if (changed & atl_thermal_throttle &&
-		hw->link_state.thermal_throttled)
-		__atl_fw2_set_link(hw);
+	if (changed & atl_thermal_monitor) {
+		atl_lock_fw(hw);
+		ret = hw->mcp.ops->__update_thermal(hw);
+		atl_unlock_fw(hw);
+	} else if (changed & atl_thermal_throttle &&
+		   hw->link_state.thermal_throttled)
+		hw->mcp.ops->set_link(hw, true);
 
 	if (ret)
 		/* __atl_fw2_update_thermal() failed. Revert flag
 		 * changes */
 		thermal->flags ^= changed;
-
-unlock:
-	atl_unlock_fw(hw);
-	return ret;
-}
-
-/* fw lock must be held */
-static int __atl_fw2_get_hbeat(struct atl_hw *hw, uint16_t *hbeat)
-{
-	int ret;
-	uint32_t val;
-
-	ret = atl_read_fwstat_word(hw, atl_fw2_stat_phy_hbeat, &val);
-	if (ret)
-		atl_dev_err("FW watchdog: failure reading PHY heartbeat: %d\n",
-			-ret);
-	else
-		*hbeat = val & 0xffff;
 
 	return ret;
 }
@@ -960,24 +1011,12 @@ int atl_fw_init(struct atl_hw *hw)
 	mcp->fw_stat_addr = atl_read(hw, ATL_MCP_SCRATCH(FW_STAT_STRUCT));
 	mcp->rpc_addr = atl_read(hw, ATL_MCP_SCRATCH(FW2_RPC_DATA));
 
-	ret = __atl_fw2_get_hbeat(hw, &mcp->phy_hbeat);
+	ret = mcp->ops->__get_hbeat(hw, &mcp->phy_hbeat);
 	if (ret)
 		return ret;
 	mcp->next_wdog = jiffies + 2 * HZ;
 
 	if (major > 1) {
-		mcp->req_high = atl_read(hw,
-					 ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH));
-
-		ret = atl_read_fwstat_word(hw, atl_fw2_stat_settings_addr,
-			&mcp->fw_settings_addr);
-		if (ret)
-			return ret;
-
-		ret = atl_read_fwstat_word(hw, atl_fw2_stat_settings_len,
-			&mcp->fw_settings_len);
-		if (ret)
-			return ret;
 
 	}
 
@@ -991,7 +1030,7 @@ int atl_fw_init(struct atl_hw *hw)
 		hw->thermal.flags &=
 			~(atl_thermal_monitor | atl_thermal_throttle);
 	} else
-		ret = __atl_fw2_update_thermal(hw);
+		ret = mcp->ops->__update_thermal(hw);
 
 
 	return ret;
@@ -1012,7 +1051,7 @@ void atl_fw_watchdog(struct atl_hw *hw)
 
 	atl_lock_fw(hw);
 
-	ret = __atl_fw2_get_hbeat(hw, &hbeat);
+	ret = mcp->ops->__get_hbeat(hw, &hbeat);
 	if (ret) {
 		atl_dev_err("FW watchdog: failure reading PHY heartbeat: %d\n",
 			-ret);

@@ -197,7 +197,9 @@ struct atl_fw_ops {
 	int (*send_macsec_req)(struct atl_hw *hw,
 			       struct macsec_msg_fw_request *msg,
 			       struct macsec_msg_fw_response *resp);
-	unsigned efuse_shadow_addr_reg;
+	int (*__get_hbeat)(struct atl_hw *hw, uint16_t *hbeat);
+	int (*get_mac_addr)(struct atl_hw *hw, uint8_t *buf);
+	int (*__update_thermal)(struct atl_hw *hw);
 };
 
 int atl_read_mcp_word(struct atl_hw *hw, uint32_t offt, uint32_t *val);
