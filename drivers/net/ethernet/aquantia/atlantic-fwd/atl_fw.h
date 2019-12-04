@@ -200,6 +200,7 @@ struct atl_fw_ops {
 	int (*__get_hbeat)(struct atl_hw *hw, uint16_t *hbeat);
 	int (*get_mac_addr)(struct atl_hw *hw, uint8_t *buf);
 	int (*__update_thermal)(struct atl_hw *hw);
+	int (*deinit)(struct atl_hw *hw);
 };
 
 int atl_read_mcp_word(struct atl_hw *hw, uint32_t offt, uint32_t *val);

@@ -827,6 +827,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.__get_hbeat = (void *)atl_fw1_unsupported,
 		.get_mac_addr = atl_fw1_get_mac_addr,
 		.__update_thermal = atl_fw1_unsupported,
+		.deinit = atl_fw1_unsupported,
 	},
 	[1] = {
 		.__wait_fw_init = __atl_fw2_wait_fw_init,
@@ -845,6 +846,7 @@ static struct atl_fw_ops atl_fw_ops[2] = {
 		.__get_hbeat = __atl_fw2_get_hbeat,
 		.get_mac_addr = atl_fw2_get_mac_addr,
 		.__update_thermal = __atl_fw2_update_thermal,
+		.deinit = atl_fw1_unsupported,
 	},
 };
 
