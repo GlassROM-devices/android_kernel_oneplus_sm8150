@@ -1616,6 +1616,7 @@ static void atl_set_intr_mod_qvec(struct atl_queue_vec *qvec)
 	struct atl_hw *hw = &nic->hw;
 	unsigned int min, max;
 	int idx = qvec->idx;
+	uint32_t reg;
 
 	min = nic->rx_intr_delay - atl_min_intr_delay;
 	max = min + atl_rx_mod_hyst;
@@ -1626,8 +1627,11 @@ static void atl_set_intr_mod_qvec(struct atl_queue_vec *qvec)
 	min = nic->tx_intr_delay - atl_min_intr_delay;
 	max = min + atl_tx_mod_hyst;
 
-	atl_write(hw, ATL_TX_INTR_MOD_CTRL(idx),
-		(max / 2) << 0x10 | (min / 2) << 8 | 2);
+	if (hw->brd_id == ATL_AQC113)
+		reg = ATL2_TX_INTR_MOD_CTRL(idx);
+	else
+		reg = ATL_TX_INTR_MOD_CTRL(idx);
+	atl_write(hw, reg, (max / 2) << 0x10 | (min / 2) << 8 | 2);
 }
 
 void atl_set_intr_mod(struct atl_nic *nic)

@@ -619,6 +619,7 @@ module_param_named(fwd_rx_buf_reserve, atl_fwd_rx_buf_reserve, uint, 0444);
 void atl_start_hw_global(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
+	int rpb_size = 320, tpb_size = 160;
 
 	if (!test_and_clear_bit(ATL_ST_GLOBAL_CONF_NEEDED, &hw->state))
 		return;
@@ -631,13 +632,20 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* Enable RPF2, filter logic 3 */
 	atl_write(hw, 0x5040, BIT(16) | (3 << 17));
 
+	if (hw->brd_id == ATL_AQC113) {
+		rpb_size = 192;
+		tpb_size = 128;
+	}
 	/* Alloc TPB */
 	/* TC1: space for offload engine iface */
 	atl_write(hw, ATL_TX_PBUF_REG1(1), atl_fwd_tx_buf_reserve);
 	/* TC0: 160k minus TC1 size */
-	atl_write(hw, ATL_TX_PBUF_REG1(0), 160 - atl_fwd_tx_buf_reserve);
+	atl_write(hw, ATL_TX_PBUF_REG1(0), tpb_size - atl_fwd_tx_buf_reserve);
 	/* 4-TC | Enable TPB */
 	atl_set_bits(hw, ATL_TX_PBUF_CTRL1, BIT(8) | BIT(0));
+	/* TX Buffer clk gate  off */
+	if (hw->brd_id == ATL_AQC113)
+		atl_clear_bits(hw, ATL_TX_PBUF_CTRL1, BIT(5));
 
 	/* Alloc RPB */
 	/* TC1: space for offload engine iface */
@@ -646,10 +654,10 @@ void atl_start_hw_global(struct atl_nic *nic)
 		(atl_fwd_rx_buf_reserve * 32 * 66 / 100) << 16 |
 		(atl_fwd_rx_buf_reserve * 32 * 50 / 100));
 	/* TC1: 320k minus TC1 size */
-	atl_write(hw, ATL_RX_PBUF_REG1(0), 320 - atl_fwd_rx_buf_reserve);
+	atl_write(hw, ATL_RX_PBUF_REG1(0), rpb_size - atl_fwd_rx_buf_reserve);
 	atl_write(hw, ATL_RX_PBUF_REG2(0), BIT(31) |
-		((320 - atl_fwd_rx_buf_reserve) * 32 * 66 / 100) << 16 |
-		((320 - atl_fwd_rx_buf_reserve) * 32 * 50 / 100));
+		((rpb_size - atl_fwd_rx_buf_reserve) * 32 * 66 / 100) << 16 |
+		((rpb_size - atl_fwd_rx_buf_reserve) * 32 * 50 / 100));
 	/* 4-TC | Enable RPB */
 	atl_set_bits(hw, ATL_RX_PBUF_CTRL1, BIT(8) | BIT(4) | BIT(0));
 
@@ -685,6 +693,17 @@ void atl_start_hw_global(struct atl_nic *nic)
 
 	/* Enable untagged packets */
 	atl_write(hw, ATL_RX_VLAN_FLT_CTRL1, 1 << 2 | 1 << 3);
+
+	if (hw->brd_id == ATL_AQC113) {
+		/* RSS hash type */
+		atl_set_bits(hw, ATL2_RX_RSS_HASH_TYPE_ADR, BIT(9) - 1);
+
+		/* ATL2 Apply legacy ring to TC mapping */
+		atl_write(hw, 0x5900, 0x00000000);
+		atl_write(hw, 0x5904, 0x11111111);
+		atl_write(hw, 0x5908, 0x22222222);
+		atl_write(hw, 0x590c, 0x33333333);
+	}
 
 	/* Reprogram ethtool Rx filters */
 	atl_refresh_rxfs(nic);

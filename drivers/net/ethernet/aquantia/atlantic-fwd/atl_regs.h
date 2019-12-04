@@ -127,6 +127,7 @@ enum mcp_scratchpad {
 #define ATL_RX_RSS_TBL_ADDR 0x54e0
 #define ATL_RX_RSS_TBL_WR_DATA 0x54e4
 #define ATL_RX_RSS_TBL_RD_DATA 0x54e8
+#define ATL2_RX_RSS_HASH_TYPE_ADR 0x54C8
 #define ATL_RX_RPF_DBG_CNT_CTRL 0x5518
 #define ATL_RX_RPF_HOST_CNT_LO 0x552c
 #define ATL_RX_RPF_HOST_CNT_HI 0x5530
@@ -180,6 +181,7 @@ enum mcp_scratchpad {
 #define ATL_TX_RING_HEAD_WB_MSW(ring) ATL_RING_OFFT(ring, 0x20)
 
 #define ATL_TX_INTR_MOD_CTRL(idx) ATL_REG_STRIDE(0x8980, 0x4, idx)
+#define ATL2_TX_INTR_MOD_CTRL(idx) ATL_REG_STRIDE(0x7c28, 0x40, idx)
 
 /* MSM */
 #define ATL_MSM_GEN_CTRL 0x8
