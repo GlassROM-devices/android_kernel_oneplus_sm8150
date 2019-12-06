@@ -262,7 +262,8 @@ static inline unsigned int atl_link_adv(struct atl_link_state *lstate)
 		 * atl_fw2_thermal_check() and switch to that lower
 		 * rate there.
 		 */
-		return BIT(lstate->throttled_to + 1) - 1;
+		return (lstate->advertized & ATL_EEE_MASK) |
+		       (BIT(lstate->throttled_to + 1) - 1);
 
 	return lstate->advertized;
 }
