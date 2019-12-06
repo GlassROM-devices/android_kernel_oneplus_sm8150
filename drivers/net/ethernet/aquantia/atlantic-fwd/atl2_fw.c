@@ -9,6 +9,7 @@
 #include "atl_common.h"
 #include "atl_hw.h"
 #include "atl2_fw.h"
+#include "atl_fw.h"
 
 #define ATL2_FW_READ_TRY_MAX 1000
 
@@ -251,6 +252,242 @@ static int atl2_fw_deinit(struct atl_hw *hw)
 	return err;
 }
 
+static inline unsigned int atl_link_adv(struct atl_link_state *lstate)
+{
+	struct atl_hw *hw = container_of(lstate, struct atl_hw, link_state);
+
+	if (lstate->thermal_throttled
+		&& hw->thermal.flags & atl_thermal_throttle)
+		/* FW doesn't provide raw LP's advertized rates, only
+		 * the rates adverized both by us and LP. Here we
+		 * advertize not just the throttled_to rate, but also
+		 * all the lower rates as well. That way if LP changes
+		 * or dynamically starts to adverize a lower rate than
+		 * throttled_to, we will notice that in
+		 * atl_fw2_thermal_check() and switch to that lower
+		 * rate there.
+		 */
+		return (lstate->advertized & ATL_EEE_MASK) |
+		       (BIT(lstate->throttled_to + 1) - 1);
+
+	return lstate->advertized;
+}
+
+static bool atl2_fw_set_link_needed(struct atl_link_state *lstate)
+{
+	struct atl_fc_state *fc = &lstate->fc;
+	bool ret = false;
+
+	if (fc->req != fc->prev_req) {
+		ret = true;
+		fc->prev_req = fc->req;
+	}
+
+	if (atl_link_adv(lstate) != lstate->prev_advertized)
+		ret = true;
+
+	return ret;
+}
+
+static void atl2_set_rate(struct atl_hw *hw,
+				   struct link_options_s *link_options)
+{
+	unsigned int adv = atl_link_adv(&hw->link_state);
+
+	link_options->rate_100M = !!(adv & atl_link_type_idx_100m);
+	link_options->rate_1G   = !!(adv & atl_link_type_idx_1g);
+	link_options->rate_2P5G = !!(adv & atl_link_type_idx_2p5g);
+	link_options->rate_5G   = !!(adv & atl_link_type_idx_5g);
+	link_options->rate_10G  = !!(adv & atl_link_type_idx_10g);
+}
+
+static void atl2_set_eee(struct atl_link_state *lstate,
+			 struct link_options_s *link_options, bool eee_enabled)
+{
+	uint32_t eee_advertized = lstate->advertized >> ATL_EEE_BIT_OFFT;
+
+	if (!eee_enabled) {
+		link_options->eee_100M = 0;
+		link_options->eee_1G = 0;
+		link_options->eee_2P5G = 0;
+		link_options->eee_5G = 0;
+		link_options->eee_10G = 0;
+		return;
+	}
+
+	link_options->eee_100M = eee_advertized & atl_link_type_idx_100m;
+	link_options->eee_1G = eee_advertized & atl_link_type_idx_1g;
+	link_options->eee_2P5G = eee_advertized & atl_link_type_idx_2p5g;
+	link_options->eee_5G = eee_advertized & atl_link_type_idx_5g;
+	link_options->eee_10G = eee_advertized & atl_link_type_idx_10g;
+}
+
+/* fw lock must be held */
+static void __atl2_fw_set_link(struct atl_hw *hw)
+{
+	struct atl_link_state *lstate = &hw->link_state;
+	struct link_options_s link_options;
+	uint32_t val;
+	int err = 0;
+
+	atl2_shared_buffer_get(hw, link_options, link_options);
+
+	link_options.pause_rx = link_options.pause_tx = 0;
+	if (lstate->fc.req & atl_fc_rx) {
+		link_options.pause_rx = 1;
+		link_options.pause_tx = 1;
+	}
+	if (lstate->fc.req & atl_fc_tx) {
+		link_options.pause_tx ^= 1;
+	}
+
+	link_options.link_up = 1;
+	if (lstate->force_off)
+		link_options.link_up = 0;
+
+	atl2_set_rate(hw, &link_options);
+	atl2_set_eee(lstate, &link_options, lstate->eee_enabled);
+
+	atl2_shared_buffer_write(hw, link_options, link_options);
+	atl2_mif_host_finished_write_set(hw, 1);
+	busy_wait(1000, udelay(100), val,
+		  atl2_mif_mcp_finished_read_get(hw),
+		  val != 0);
+
+	if (val != 0)
+		err = -ETIME;
+
+	lstate->prev_advertized = atl_link_adv(lstate);
+	lstate->fc.prev_req = lstate->fc.req;
+}
+
+static void atl2_fw_set_link(struct atl_hw *hw, bool force)
+{
+	if (!force && !atl2_fw_set_link_needed(&hw->link_state))
+		return;
+
+	atl_lock_fw(hw);
+	__atl2_fw_set_link(hw);
+	atl_unlock_fw(hw);
+}
+
+static u32 a2_fw_caps_to_mask(struct device_link_caps_s *link_caps)
+{
+	u32 supported = 0;
+
+	if (link_caps->rate_10G)
+		supported |= BIT(atl_link_type_idx_10g);
+	if (link_caps->rate_5G)
+		supported |= BIT(atl_link_type_idx_5g);
+	if (link_caps->rate_2P5G)
+		supported |= BIT(atl_link_type_idx_2p5g);
+	if (link_caps->rate_1G)
+		supported |= BIT(atl_link_type_idx_1g);
+	if (link_caps->rate_100M)
+		supported |= BIT(atl_link_type_idx_100m);
+
+	if (link_caps->eee_10G)
+		supported |= BIT(atl_link_type_idx_10g) << ATL_EEE_BIT_OFFT;
+	if (link_caps->eee_5G)
+		supported |= BIT(atl_link_type_idx_5g) << ATL_EEE_BIT_OFFT;
+	if (link_caps->eee_2P5G)
+		supported |= BIT(atl_link_type_idx_2p5g) << ATL_EEE_BIT_OFFT;
+	if (link_caps->eee_1G)
+		supported |= BIT(atl_link_type_idx_1g) << ATL_EEE_BIT_OFFT;
+
+	return supported;
+}
+
+static u32 a2_fw_lkp_to_mask(struct lkp_link_caps_s *lkp_link_caps)
+{
+	u32 rate = 0;
+
+	if (lkp_link_caps->rate_10G)
+		rate |= BIT(atl_link_type_idx_10g);
+	if (lkp_link_caps->rate_5G)
+		rate |= BIT(atl_link_type_idx_5g);
+	if (lkp_link_caps->rate_2P5G)
+		rate |= BIT(atl_link_type_idx_2p5g);
+	if (lkp_link_caps->rate_1G)
+		rate |= BIT(atl_link_type_idx_1g);
+	if (lkp_link_caps->rate_100M)
+		rate |= BIT(atl_link_type_idx_100m);
+
+	if (lkp_link_caps->eee_10G)
+		rate |= BIT(atl_link_type_idx_10g) << ATL_EEE_BIT_OFFT;
+	if (lkp_link_caps->eee_5G)
+		rate |= BIT(atl_link_type_idx_5g) << ATL_EEE_BIT_OFFT;
+	if (lkp_link_caps->eee_2P5G)
+		rate |= BIT(atl_link_type_idx_2p5g) << ATL_EEE_BIT_OFFT;
+	if (lkp_link_caps->eee_1G)
+		rate |= BIT(atl_link_type_idx_1g) << ATL_EEE_BIT_OFFT;
+
+	return rate;
+}
+
+static int __atl2_fw_update_link_status(struct atl_hw *hw)
+{
+	struct atl_link_state *lstate = &hw->link_state;
+	struct link_status_s link_status;
+	struct lkp_link_caps_s lkp_link_caps;
+	enum atl_fc_mode fc = atl_fc_none;
+
+	atl2_shared_buffer_read(hw, link_status, link_status);
+
+	switch (link_status.link_rate) {
+	case ATL2_FW_LINK_RATE_10G:
+		lstate->link = &atl_link_types[atl_link_type_idx_10g];
+		break;
+	case ATL2_FW_LINK_RATE_5G:
+		lstate->link = &atl_link_types[atl_link_type_idx_5g];
+		break;
+	case ATL2_FW_LINK_RATE_2G5:
+		lstate->link = &atl_link_types[atl_link_type_idx_2p5g];
+		break;
+	case ATL2_FW_LINK_RATE_1G:
+		lstate->link = &atl_link_types[atl_link_type_idx_1g];
+		break;
+	case ATL2_FW_LINK_RATE_100M:
+		lstate->link = &atl_link_types[atl_link_type_idx_100m];
+		break;
+	default:
+		lstate->link = NULL;
+	}
+
+	if (link_status.pause_rx)
+		fc |= atl_fc_rx;
+	if (link_status.pause_tx)
+		fc |= atl_fc_tx;
+	lstate->fc.cur = fc;
+	lstate->eee = link_status.eee;
+
+	atl2_shared_buffer_read(hw, lkp_link_caps, lkp_link_caps);
+
+	lstate->lp_advertized = a2_fw_lkp_to_mask(&lkp_link_caps);
+
+	return 0;
+}
+
+static struct atl_link_type *atl2_fw_check_link(struct atl_hw *hw)
+{
+	struct atl_link_type *link;
+	struct atl_link_state *lstate = &hw->link_state;
+
+	atl_lock_fw(hw);
+
+	__atl2_fw_update_link_status(hw);
+
+	/* TODO 
+	__atl_fw2_thermal_check(hw, low);
+	*/
+
+	/* Thermal check might have reset link due to throttling */
+	link = lstate->link;
+
+	atl_unlock_fw(hw);
+	return link;
+}
+
 int atl2_get_fw_version(struct atl_hw *hw, u32 *fw_version)
 {
 	*fw_version = atl_read(hw, 0x13008);
@@ -261,9 +498,9 @@ int atl2_get_fw_version(struct atl_hw *hw, u32 *fw_version)
 static struct atl_fw_ops atl2_fw_ops = {
 		.__wait_fw_init = __a2_fw_wait_init,
 		.deinit = atl2_fw_deinit,
-/*		.set_link = atl2_fw_set_link,
+		.set_link = atl2_fw_set_link,
 		.check_link = atl2_fw_check_link,
-		.__get_link_caps = __atl2_fw_get_link_caps,
+/*		.__get_link_caps = __atl2_fw_get_link_caps,
 		.restart_aneg = atl2_fw_restart_aneg,
 		.set_default_link = atl2_fw_set_default_link,
 		.enable_wol = atl2_fw_enable_wol,
