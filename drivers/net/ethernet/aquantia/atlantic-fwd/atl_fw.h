@@ -42,6 +42,14 @@ struct atl_link_type {
 	const char *name;
 };
 
+enum atl_link_type_index {
+	atl_link_type_idx_100m,
+	atl_link_type_idx_1g,
+	atl_link_type_idx_2p5g,
+	atl_link_type_idx_5g,
+	atl_link_type_idx_10g,
+};
+
 extern struct atl_link_type atl_link_types[];
 extern const int atl_num_rates;
 
