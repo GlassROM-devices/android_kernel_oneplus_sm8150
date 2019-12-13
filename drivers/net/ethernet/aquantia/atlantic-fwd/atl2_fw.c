@@ -6,6 +6,8 @@
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
  */
+#include <linux/etherdevice.h>
+
 #include "atl_common.h"
 #include "atl_hw.h"
 #include "atl2_fw.h"
@@ -542,6 +544,145 @@ static void atl2_fw_set_default_link(struct atl_hw *hw)
 	lstate->advertized &= ~ATL_EEE_MASK;
 }
 
+atl2_shared_buffer_read_item_fn_decl(phy_health_monitor);
+
+static int atl2_fw_get_phy_temperature(struct atl_hw *hw, int *temp)
+{
+	struct phy_health_monitor_s phy_health_monitor;
+	int ret = 0;
+
+	atl_lock_fw(hw);
+
+	ret = atl2_shared_buffer_read_safe(hw,
+			atl2_shared_buffer_read_item_fn_name(phy_health_monitor),
+			&phy_health_monitor);
+
+	*temp = (phy_health_monitor.phy_temperature & 0xffff) * 1000 / 256;
+
+	atl_unlock_fw(hw);
+
+	return ret;
+}
+
+static int atl2_fw_get_mac_addr(struct atl_hw *hw, uint8_t *mac)
+{
+	struct mac_address_s mac_address;
+	int err = 0;
+
+	atl2_shared_buffer_get(hw, mac_address, mac_address);
+
+	ether_addr_copy(mac, (u8 *)mac_address.mac_address);
+
+	return err;
+}
+
+/* fw lock must be held */
+static int __atl2_fw_get_hbeat(struct atl_hw *hw, uint16_t *hbeat)
+{
+	struct phy_health_monitor_s phy_health_monitor;
+	int ret = 0;
+
+	ret = atl2_shared_buffer_read_safe(hw,
+			atl2_shared_buffer_read_item_fn_name(phy_health_monitor),
+			&phy_health_monitor);
+
+	*hbeat = phy_health_monitor.phy_heart_beat;
+
+	return ret;
+}
+
+static int atl2_fw_set_phy_loopback(struct atl_nic *nic, u32 mode)
+{
+	struct device_link_caps_s device_link_caps;
+	bool on = !!(nic->priv_flags & BIT(mode));
+	struct atl_hw *hw = &nic->hw;
+	struct link_options_s link_options;
+	uint32_t val;
+	int ret = 0;
+
+	atl_lock_fw(hw);
+
+	atl2_shared_buffer_read(hw, device_link_caps, device_link_caps);
+	atl2_shared_buffer_get(hw, link_options, link_options);
+
+	switch (mode) {
+	case ATL_PF_LPB_INT_PHY:
+		if (!device_link_caps.internal_loopback){
+			ret = -ENOTSUPP;
+			goto unlock;
+		}
+
+		link_options.internal_loopback = on;
+		break;
+	case ATL_PF_LPB_EXT_PHY:
+		if (!device_link_caps.external_loopback){
+			ret = -ENOTSUPP;
+			goto unlock;
+		}
+		link_options.external_loopback = on;
+		break;
+	}
+
+	atl2_shared_buffer_write(hw, link_options, link_options);
+	atl2_mif_host_finished_write_set(hw, 1);
+	busy_wait(1000, udelay(100), val,
+		  atl2_mif_mcp_finished_read_get(hw),
+		  val != 0);
+
+	if (val != 0)
+		ret = -ETIME;
+unlock:
+	atl_unlock_fw(hw);
+
+	return 0;
+}
+
+static int atl2_fw_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
+{
+	struct wake_on_lan_s wake_on_lan;
+	struct mac_address_s mac_address;
+	uint32_t val;
+	int ret = 0;
+
+	atl_lock_fw(hw);
+
+	atl2_shared_buffer_get(hw, sleep_proxy, wake_on_lan);
+
+	if (wol_mode & atl_fw_wake_on_link) {
+		wake_on_lan.wake_on_link_up = 1;
+		/* TODO: add wol_ex_wake_on_link_keep_rate */
+	}
+
+	if (wol_mode & atl_fw_wake_on_link_rtpm) {
+		/* TODO: add wake_on_link_force - wake alive host upon wake on link */
+	}
+
+	if (wol_mode & atl_fw_wake_on_magic) {
+		/* TODO: add wol_ex_wake_on_link_keep_rate */
+		wake_on_lan.wake_on_magic_packet = 1;
+	}
+
+	ether_addr_copy(mac_address.mac_address, hw->mac_addr);
+
+	atl2_shared_buffer_write(hw, mac_address, mac_address);
+	atl2_shared_buffer_write(hw, sleep_proxy, wake_on_lan);
+	atl2_mif_host_finished_write_set(hw, 1);
+	busy_wait(1000, udelay(100), val,
+		  atl2_mif_mcp_finished_read_get(hw),
+		  val != 0);
+
+	if (val != 0)
+		ret = -ETIME;
+
+	atl_unlock_fw(hw);
+	return ret;
+}
+
+static int atl2_fw_unsupported(struct atl_hw *hw)
+{
+	return -ENOTSUPP;
+}
+
 int atl2_get_fw_version(struct atl_hw *hw, u32 *fw_version)
 {
 	*fw_version = atl_read(hw, 0x13008);
@@ -557,16 +698,15 @@ static struct atl_fw_ops atl2_fw_ops = {
 		.__get_link_caps = __atl2_fw_get_link_caps,
 		.restart_aneg = atl2_fw_restart_aneg,
 		.set_default_link = atl2_fw_set_default_link,
-/*		.enable_wol = atl2_fw_enable_wol,
 		.get_phy_temperature = atl2_fw_get_phy_temperature,
-		.dump_cfg = atl2_fw_dump_cfg,
-		.restore_cfg = atl2_fw_restore_cfg,
-		.set_phy_loopback = atl2_fw_set_phy_loopback,
-		.set_mediadetect = atl2_fw_set_mediadetect,
-		.send_macsec_req = atl2_fw_send_macsec_request,
-		.__get_hbeat = __atl2_fw_get_hbeat,
+		.set_mediadetect = (void *)atl2_fw_unsupported,
+		.send_macsec_req = (void *)atl2_fw_unsupported,
 		.get_mac_addr = atl2_fw_get_mac_addr,
-*/
+		.__get_hbeat = __atl2_fw_get_hbeat,
+		.set_phy_loopback = atl2_fw_set_phy_loopback,
+		.enable_wol = atl2_fw_enable_wol,
+		.dump_cfg = (void *)atl2_fw_unsupported,
+		.restore_cfg = (void *)atl2_fw_unsupported,
 };
 
 int atl2_fw_init(struct atl_hw *hw)
