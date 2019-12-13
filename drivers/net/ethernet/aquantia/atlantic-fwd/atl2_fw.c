@@ -488,6 +488,60 @@ static struct atl_link_type *atl2_fw_check_link(struct atl_hw *hw)
 	return link;
 }
 
+/* fw lock must be held */
+static int __atl2_fw_get_link_caps(struct atl_hw *hw)
+{
+	struct device_link_caps_s device_link_caps;
+	struct atl_mcp *mcp = &hw->mcp;
+	unsigned int supported = 0;
+	int ret = 0;
+
+
+	atl2_shared_buffer_read(hw, device_link_caps, device_link_caps);
+
+	mcp->wdog_disabled = true;
+
+	supported  = a2_fw_caps_to_mask(&device_link_caps);
+
+	hw->link_state.supported = supported;
+	hw->link_state.lp_lowest = fls(supported) - 1;
+
+	return ret;
+}
+
+static int atl2_fw_restart_aneg(struct atl_hw *hw)
+{
+	struct link_options_s link_options;
+	uint32_t val;
+	int ret = 0;
+
+	atl2_shared_buffer_get(hw, link_options, link_options);
+
+	link_options.link_renegotiate ^= 1;
+
+	atl2_shared_buffer_write(hw, link_options, link_options);
+	atl2_mif_host_finished_write_set(hw, 1);
+	busy_wait(1000, udelay(100), val,
+		  atl2_mif_mcp_finished_read_get(hw),
+		  val != 0);
+
+	if (val != 0)
+		ret = -ETIME;
+
+	return ret;
+}
+
+static void atl2_fw_set_default_link(struct atl_hw *hw)
+{
+	struct atl_link_state *lstate = &hw->link_state;
+
+	lstate->autoneg = true;
+	lstate->advertized = hw->link_state.supported;
+	lstate->fc.req = atl_fc_full;
+	lstate->eee_enabled = 0;
+	lstate->advertized &= ~ATL_EEE_MASK;
+}
+
 int atl2_get_fw_version(struct atl_hw *hw, u32 *fw_version)
 {
 	*fw_version = atl_read(hw, 0x13008);
@@ -500,10 +554,10 @@ static struct atl_fw_ops atl2_fw_ops = {
 		.deinit = atl2_fw_deinit,
 		.set_link = atl2_fw_set_link,
 		.check_link = atl2_fw_check_link,
-/*		.__get_link_caps = __atl2_fw_get_link_caps,
+		.__get_link_caps = __atl2_fw_get_link_caps,
 		.restart_aneg = atl2_fw_restart_aneg,
 		.set_default_link = atl2_fw_set_default_link,
-		.enable_wol = atl2_fw_enable_wol,
+/*		.enable_wol = atl2_fw_enable_wol,
 		.get_phy_temperature = atl2_fw_get_phy_temperature,
 		.dump_cfg = atl2_fw_dump_cfg,
 		.restore_cfg = atl2_fw_restore_cfg,
