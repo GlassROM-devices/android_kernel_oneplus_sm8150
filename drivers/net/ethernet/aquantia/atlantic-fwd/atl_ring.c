@@ -1648,7 +1648,9 @@ int atl_init_rx_ring(struct atl_desc_ring *rx)
 	struct atl_rxbuf *rxbuf;
 	int ret = 0;
 
-	rx->head = rx->tail = atl_read(hw, ATL_RING_HEAD(rx)) & 0x1fff;
+	rx->head = rx->tail = atl_read(hw, ATL_RING_HEAD(rx)) & 0xffff;
+	if (rx->head > 0x1FFF)
+		return -EIO;
 
 	ret = atl_fill_rx(rx, ring_space(rx), false);
 	if (ret)
@@ -1674,7 +1676,9 @@ int atl_init_tx_ring(struct atl_desc_ring *tx)
 {
 	struct atl_hw *hw = &tx->nic->hw;
 
-	tx->head = tx->tail = atl_read(hw, ATL_RING_HEAD(tx)) & 0x1fff;
+	tx->head = tx->tail = atl_read(hw, ATL_RING_HEAD(tx)) & 0xffff;
+	if (tx->head > 0x1FFF)
+		return -EIO;
 
 	return 0;
 }
@@ -1802,7 +1806,9 @@ int atl_start_rings(struct atl_nic *nic)
 	}
 
 	atl_set_lro(nic);
-	atl_set_rss_tbl(hw);
+	ret = atl_set_rss_tbl(hw);
+	if (ret)
+		return ret;
 
 	atl_for_each_qvec(nic, qvec) {
 		ret = atl_start_qvec(qvec);

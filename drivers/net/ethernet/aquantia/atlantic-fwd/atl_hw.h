@@ -220,7 +220,7 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 int atl_hwinit(struct atl_hw *hw, enum atl_board brd_id);
 void atl_refresh_link(struct atl_nic *nic);
 void atl_set_rss_key(struct atl_hw *hw);
-void atl_set_rss_tbl(struct atl_hw *hw);
+int atl_set_rss_tbl(struct atl_hw *hw);
 void atl_set_uc_flt(struct atl_hw *hw, int idx, uint8_t mac_addr[ETH_ALEN]);
 
 int atl_alloc_descs(struct atl_nic *nic, struct atl_hw_ring *ring);

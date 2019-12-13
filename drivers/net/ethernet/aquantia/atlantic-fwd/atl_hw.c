@@ -568,7 +568,7 @@ void atl_set_rss_key(struct atl_hw *hw)
 	}
 }
 
-void atl_set_rss_tbl(struct atl_hw *hw)
+int atl_set_rss_tbl(struct atl_hw *hw)
 {
 	int i, shift = 0, addr = 0;
 	uint32_t val = 0, stat;
@@ -588,13 +588,14 @@ void atl_set_rss_tbl(struct atl_hw *hw)
 		if (stat & BIT(4)) {
 			atl_dev_err("Timeout writing RSS redir table[%d] (addr %d): %#x\n",
 				    i, addr, stat);
-			return;
+			return -ETIME;
 		}
 
 		shift -= 16;
 		val >>= 16;
 		addr++;
 	}
+	return 0;
 }
 
 unsigned int atl_fwd_rx_buf_reserve =
