@@ -1024,10 +1024,6 @@ int atl_fw_init(struct atl_hw *hw)
 		return ret;
 	mcp->next_wdog = jiffies + 2 * HZ;
 
-	if (major > 1) {
-
-	}
-
 	ret = mcp->ops->__get_link_caps(hw);
 	if (ret)
 		return ret;
