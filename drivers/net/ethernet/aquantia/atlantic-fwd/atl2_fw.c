@@ -297,6 +297,8 @@ static void atl2_set_rate(struct atl_hw *hw,
 	link_options->rate_2P5G = !!(adv & BIT(atl_link_type_idx_2p5g));
 	link_options->rate_5G   = !!(adv & BIT(atl_link_type_idx_5g));
 	link_options->rate_10G  = !!(adv & BIT(atl_link_type_idx_10g));
+	link_options->rate_N5G = link_options->rate_5G;
+	link_options->rate_N2P5G = link_options->rate_2P5G;
 }
 
 static void atl2_set_eee(struct atl_link_state *lstate,
@@ -515,7 +517,7 @@ static int atl2_fw_restart_aneg(struct atl_hw *hw)
 
 	atl2_shared_buffer_get(hw, link_options, link_options);
 
-	link_options.link_renegotiate ^= 1;
+	link_options.link_renegotiate = 1;
 
 	atl2_shared_buffer_write(hw, link_options, link_options);
 	atl2_mif_host_finished_write_set(hw, 1);
@@ -525,6 +527,9 @@ static int atl2_fw_restart_aneg(struct atl_hw *hw)
 
 	if (val != 0)
 		ret = -ETIME;
+
+	link_options.link_renegotiate = 0;
+	atl2_shared_buffer_write(hw, link_options, link_options);
 
 	return ret;
 }
