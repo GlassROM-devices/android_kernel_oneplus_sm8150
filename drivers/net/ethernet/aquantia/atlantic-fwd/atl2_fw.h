@@ -504,19 +504,19 @@ struct fw_interface_out {
 #pragma pack(pop)
 
 
-#define  ATL2_FW_LINK_RATE_INVALID 0
-#define  ATL2_FW_LINK_RATE_10M     1
-#define  ATL2_FW_LINK_RATE_100M    2
-#define  ATL2_FW_LINK_RATE_1G      3
-#define  ATL2_FW_LINK_RATE_2G5     4
-#define  ATL2_FW_LINK_RATE_5G      5
-#define  ATL2_FW_LINK_RATE_10G     6
+#define ATL2_FW_LINK_RATE_INVALID 0
+#define ATL2_FW_LINK_RATE_10M     1
+#define ATL2_FW_LINK_RATE_100M    2
+#define ATL2_FW_LINK_RATE_1G      3
+#define ATL2_FW_LINK_RATE_2G5     4
+#define ATL2_FW_LINK_RATE_5G      5
+#define ATL2_FW_LINK_RATE_10G     6
 
-#define  ATL2_HOST_MODE_INVALID      0
-#define  ATL2_HOST_MODE_ACTIVE       1
-#define  ATL2_HOST_MODE_SLEEP_PROXY  2
-#define  ATL2_HOST_MODE_LOW_POWER    3
-#define  ATL2_HOST_MODE_SHUTDOWN     4
+#define ATL2_HOST_MODE_INVALID      0
+#define ATL2_HOST_MODE_ACTIVE       1
+#define ATL2_HOST_MODE_SLEEP_PROXY  2
+#define ATL2_HOST_MODE_LOW_POWER    3
+#define ATL2_HOST_MODE_SHUTDOWN     4
 
 #define ATL2_FW_CABLE_STATUS_OPEN_CIRCUIT  7
 #define ATL2_FW_CABLE_STATUS_HIGH_MISMATCH 6

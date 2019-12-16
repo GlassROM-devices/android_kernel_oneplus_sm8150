@@ -202,7 +202,7 @@ static bool atl2_mcp_boot_complete(struct atl_hw *hw)
 		return true;
 
 	/* Host boot requested */
-	if (atl_read(hw, ATL2_MCP_HOST_REQ_INT_ADR) & 0x1)
+	if (atl_read(hw, ATL2_MCP_HOST_REQ_INT) & 0x1)
 		return true;
 
 	return false;
@@ -224,7 +224,7 @@ static int atl_hw_a2_reset(struct atl_hw *hw)
 		atl_dev_dbg("Boot code probably hanged, reboot anyway");
 
 
-	atl_write(hw, ATL2_MCP_HOST_REQ_INT_CLR_ADR, 0x01);
+	atl_write(hw, ATL2_MCP_HOST_REQ_INT_CLR, 0x01);
 	rbl_request = ATL2_FW_BOOT_REQ_REBOOT;
 #ifdef AQ_CFG_FAST_START
 	rbl_request |= ATL2_FW_BOOT_REQ_MAC_FAST_BOOT;
@@ -266,7 +266,7 @@ static int atl_hw_a2_reset(struct atl_hw *hw)
 		goto unlock;
 	}
 
-	if (atl_read(hw, ATL2_MCP_HOST_REQ_INT_ADR) & 0x1) {
+	if (atl_read(hw, ATL2_MCP_HOST_REQ_INT) & 0x1) {
 		err = -EIO;
 		atl_dev_err("No FW detected. Dynamic FW load not implemented");
 		goto unlock;
@@ -294,7 +294,7 @@ int atl_hw_reset(struct atl_hw *hw)
 	/* bool host_load_done = false; */
 	int ret;
 
-	if (hw->brd_id == ATL_AQC109)
+	if (hw->brd_id == ATL_AQC113)
 		return atl_hw_a2_reset(hw);
 	atl_lock_fw(hw);
 

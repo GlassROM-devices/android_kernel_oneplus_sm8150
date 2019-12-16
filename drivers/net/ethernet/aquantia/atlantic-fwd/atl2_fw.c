@@ -64,7 +64,7 @@ static void atl2_mif_shared_buf_get(struct atl_hw *hw, int offset,
 	int j = 0;
 
 	for (i = offset; i < offset + len; i++, j++)
-		data[j] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_IN_ADR(i));
+		data[j] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_IN(i));
 }
 
 static void atl2_mif_shared_buf_write(struct atl_hw *hw, int offset,
@@ -74,7 +74,7 @@ static void atl2_mif_shared_buf_write(struct atl_hw *hw, int offset,
 	int j = 0;
 
 	for (i = offset; i < offset + len; i++, j++)
-		atl_write(hw, ATL2_MIF_SHARED_BUFFER_IN_ADR(i),
+		atl_write(hw, ATL2_MIF_SHARED_BUFFER_IN(i),
 				data[j]);
 }
 
@@ -85,23 +85,19 @@ static void atl2_mif_shared_buf_read(struct atl_hw *hw, int offset,
 	int j = 0;
 
 	for (i = offset; i < offset + len; i++, j++)
-		data[j] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_OUT_ADR(i));
+		data[j] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_OUT(i));
 }
 
 static void atl2_mif_host_finished_write_set(struct atl_hw *hw, u32 finish)
 {
-	atl_write_bits(hw, ATL2_MIF_HOST_FINISHED_WRITE_ADR,
-			    ATL2_MIF_HOST_FINISHED_WRITE_SHIFT,
-			    ATL2_MIF_HOST_FINISHED_WRITE_WIDTH,
-			    finish);
+	atl_write_bits(hw, ATL2_MIF_HOST_FINISHED_WRITE, 0, 1, finish);
 }
 
 static u32 atl2_mif_mcp_finished_read_get(struct atl_hw *hw)
 {
-	return (atl_read(hw, ATL2_MIF_MCP_FINISHED_READ_ADR) &
-		ATL2_MIF_MCP_FINISHED_READ_MSK) >>
-		ATL2_MIF_MCP_FINISHED_READ_SHIFT;
+	return atl_read(hw, ATL2_MIF_MCP_FINISHED_READ) & 1;
 }
+
 static int atl2_shared_buffer_read_safe(struct atl_hw *hw,
 		     int (*read_item_fn)(struct atl_hw *hw, void *data),
 		     void *data)
