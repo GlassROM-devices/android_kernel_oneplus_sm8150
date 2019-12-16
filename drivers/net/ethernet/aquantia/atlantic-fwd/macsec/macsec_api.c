@@ -294,8 +294,6 @@ static int GetIngressPreCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreCTLFR
             return ret;
     }
 
-    memset(rec, 0, sizeof(AQ_API_SEC_IngressPreCTLFRecord));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_INGRESSPRECTLFRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -318,6 +316,8 @@ static int GetIngressPreCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreCTLFR
 
 int AQ_API_GetIngressPreCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreCTLFRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_IngressPreCTLFRecord));
+
     AQ_API_CALL_SAFE(GetIngressPreCTLFRecord, hw, rec, tableIndex);
 }
 
@@ -428,8 +428,6 @@ static int GetIngressPreClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreClas
             return ret;
     }
 
-    memset(rec, 0, sizeof(AQ_API_SEC_IngressPreClassRecord));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 20, 1, ROWOFFSET_INGRESSPRECLASSRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -508,6 +506,8 @@ static int GetIngressPreClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreClas
 
 int AQ_API_GetIngressPreClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPreClassRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_IngressPreClassRecord));
+
     AQ_API_CALL_SAFE(GetIngressPreClassRecord, hw, rec, tableIndex);
 }
 
@@ -561,8 +561,6 @@ static int GetIngressSCRecord(struct atl_hw *hw, AQ_API_SEC_IngressSCRecord* rec
     if (tableIndex >= NUMROWS_INGRESSSCRECORD)
         return -EINVAL;
 
-    memset(rec, 0, sizeof(AQ_API_SEC_IngressSCRecord));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 8, 3, ROWOFFSET_INGRESSSCRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -597,6 +595,8 @@ static int GetIngressSCRecord(struct atl_hw *hw, AQ_API_SEC_IngressSCRecord* rec
 
 int AQ_API_GetIngressSCRecord(struct atl_hw *hw, AQ_API_SEC_IngressSCRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_IngressSCRecord));
+
     AQ_API_CALL_SAFE(GetIngressSCRecord, hw, rec, tableIndex);
 }
 
@@ -645,8 +645,6 @@ static int GetIngressSARecord(struct atl_hw *hw, AQ_API_SEC_IngressSARecord* rec
     if (tableIndex >= NUMROWS_INGRESSSARECORD)
         return -EINVAL;
 
-    memset(rec, 0, sizeof(AQ_API_SEC_IngressSARecord));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 8, 3, ROWOFFSET_INGRESSSARECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -676,6 +674,8 @@ static int GetIngressSARecord(struct atl_hw *hw, AQ_API_SEC_IngressSARecord* rec
 
 int AQ_API_GetIngressSARecord(struct atl_hw *hw, AQ_API_SEC_IngressSARecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_IngressSARecord));
+
     AQ_API_CALL_SAFE(GetIngressSARecord, hw, rec, tableIndex);
 }
 
@@ -730,8 +730,6 @@ static int GetIngressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_IngressSAKeyRecor
     if (tableIndex >= NUMROWS_INGRESSSAKEYRECORD)
         return -EINVAL;
 
-    memset(rec, 0, sizeof(AQ_API_SEC_IngressSAKeyRecord));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 18, 2, ROWOFFSET_INGRESSSAKEYRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -767,6 +765,8 @@ static int GetIngressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_IngressSAKeyRecor
 
 int AQ_API_GetIngressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_IngressSAKeyRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_IngressSAKeyRecord));
+
     AQ_API_CALL_SAFE(GetIngressSAKeyRecord, hw, rec, tableIndex);
 }
 
@@ -870,8 +870,6 @@ static int GetIngressPostClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCl
             return ret;
     }
 
-    memset(rec, 0, sizeof(AQ_API_SEC_IngressPostClassRecord));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 8, 4, ROWOFFSET_INGRESSPOSTCLASSRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -944,6 +942,8 @@ static int GetIngressPostClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCl
 
 int AQ_API_GetIngressPostClassRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostClassRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_IngressPostClassRecord));
+
     AQ_API_CALL_SAFE(GetIngressPostClassRecord, hw, rec, tableIndex);
 }
 
@@ -997,8 +997,6 @@ static int GetIngressPostCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCTL
             return ret;
     }
 
-    memset(rec, 0, sizeof(AQ_API_SEC_IngressPostCTLFRecord));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 6, 5, ROWOFFSET_INGRESSPOSTCTLFRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -1021,6 +1019,8 @@ static int GetIngressPostCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCTL
 
 int AQ_API_GetIngressPostCTLFRecord(struct atl_hw *hw, AQ_API_SEC_IngressPostCTLFRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_IngressPostCTLFRecord));
+
     AQ_API_CALL_SAFE(GetIngressPostCTLFRecord, hw, rec, tableIndex);
 }
 
@@ -1074,8 +1074,6 @@ static int GetEgressCTLFRecord(struct atl_hw *hw, AQ_API_SEC_EgressCTLFRecord* r
             return ret;
     }
 
-    memset(rec, 0, sizeof(AQ_API_SEC_EgressCTLFRecord));
-
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 6, 0, ROWOFFSET_EGRESSCTLFRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -1098,6 +1096,8 @@ static int GetEgressCTLFRecord(struct atl_hw *hw, AQ_API_SEC_EgressCTLFRecord* r
 
 int AQ_API_GetEgressCTLFRecord(struct atl_hw *hw, AQ_API_SEC_EgressCTLFRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_EgressCTLFRecord));
+
     AQ_API_CALL_SAFE(GetEgressCTLFRecord, hw, rec, tableIndex);
 }
 
@@ -1251,8 +1251,6 @@ static int GetEgressClassRecord(struct atl_hw *hw, AQ_API_SEC_EgressClassRecord*
             return ret;
     }
 
-    memset(rec, 0, sizeof(AQ_API_SEC_EgressClassRecord));
-
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 28, 1, ROWOFFSET_EGRESSCLASSRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -1376,6 +1374,8 @@ static int GetEgressClassRecord(struct atl_hw *hw, AQ_API_SEC_EgressClassRecord*
 
 int AQ_API_GetEgressClassRecord(struct atl_hw *hw, AQ_API_SEC_EgressClassRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_EgressClassRecord));
+
     AQ_API_CALL_SAFE(GetEgressClassRecord, hw, rec, tableIndex);
 }
 
@@ -1429,8 +1429,6 @@ static int GetEgressSCRecord(struct atl_hw *hw, AQ_API_SEC_EgressSCRecord* rec, 
     if (tableIndex >= NUMROWS_EGRESSSCRECORD)
         return -EINVAL;
 
-    memset(rec, 0, sizeof(AQ_API_SEC_EgressSCRecord));
-
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSCRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -1465,6 +1463,8 @@ static int GetEgressSCRecord(struct atl_hw *hw, AQ_API_SEC_EgressSCRecord* rec, 
 
 int AQ_API_GetEgressSCRecord(struct atl_hw *hw, AQ_API_SEC_EgressSCRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_EgressSCRecord));
+
     AQ_API_CALL_SAFE(GetEgressSCRecord, hw, rec, tableIndex);
 }
 
@@ -1508,8 +1508,6 @@ static int GetEgressSARecord(struct atl_hw *hw, AQ_API_SEC_EgressSARecord* rec, 
     if (tableIndex >= NUMROWS_EGRESSSARECORD)
         return -EINVAL;
 
-    memset(rec, 0, sizeof(AQ_API_SEC_EgressSARecord));
-
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSARECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -1534,6 +1532,8 @@ static int GetEgressSARecord(struct atl_hw *hw, AQ_API_SEC_EgressSARecord* rec, 
 
 int AQ_API_GetEgressSARecord(struct atl_hw *hw, AQ_API_SEC_EgressSARecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_EgressSARecord));
+
     AQ_API_CALL_SAFE(GetEgressSARecord, hw, rec, tableIndex);
 }
 
@@ -1594,8 +1594,6 @@ static int GetEgressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_EgressSAKeyRecord*
     if (tableIndex >= NUMROWS_EGRESSSAKEYRECORD)
         return -EINVAL;
 
-    memset(rec, 0, sizeof(AQ_API_SEC_EgressSAKeyRecord));
-
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 8, 2, ROWOFFSET_EGRESSSAKEYRECORD + tableIndex);
     if (unlikely(ret))
         return ret;
@@ -1632,6 +1630,8 @@ static int GetEgressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_EgressSAKeyRecord*
 
 int AQ_API_GetEgressSAKeyRecord(struct atl_hw *hw, AQ_API_SEC_EgressSAKeyRecord* rec, uint16_t tableIndex)
 {
+    memset(rec, 0, sizeof(AQ_API_SEC_EgressSAKeyRecord));
+
     AQ_API_CALL_SAFE(GetEgressSAKeyRecord, hw, rec, tableIndex);
 }
 
@@ -1642,8 +1642,6 @@ static int GetEgressSCCounters(struct atl_hw *hw, AQ_API_SEC_EgressSCCounters* c
 
     if (SCIndex >= NUMROWS_EGRESSSCRECORD)
         return -EINVAL;
-
-    memset(counters, 0, sizeof(AQ_API_SEC_EgressSCCounters));
 
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SCIndex * 8 + 4);
     if (unlikely(ret))
@@ -1674,6 +1672,8 @@ static int GetEgressSCCounters(struct atl_hw *hw, AQ_API_SEC_EgressSCCounters* c
 
 int AQ_API_GetEgressSCCounters(struct atl_hw *hw, AQ_API_SEC_EgressSCCounters* counters, uint16_t SCIndex)
 {
+    memset(counters, 0, sizeof(AQ_API_SEC_EgressSCCounters));
+
     AQ_API_CALL_SAFE(GetEgressSCCounters, hw, counters, SCIndex);
 }
 
@@ -1684,8 +1684,6 @@ static int GetEgressSACounters(struct atl_hw *hw, AQ_API_SEC_EgressSACounters* c
 
     if (SAIndex >= NUMROWS_EGRESSSARECORD)
         return -EINVAL;
-
-    memset(counters, 0, sizeof(AQ_API_SEC_EgressSACounters));
 
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, SAIndex * 8 + 0);
     if (unlikely(ret))
@@ -1716,6 +1714,8 @@ static int GetEgressSACounters(struct atl_hw *hw, AQ_API_SEC_EgressSACounters* c
 
 int AQ_API_GetEgressSACounters(struct atl_hw *hw, AQ_API_SEC_EgressSACounters* counters, uint16_t SAIndex)
 {
+    memset(counters, 0, sizeof(AQ_API_SEC_EgressSACounters));
+
     AQ_API_CALL_SAFE(GetEgressSACounters, hw, counters, SAIndex);
 }
 
@@ -1723,8 +1723,6 @@ static int GetEgressCommonCounters(struct atl_hw *hw, AQ_API_SEC_EgressCommonCou
 {
     uint16_t packedRecVal[4];
     int ret;
-
-    memset(counters, 0, sizeof(AQ_API_SEC_EgressCommonCounters));
 
     ret = GetRawSECEgressRecordVal(hw, packedRecVal, 4, 3, 256 + 0);
     if (unlikely(ret))
@@ -1767,6 +1765,8 @@ static int GetEgressCommonCounters(struct atl_hw *hw, AQ_API_SEC_EgressCommonCou
 
 int AQ_API_GetEgressCommonCounters(struct atl_hw *hw, AQ_API_SEC_EgressCommonCounters* counters)
 {
+    memset(counters, 0, sizeof(AQ_API_SEC_EgressCommonCounters));
+
     AQ_API_CALL_SAFE(GetEgressCommonCounters, hw, counters);
 }
 
@@ -1851,8 +1851,6 @@ static int GetIngressSACounters(struct atl_hw *hw, AQ_API_SEC_IngressSACounters*
     if (SAIndex >= NUMROWS_INGRESSSARECORD)
         return -EINVAL;
 
-    memset(counters, 0, sizeof(AQ_API_SEC_IngressSACounters));
-
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, SAIndex * 12 + 0);
     if (unlikely(ret))
         return ret;
@@ -1930,6 +1928,8 @@ static int GetIngressSACounters(struct atl_hw *hw, AQ_API_SEC_IngressSACounters*
 
 int AQ_API_GetIngressSACounters(struct atl_hw *hw, AQ_API_SEC_IngressSACounters* counters, uint16_t SAIndex)
 {
+    memset(counters, 0, sizeof(AQ_API_SEC_IngressSACounters));
+
     AQ_API_CALL_SAFE(GetIngressSACounters, hw, counters, SAIndex);
 }
 
@@ -1937,8 +1937,6 @@ static int GetIngressCommonCounters(struct atl_hw *hw, AQ_API_SEC_IngressCommonC
 {
     uint16_t packedRecVal[4];
     int ret;
-
-    memset(counters, 0, sizeof(AQ_API_SEC_IngressCommonCounters));
 
     ret = GetRawSECIngressRecordVal(hw, packedRecVal, 4, 6, 385 + 0);
     if (unlikely(ret))
@@ -2041,6 +2039,8 @@ static int GetIngressCommonCounters(struct atl_hw *hw, AQ_API_SEC_IngressCommonC
 
 int AQ_API_GetIngressCommonCounters(struct atl_hw *hw, AQ_API_SEC_IngressCommonCounters* counters)
 {
+    memset(counters, 0, sizeof(AQ_API_SEC_IngressCommonCounters));
+
     AQ_API_CALL_SAFE(GetIngressCommonCounters, hw, counters);
 }
 
@@ -2135,6 +2135,8 @@ static int GetEgressSAExpired(struct atl_hw *hw, uint32_t *expired)
 
 int AQ_API_GetEgressSAExpired(struct atl_hw *hw, uint32_t *expired)
 {
+    *expired = 0;
+
     AQ_API_CALL_SAFE(GetEgressSAExpired, hw, expired);
 }
 
@@ -2160,6 +2162,8 @@ static int GetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t *expired)
 
 int AQ_API_GetEgressSAThresholdExpired(struct atl_hw *hw, uint32_t *expired)
 {
+    *expired = 0;
+
     AQ_API_CALL_SAFE(GetEgressSAThresholdExpired, hw, expired);
 }
 
