@@ -296,11 +296,11 @@ static void atl2_set_rate(struct atl_hw *hw,
 {
 	unsigned int adv = atl_link_adv(&hw->link_state);
 
-	link_options->rate_100M = !!(adv & atl_link_type_idx_100m);
-	link_options->rate_1G   = !!(adv & atl_link_type_idx_1g);
-	link_options->rate_2P5G = !!(adv & atl_link_type_idx_2p5g);
-	link_options->rate_5G   = !!(adv & atl_link_type_idx_5g);
-	link_options->rate_10G  = !!(adv & atl_link_type_idx_10g);
+	link_options->rate_100M = !!(adv & BIT(atl_link_type_idx_100m));
+	link_options->rate_1G   = !!(adv & BIT(atl_link_type_idx_1g));
+	link_options->rate_2P5G = !!(adv & BIT(atl_link_type_idx_2p5g));
+	link_options->rate_5G   = !!(adv & BIT(atl_link_type_idx_5g));
+	link_options->rate_10G  = !!(adv & BIT(atl_link_type_idx_10g));
 }
 
 static void atl2_set_eee(struct atl_link_state *lstate,
@@ -317,11 +317,11 @@ static void atl2_set_eee(struct atl_link_state *lstate,
 		return;
 	}
 
-	link_options->eee_100M = eee_advertized & atl_link_type_idx_100m;
-	link_options->eee_1G = eee_advertized & atl_link_type_idx_1g;
-	link_options->eee_2P5G = eee_advertized & atl_link_type_idx_2p5g;
-	link_options->eee_5G = eee_advertized & atl_link_type_idx_5g;
-	link_options->eee_10G = eee_advertized & atl_link_type_idx_10g;
+	link_options->eee_100M = eee_advertized & BIT(atl_link_type_idx_100m);
+	link_options->eee_1G = eee_advertized & BIT(atl_link_type_idx_1g);
+	link_options->eee_2P5G = eee_advertized & BIT(atl_link_type_idx_2p5g);
+	link_options->eee_5G = eee_advertized & BIT(atl_link_type_idx_5g);
+	link_options->eee_10G = eee_advertized & BIT(atl_link_type_idx_10g);
 }
 
 /* fw lock must be held */

@@ -10,10 +10,6 @@
 #ifndef _ATL2_FW_H_
 #define _ATL2_FW_H_
 
-#include <linux/kernel.h>
-#include <linux/mutex.h>
-#include <linux/ethtool.h>
-
 /* Start of HW byte packed interface declaration */
 #pragma pack(push, 1)
 
