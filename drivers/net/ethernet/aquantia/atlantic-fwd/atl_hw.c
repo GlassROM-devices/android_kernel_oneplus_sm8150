@@ -249,9 +249,9 @@ static int atl_hw_a2_reset(struct atl_hw *hw)
 		goto unlock;
 	}
 
-	busy_wait(50, mdelay(1), rbl_complete,
-			atl2_mcp_boot_complete(hw),
-			!rbl_complete);
+	busy_wait(100, mdelay(1), rbl_complete,
+		  atl2_mcp_boot_complete(hw),
+		  !rbl_complete);
 	if (!rbl_complete) {
 		err = -ETIME;
 		atl_dev_err("FW Restart timed out");
@@ -458,6 +458,9 @@ static irqreturn_t atl_link_irq(int irq, void *priv)
 
 	set_bit(ATL_ST_UPDATE_LINK, &nic->hw.state);
 	atl_schedule_work(nic);
+	if (nic->hw.brd_id == ATL_AQC113)
+		atl_write(&nic->hw, ATL2_MCP_HOST_REQ_INT, 0);
+
 	return IRQ_HANDLED;
 }
 
@@ -738,8 +741,15 @@ void atl_start_hw_global(struct atl_nic *nic)
 		atl_write(hw, ATL_INTR_AUTO_CLEAR, 0);
 	}
 
-	/* Map link interrupt to cause 0 */
+	/* Map MCP 4 interrupt to cause 0 */
 	atl_write(hw, ATL_INTR_GEN_INTR_MAP4, BIT(7) | (0 << 0));
+
+	if (hw->brd_id == ATL_AQC113) {
+		atl_set_bits(hw, ATL_GLOBAL_CTRL2, BIT(3) << 0xA);
+		atl_write(hw, ATL2_MCP_HOST_REQ_INT_MASK(3),
+			  ATL2_FW_HOST_INTERRUPT_LINK_UP |
+			  ATL2_FW_HOST_INTERRUPT_LINK_DOWN);
+	}
 
 	atl_write(hw, ATL_TX_INTR_CTRL, BIT(4));
 	atl_write(hw, ATL_RX_INTR_CTRL, BIT(3));
