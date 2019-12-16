@@ -42,21 +42,6 @@
 		sizeof(VARIABLE) / sizeof(u32));\
 }
 
-#define atl2_shared_buffer_read_item_fn_decl(ITEM) \
-static int atl2_mif_shared_buf_read_item_##ITEM(struct atl_hw *hw,\
-						void *data)\
-{\
-	atl2_mif_shared_buf_read(hw, \
-		(offsetof(struct fw_interface_out, ITEM) / sizeof(u32)),\
-		(u32 *)data,\
-		sizeof(((struct fw_interface_out *)0)->ITEM) / sizeof(u32));\
-	return 0;\
-}
-
-#define  atl2_shared_buffer_read_item_fn_name(ITEM) \
-	atl2_mif_shared_buf_read_item_##ITEM
-
-
 static void atl2_mif_shared_buf_get(struct atl_hw *hw, int offset,
 				       u32 *data, int len)
 {
@@ -98,8 +83,14 @@ static u32 atl2_mif_mcp_finished_read_get(struct atl_hw *hw)
 	return atl_read(hw, ATL2_MIF_MCP_FINISHED_READ) & 1;
 }
 
-static int atl2_shared_buffer_read_safe(struct atl_hw *hw,
-		     int (*read_item_fn)(struct atl_hw *hw, void *data),
+#define atl2_shared_buffer_read_safe(HW, ITEM, DATA) \
+	_atl2_shared_buffer_read_safe((HW), \
+		(offsetof(struct fw_interface_out, ITEM) / sizeof(u32)),\
+		sizeof(((struct fw_interface_out *)0)->ITEM) / sizeof(u32),\
+		(DATA))
+
+static int _atl2_shared_buffer_read_safe(struct atl_hw *hw,
+		     uint32_t offset, uint32_t dwords,
 		     void *data)
 {
 	struct transaction_counter_s tid1, tid2;
@@ -115,7 +106,7 @@ static int atl2_shared_buffer_read_safe(struct atl_hw *hw,
 				udelay(1);
 		} while (tid1.transaction_cnt_a != tid1.transaction_cnt_b);
 
-		read_item_fn(hw, data);
+		atl2_mif_shared_buf_read(hw, offset, (u32 *)data, dwords);
 
 		atl2_shared_buffer_read(hw, transaction_id, tid2);
 
@@ -545,8 +536,6 @@ static void atl2_fw_set_default_link(struct atl_hw *hw)
 	lstate->advertized &= ~ATL_EEE_MASK;
 }
 
-atl2_shared_buffer_read_item_fn_decl(phy_health_monitor);
-
 static int atl2_fw_get_phy_temperature(struct atl_hw *hw, int *temp)
 {
 	struct phy_health_monitor_s phy_health_monitor;
@@ -554,9 +543,8 @@ static int atl2_fw_get_phy_temperature(struct atl_hw *hw, int *temp)
 
 	atl_lock_fw(hw);
 
-	ret = atl2_shared_buffer_read_safe(hw,
-			atl2_shared_buffer_read_item_fn_name(phy_health_monitor),
-			&phy_health_monitor);
+	ret = atl2_shared_buffer_read_safe(hw, phy_health_monitor,
+					   &phy_health_monitor);
 
 	*temp = (phy_health_monitor.phy_temperature & 0xffff) * 1000 / 256;
 
@@ -583,9 +571,8 @@ static int __atl2_fw_get_hbeat(struct atl_hw *hw, uint16_t *hbeat)
 	struct phy_health_monitor_s phy_health_monitor;
 	int ret = 0;
 
-	ret = atl2_shared_buffer_read_safe(hw,
-			atl2_shared_buffer_read_item_fn_name(phy_health_monitor),
-			&phy_health_monitor);
+	ret = atl2_shared_buffer_read_safe(hw, phy_health_monitor,
+					   &phy_health_monitor);
 
 	*hbeat = phy_health_monitor.phy_heart_beat;
 
