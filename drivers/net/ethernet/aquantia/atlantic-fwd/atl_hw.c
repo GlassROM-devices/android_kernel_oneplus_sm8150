@@ -240,7 +240,7 @@ static int atl_hw_a2_reset(struct atl_hw *hw)
 	atl_clear_bits(hw, 0x404, 1);
 */
 	/* Wait for RBL boot */
-	busy_wait(50, mdelay(1), rbl_status,
+	busy_wait(200, mdelay(1), rbl_status,
 		  atl_read(hw, ATL2_MIF_BOOT_REG_ADR),
 		  !(rbl_status & ATL2_BOOT_STARTED)); 
 	if (!(rbl_status & ATL2_BOOT_STARTED)) {
