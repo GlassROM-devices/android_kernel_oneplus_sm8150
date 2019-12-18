@@ -224,7 +224,7 @@ static int GetRawSECEgressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 
 static int
 SetIngressPreCTLFRecord(struct atl_hw *hw,
-			const struct AQ_API_SEC_IngressPreCTLFRecord *rec,
+			const struct aq_mss_ingress_prectlf_record *rec,
 			uint16_t tableIndex)
 {
 	uint16_t packedRecVal[6];
@@ -255,14 +255,14 @@ SetIngressPreCTLFRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetIngressPreCTLFRecord(
-	struct atl_hw *hw, const struct AQ_API_SEC_IngressPreCTLFRecord *rec,
+	struct atl_hw *hw, const struct aq_mss_ingress_prectlf_record *rec,
 	uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetIngressPreCTLFRecord, hw, rec, tableIndex);
 }
 
 static int GetIngressPreCTLFRecord(struct atl_hw *hw,
-				   struct AQ_API_SEC_IngressPreCTLFRecord *rec,
+				   struct aq_mss_ingress_prectlf_record *rec,
 				   uint16_t tableIndex)
 {
 	uint16_t packedRecVal[6];
@@ -315,7 +315,7 @@ static int GetIngressPreCTLFRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressPreCTLFRecord(struct atl_hw *hw,
-				   struct AQ_API_SEC_IngressPreCTLFRecord *rec,
+				   struct aq_mss_ingress_prectlf_record *rec,
 				   uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -325,7 +325,7 @@ int AQ_API_GetIngressPreCTLFRecord(struct atl_hw *hw,
 
 static int
 SetIngressPreClassRecord(struct atl_hw *hw,
-			 const struct AQ_API_SEC_IngressPreClassRecord *rec,
+			 const struct aq_mss_ingress_preclass_record *rec,
 			 uint16_t tableIndex)
 {
 	uint16_t packedRecVal[20];
@@ -449,7 +449,7 @@ SetIngressPreClassRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetIngressPreClassRecord(
-	struct atl_hw *hw, const struct AQ_API_SEC_IngressPreClassRecord *rec,
+	struct atl_hw *hw, const struct aq_mss_ingress_preclass_record *rec,
 	uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetIngressPreClassRecord, hw, rec, tableIndex);
@@ -457,7 +457,7 @@ int AQ_API_SetIngressPreClassRecord(
 
 static int
 GetIngressPreClassRecord(struct atl_hw *hw,
-			 struct AQ_API_SEC_IngressPreClassRecord *rec,
+			 struct aq_mss_ingress_preclass_record *rec,
 			 uint16_t tableIndex)
 {
 	uint16_t packedRecVal[20];
@@ -595,7 +595,7 @@ GetIngressPreClassRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressPreClassRecord(
-	struct atl_hw *hw, struct AQ_API_SEC_IngressPreClassRecord *rec,
+	struct atl_hw *hw, struct aq_mss_ingress_preclass_record *rec,
 	uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -604,7 +604,7 @@ int AQ_API_GetIngressPreClassRecord(
 }
 
 static int SetIngressSCRecord(struct atl_hw *hw,
-			      const struct AQ_API_SEC_IngressSCRecord *rec,
+			      const struct aq_mss_ingress_sc_record *rec,
 			      uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -659,14 +659,14 @@ static int SetIngressSCRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetIngressSCRecord(struct atl_hw *hw,
-			      const struct AQ_API_SEC_IngressSCRecord *rec,
+			      const struct aq_mss_ingress_sc_record *rec,
 			      uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetIngressSCRecord, hw, rec, tableIndex);
 }
 
 static int GetIngressSCRecord(struct atl_hw *hw,
-			      struct AQ_API_SEC_IngressSCRecord *rec,
+			      struct aq_mss_ingress_sc_record *rec,
 			      uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -724,7 +724,7 @@ static int GetIngressSCRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressSCRecord(struct atl_hw *hw,
-			      struct AQ_API_SEC_IngressSCRecord *rec,
+			      struct aq_mss_ingress_sc_record *rec,
 			      uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -733,7 +733,7 @@ int AQ_API_GetIngressSCRecord(struct atl_hw *hw,
 }
 
 static int SetIngressSARecord(struct atl_hw *hw,
-			      const struct AQ_API_SEC_IngressSARecord *rec,
+			      const struct aq_mss_ingress_sa_record *rec,
 			      uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -780,14 +780,14 @@ static int SetIngressSARecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetIngressSARecord(struct atl_hw *hw,
-			      const struct AQ_API_SEC_IngressSARecord *rec,
+			      const struct aq_mss_ingress_sa_record *rec,
 			      uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetIngressSARecord, hw, rec, tableIndex);
 }
 
 static int GetIngressSARecord(struct atl_hw *hw,
-			      struct AQ_API_SEC_IngressSARecord *rec,
+			      struct aq_mss_ingress_sa_record *rec,
 			      uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -837,7 +837,7 @@ static int GetIngressSARecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressSARecord(struct atl_hw *hw,
-			      struct AQ_API_SEC_IngressSARecord *rec,
+			      struct aq_mss_ingress_sa_record *rec,
 			      uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -847,7 +847,7 @@ int AQ_API_GetIngressSARecord(struct atl_hw *hw,
 
 static int
 SetIngressSAKeyRecord(struct atl_hw *hw,
-		      const struct AQ_API_SEC_IngressSAKeyRecord *rec,
+		      const struct aq_mss_ingress_sakey_record *rec,
 		      uint16_t tableIndex)
 {
 	uint16_t packedRecVal[18];
@@ -906,14 +906,14 @@ SetIngressSAKeyRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetIngressSAKeyRecord(
-	struct atl_hw *hw,  const struct AQ_API_SEC_IngressSAKeyRecord *rec,
+	struct atl_hw *hw, const struct aq_mss_ingress_sakey_record *rec,
 	uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetIngressSAKeyRecord, hw, rec, tableIndex);
 }
 
 static int GetIngressSAKeyRecord(struct atl_hw *hw,
-				 struct AQ_API_SEC_IngressSAKeyRecord *rec,
+				 struct aq_mss_ingress_sakey_record *rec,
 				 uint16_t tableIndex)
 {
 	uint16_t packedRecVal[18];
@@ -975,7 +975,7 @@ static int GetIngressSAKeyRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressSAKeyRecord(struct atl_hw *hw,
-				 struct AQ_API_SEC_IngressSAKeyRecord *rec,
+				 struct aq_mss_ingress_sakey_record *rec,
 				 uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -985,7 +985,7 @@ int AQ_API_GetIngressSAKeyRecord(struct atl_hw *hw,
 
 static int
 SetIngressPostClassRecord(struct atl_hw *hw,
-			  const struct AQ_API_SEC_IngressPostClassRecord *rec,
+			  const struct aq_mss_ingress_postclass_record *rec,
 			  uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -1097,7 +1097,7 @@ SetIngressPostClassRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetIngressPostClassRecord(
-	struct atl_hw *hw, const struct AQ_API_SEC_IngressPostClassRecord *rec,
+	struct atl_hw *hw, const struct aq_mss_ingress_postclass_record *rec,
 	uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetIngressPostClassRecord, hw, rec, tableIndex);
@@ -1105,7 +1105,7 @@ int AQ_API_SetIngressPostClassRecord(
 
 static int
 GetIngressPostClassRecord(struct atl_hw *hw,
-			  struct AQ_API_SEC_IngressPostClassRecord *rec,
+			  struct aq_mss_ingress_postclass_record *rec,
 			  uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -1231,7 +1231,7 @@ GetIngressPostClassRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressPostClassRecord(
-	struct atl_hw *hw, struct AQ_API_SEC_IngressPostClassRecord *rec,
+	struct atl_hw *hw, struct aq_mss_ingress_postclass_record *rec,
 	uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -1241,7 +1241,7 @@ int AQ_API_GetIngressPostClassRecord(
 
 static int
 SetIngressPostCTLFRecord(struct atl_hw *hw,
-			 const struct AQ_API_SEC_IngressPostCTLFRecord *rec,
+			 const struct aq_mss_ingress_postctlf_record *rec,
 			 uint16_t tableIndex)
 {
 	uint16_t packedRecVal[6];
@@ -1277,7 +1277,7 @@ SetIngressPostCTLFRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetIngressPostCTLFRecord(
-	struct atl_hw *hw, const struct AQ_API_SEC_IngressPostCTLFRecord *rec,
+	struct atl_hw *hw, const struct aq_mss_ingress_postctlf_record *rec,
 	uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetIngressPostCTLFRecord, hw, rec, tableIndex);
@@ -1285,7 +1285,7 @@ int AQ_API_SetIngressPostCTLFRecord(
 
 static int
 GetIngressPostCTLFRecord(struct atl_hw *hw,
-			 struct AQ_API_SEC_IngressPostCTLFRecord *rec,
+			 struct aq_mss_ingress_postctlf_record *rec,
 			 uint16_t tableIndex)
 {
 	uint16_t packedRecVal[6];
@@ -1335,7 +1335,7 @@ GetIngressPostCTLFRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressPostCTLFRecord(
-	struct atl_hw *hw, struct AQ_API_SEC_IngressPostCTLFRecord *rec,
+	struct atl_hw *hw, struct aq_mss_ingress_postctlf_record *rec,
 	uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -1344,7 +1344,7 @@ int AQ_API_GetIngressPostCTLFRecord(
 }
 
 static int SetEgressCTLFRecord(struct atl_hw *hw,
-			       const struct AQ_API_SEC_EgressCTLFRecord *rec,
+			       const struct aq_mss_egress_ctlf_record *rec,
 			       uint16_t tableIndex)
 {
 	uint16_t packedRecVal[6];
@@ -1380,14 +1380,14 @@ static int SetEgressCTLFRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetEgressCTLFRecord(struct atl_hw *hw,
-			       const struct AQ_API_SEC_EgressCTLFRecord *rec,
+			       const struct aq_mss_egress_ctlf_record *rec,
 			       uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetEgressCTLFRecord, hw, rec, tableIndex);
 }
 
 static int GetEgressCTLFRecord(struct atl_hw *hw,
-			       struct AQ_API_SEC_EgressCTLFRecord *rec,
+			       struct aq_mss_egress_ctlf_record *rec,
 			       uint16_t tableIndex)
 {
 	uint16_t packedRecVal[6];
@@ -1436,7 +1436,7 @@ static int GetEgressCTLFRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressCTLFRecord(struct atl_hw *hw,
-			       struct AQ_API_SEC_EgressCTLFRecord *rec,
+			       struct aq_mss_egress_ctlf_record *rec,
 			       uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -1445,7 +1445,7 @@ int AQ_API_GetEgressCTLFRecord(struct atl_hw *hw,
 }
 
 static int SetEgressClassRecord(struct atl_hw *hw,
-				const struct AQ_API_SEC_EgressClassRecord *rec,
+				const struct aq_mss_egress_class_record *rec,
 				uint16_t tableIndex)
 {
 	uint16_t packedRecVal[28];
@@ -1642,14 +1642,14 @@ static int SetEgressClassRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetEgressClassRecord(struct atl_hw *hw,
-				const struct AQ_API_SEC_EgressClassRecord *rec,
+				const struct aq_mss_egress_class_record *rec,
 				uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetEgressClassRecord, hw, rec, tableIndex);
 }
 
 static int GetEgressClassRecord(struct atl_hw *hw,
-				struct AQ_API_SEC_EgressClassRecord *rec,
+				struct aq_mss_egress_class_record *rec,
 				uint16_t tableIndex)
 {
 	uint16_t packedRecVal[28];
@@ -1860,7 +1860,7 @@ static int GetEgressClassRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressClassRecord(struct atl_hw *hw,
-				struct AQ_API_SEC_EgressClassRecord *rec,
+				struct aq_mss_egress_class_record *rec,
 				uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -1869,7 +1869,7 @@ int AQ_API_GetEgressClassRecord(struct atl_hw *hw,
 }
 
 static int SetEgressSCRecord(struct atl_hw *hw,
-			     const struct AQ_API_SEC_EgressSCRecord *rec,
+			     const struct aq_mss_egress_sc_record *rec,
 			     uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -1923,14 +1923,14 @@ static int SetEgressSCRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetEgressSCRecord(struct atl_hw *hw,
-			     const struct AQ_API_SEC_EgressSCRecord *rec,
+			     const struct aq_mss_egress_sc_record *rec,
 			     uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetEgressSCRecord, hw, rec, tableIndex);
 }
 
 static int GetEgressSCRecord(struct atl_hw *hw,
-			     struct AQ_API_SEC_EgressSCRecord *rec,
+			     struct aq_mss_egress_sc_record *rec,
 			     uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -1987,7 +1987,7 @@ static int GetEgressSCRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressSCRecord(struct atl_hw *hw,
-			     struct AQ_API_SEC_EgressSCRecord *rec,
+			     struct aq_mss_egress_sc_record *rec,
 			     uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -1996,7 +1996,7 @@ int AQ_API_GetEgressSCRecord(struct atl_hw *hw,
 }
 
 static int SetEgressSARecord(struct atl_hw *hw,
-			     const struct AQ_API_SEC_EgressSARecord *rec,
+			     const struct aq_mss_egress_sa_record *rec,
 			     uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -2035,14 +2035,14 @@ static int SetEgressSARecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetEgressSARecord(struct atl_hw *hw,
-			     const struct AQ_API_SEC_EgressSARecord *rec,
+			     const struct aq_mss_egress_sa_record *rec,
 			     uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetEgressSARecord, hw, rec, tableIndex);
 }
 
 static int GetEgressSARecord(struct atl_hw *hw,
-			     struct AQ_API_SEC_EgressSARecord *rec,
+			     struct aq_mss_egress_sa_record *rec,
 			     uint16_t tableIndex)
 {
 	uint16_t packedRecVal[8];
@@ -2084,7 +2084,7 @@ static int GetEgressSARecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressSARecord(struct atl_hw *hw,
-			     struct AQ_API_SEC_EgressSARecord *rec,
+			     struct aq_mss_egress_sa_record *rec,
 			     uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -2093,7 +2093,7 @@ int AQ_API_GetEgressSARecord(struct atl_hw *hw,
 }
 
 static int SetEgressSAKeyRecord(struct atl_hw *hw,
-				const struct AQ_API_SEC_EgressSAKeyRecord *rec,
+				const struct aq_mss_egress_sakey_record *rec,
 				uint16_t tableIndex)
 {
 	uint16_t packedRecVal[16];
@@ -2159,14 +2159,14 @@ static int SetEgressSAKeyRecord(struct atl_hw *hw,
 }
 
 int AQ_API_SetEgressSAKeyRecord(struct atl_hw *hw,
-				const struct AQ_API_SEC_EgressSAKeyRecord *rec,
+				const struct aq_mss_egress_sakey_record *rec,
 				uint16_t tableIndex)
 {
 	AQ_API_CALL_SAFE(SetEgressSAKeyRecord, hw, rec, tableIndex);
 }
 
 static int GetEgressSAKeyRecord(struct atl_hw *hw,
-				struct AQ_API_SEC_EgressSAKeyRecord *rec,
+				struct aq_mss_egress_sakey_record *rec,
 				uint16_t tableIndex)
 {
 	uint16_t packedRecVal[16];
@@ -2230,7 +2230,7 @@ static int GetEgressSAKeyRecord(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressSAKeyRecord(struct atl_hw *hw,
-				struct AQ_API_SEC_EgressSAKeyRecord *rec,
+				struct aq_mss_egress_sakey_record *rec,
 				uint16_t tableIndex)
 {
 	memset(rec, 0, sizeof(*rec));
@@ -2239,7 +2239,7 @@ int AQ_API_GetEgressSAKeyRecord(struct atl_hw *hw,
 }
 
 static int GetEgressSCCounters(struct atl_hw *hw,
-			       struct AQ_API_SEC_EgressSCCounters *counters,
+			       struct aq_mss_egress_sc_counters *counters,
 			       uint16_t SCIndex)
 {
 	uint16_t packedRecVal[4];
@@ -2284,7 +2284,7 @@ static int GetEgressSCCounters(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressSCCounters(struct atl_hw *hw,
-			       struct AQ_API_SEC_EgressSCCounters *counters,
+			       struct aq_mss_egress_sc_counters *counters,
 			       uint16_t SCIndex)
 {
 	memset(counters, 0, sizeof(*counters));
@@ -2293,7 +2293,7 @@ int AQ_API_GetEgressSCCounters(struct atl_hw *hw,
 }
 
 static int GetEgressSACounters(struct atl_hw *hw,
-			       struct AQ_API_SEC_EgressSACounters *counters,
+			       struct aq_mss_egress_sa_counters *counters,
 			       uint16_t SAIndex)
 {
 	uint16_t packedRecVal[4];
@@ -2338,7 +2338,7 @@ static int GetEgressSACounters(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressSACounters(struct atl_hw *hw,
-			       struct AQ_API_SEC_EgressSACounters *counters,
+			       struct aq_mss_egress_sa_counters *counters,
 			       uint16_t SAIndex)
 {
 	memset(counters, 0, sizeof(*counters));
@@ -2348,7 +2348,7 @@ int AQ_API_GetEgressSACounters(struct atl_hw *hw,
 
 static int
 GetEgressCommonCounters(struct atl_hw *hw,
-			struct AQ_API_SEC_EgressCommonCounters *counters)
+			struct aq_mss_egress_common_counters *counters)
 {
 	uint16_t packedRecVal[4];
 	int ret;
@@ -2397,7 +2397,7 @@ GetEgressCommonCounters(struct atl_hw *hw,
 }
 
 int AQ_API_GetEgressCommonCounters(
-	struct atl_hw *hw, struct AQ_API_SEC_EgressCommonCounters *counters)
+	struct atl_hw *hw, struct aq_mss_egress_common_counters *counters)
 {
 	memset(counters, 0, sizeof(*counters));
 
@@ -2464,7 +2464,7 @@ int AQ_API_ClearEgressCounters(struct atl_hw *hw)
 }
 
 static int GetIngressSACounters(struct atl_hw *hw,
-				struct AQ_API_SEC_IngressSACounters *counters,
+				struct aq_mss_ingress_sa_counters *counters,
 				uint16_t SAIndex)
 {
 	uint16_t packedRecVal[4];
@@ -2569,7 +2569,7 @@ static int GetIngressSACounters(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressSACounters(struct atl_hw *hw,
-				struct AQ_API_SEC_IngressSACounters *counters,
+				struct aq_mss_ingress_sa_counters *counters,
 				uint16_t SAIndex)
 {
 	memset(counters, 0, sizeof(*counters));
@@ -2579,7 +2579,7 @@ int AQ_API_GetIngressSACounters(struct atl_hw *hw,
 
 static int
 GetIngressCommonCounters(struct atl_hw *hw,
-			 struct AQ_API_SEC_IngressCommonCounters *counters)
+			 struct aq_mss_ingress_common_counters *counters)
 {
 	uint16_t packedRecVal[4];
 	int ret;
@@ -2700,7 +2700,7 @@ GetIngressCommonCounters(struct atl_hw *hw,
 }
 
 int AQ_API_GetIngressCommonCounters(
-	struct atl_hw *hw, struct AQ_API_SEC_IngressCommonCounters *counters)
+	struct atl_hw *hw, struct aq_mss_ingress_common_counters *counters)
 {
 	memset(counters, 0, sizeof(*counters));
 

@@ -142,8 +142,8 @@ static void atl_rotate_keys(uint32_t (*key)[8], int key_len)
 static int atl_macsec_get_common_stats(struct atl_hw *hw,
 				       struct atl_macsec_common_stats *stats)
 {
-	struct AQ_API_SEC_EgressCommonCounters egress_counters;
-	struct AQ_API_SEC_IngressCommonCounters ingress_counters;
+	struct aq_mss_egress_common_counters egress_counters;
+	struct aq_mss_ingress_common_counters ingress_counters;
 	int ret;
 
 	/* MACSEC counters */
@@ -201,7 +201,7 @@ static int atl_macsec_get_common_stats(struct atl_hw *hw,
 static int atl_macsec_get_rx_sa_stats(struct atl_hw *hw, int sa_idx,
 				      struct atl_macsec_rx_sa_stats *stats)
 {
-	struct AQ_API_SEC_IngressSACounters i_sa_counters;
+	struct aq_mss_ingress_sa_counters i_sa_counters;
 	int ret;
 
 	ret = AQ_API_GetIngressSACounters(hw, &i_sa_counters, sa_idx);
@@ -231,7 +231,7 @@ static int atl_macsec_get_rx_sa_stats(struct atl_hw *hw, int sa_idx,
 static int atl_macsec_get_tx_sa_stats(struct atl_hw *hw, int sa_idx,
 				      struct atl_macsec_tx_sa_stats *stats)
 {
-	struct AQ_API_SEC_EgressSACounters e_sa_counters;
+	struct aq_mss_egress_sa_counters e_sa_counters;
 	int ret;
 
 	ret = AQ_API_GetEgressSACounters(hw, &e_sa_counters, sa_idx);
@@ -252,7 +252,7 @@ static int atl_macsec_get_tx_sa_stats(struct atl_hw *hw, int sa_idx,
 
 static int atl_macsec_get_tx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 {
-	struct AQ_API_SEC_EgressSARecord matchSARecord;
+	struct aq_mss_egress_sa_record matchSARecord;
 	int ret;
 
 	ret = AQ_API_GetEgressSARecord(hw, &matchSARecord, sa_idx);
@@ -264,7 +264,7 @@ static int atl_macsec_get_tx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 
 static int atl_macsec_get_rx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 {
-	struct AQ_API_SEC_IngressSARecord matchSARecord;
+	struct aq_mss_ingress_sa_record matchSARecord;
 	int ret;
 
 	ret = AQ_API_GetIngressSARecord(hw, &matchSARecord, sa_idx);
@@ -277,7 +277,7 @@ static int atl_macsec_get_rx_sa_next_pn(struct atl_hw *hw, int sa_idx, u32 *pn)
 static int atl_macsec_get_tx_sc_stats(struct atl_hw *hw, int sc_idx,
 				      struct atl_macsec_tx_sc_stats *stats)
 {
-	struct AQ_API_SEC_EgressSCCounters e_sc_counters;
+	struct aq_mss_egress_sc_counters e_sc_counters;
 	int ret;
 
 	ret = AQ_API_GetEgressSCCounters(hw, &e_sc_counters, sc_idx);
@@ -408,7 +408,7 @@ int atl_init_macsec(struct atl_hw *hw)
 	for (index = 0; index < ARRAY_SIZE(ctl_ether_types); index++) {
 		if (ctl_ether_types[index] == 0)
 			continue;
-		struct AQ_API_SEC_EgressCTLFRecord egressCTLFRecord = { 0 };
+		struct aq_mss_egress_ctlf_record egressCTLFRecord = { 0 };
 		egressCTLFRecord.eth_type = ctl_ether_types[index];
 		egressCTLFRecord.match_type = 4; /* Match eth_type only */
 		egressCTLFRecord.match_mask = 0xf; /* match for eth_type */
@@ -416,7 +416,7 @@ int atl_init_macsec(struct atl_hw *hw)
 		tbl_idx = NUMROWS_EGRESSCTLFRECORD - num_ctl_ether_types - 1;
 		AQ_API_SetEgressCTLFRecord(hw, &egressCTLFRecord, tbl_idx);
 
-		struct AQ_API_SEC_IngressPreCTLFRecord ingressPreCTLFRecord = {
+		struct aq_mss_ingress_prectlf_record ingressPreCTLFRecord = {
 			0
 		};
 		ingressPreCTLFRecord.eth_type = ctl_ether_types[index];
@@ -469,7 +469,7 @@ static int atl_set_txsc(struct atl_hw *hw, int txsc_idx)
 	unsigned int sc_idx = atl_txsc->hw_sc_idx;
 	int ret = 0;
 
-	struct AQ_API_SEC_EgressClassRecord matchEgressClassRecord = { 0 };
+	struct aq_mss_egress_class_record matchEgressClassRecord = { 0 };
 
 	ether_addr_to_mac(matchEgressClassRecord.mac_sa,
 			  secy->netdev->dev_addr);
@@ -496,7 +496,7 @@ static int atl_set_txsc(struct atl_hw *hw, int txsc_idx)
 	if (ret)
 		return ret;
 
-	struct AQ_API_SEC_EgressSCRecord matchSCRecord = { 0 };
+	struct aq_mss_egress_sc_record matchSCRecord = { 0 };
 
 	matchSCRecord.protect = secy->protect_frames;
 	if (secy->tx_sc.encrypt)
@@ -663,8 +663,8 @@ static int atl_clear_txsc(struct atl_nic *nic, const int txsc_idx,
 {
 	struct atl_hw *hw = &nic->hw;
 	struct atl_macsec_txsc *tx_sc = &hw->macsec_cfg.atl_txsc[txsc_idx];
-	struct AQ_API_SEC_EgressClassRecord matchEgressClassRecord = { 0 };
-	struct AQ_API_SEC_EgressSCRecord matchSCRecord = { 0 };
+	struct aq_mss_egress_class_record matchEgressClassRecord = { 0 };
+	struct aq_mss_egress_sc_record matchSCRecord = { 0 };
 	int ret = 0;
 	int sa_num;
 
@@ -710,8 +710,8 @@ static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
 			   const struct macsec_tx_sa *tx_sa,
 			   const unsigned char *key, unsigned char an)
 {
-	struct AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = { 0 };
-	struct AQ_API_SEC_EgressSARecord matchSARecord = { 0 };
+	struct aq_mss_egress_sakey_record matchKeyRecord = { 0 };
+	struct aq_mss_egress_sa_record matchSARecord = { 0 };
 	unsigned int sa_idx = sc_idx | an;
 	int ret = 0;
 
@@ -796,14 +796,14 @@ static int atl_clear_txsa(struct atl_nic *nic, struct atl_macsec_txsc *atl_txsc,
 		clear_bit(sa_num, &atl_txsc->tx_sa_idx_busy);
 
 	if ((clear_type & ATL_CLEAR_HW) && netif_carrier_ok(nic->ndev)) {
-		struct AQ_API_SEC_EgressSARecord matchSARecord = { 0 };
+		struct aq_mss_egress_sa_record matchSARecord = { 0 };
 		matchSARecord.fresh = 1;
 
 		ret = AQ_API_SetEgressSARecord(hw, &matchSARecord, sa_idx);
 		if (ret)
 			return ret;
 
-		struct AQ_API_SEC_EgressSAKeyRecord matchKeyRecord = { 0 };
+		struct aq_mss_egress_sakey_record matchKeyRecord = { 0 };
 
 		return AQ_API_SetEgressSAKeyRecord(hw, &matchKeyRecord, sa_idx);
 	}
@@ -845,11 +845,11 @@ static int atl_set_rxsc(struct atl_hw *hw, const uint32_t rxsc_idx)
 {
 	const struct atl_macsec_rxsc *atl_rxsc =
 		&hw->macsec_cfg.atl_rxsc[rxsc_idx];
-	struct AQ_API_SEC_IngressPreClassRecord pre_class_record = { 0 };
+	struct aq_mss_ingress_preclass_record pre_class_record = { 0 };
 	const struct macsec_rx_sc *rx_sc = atl_rxsc->sw_rxsc;
 	const struct macsec_secy *secy = atl_rxsc->sw_secy;
 	const uint32_t hw_sc_idx = atl_rxsc->hw_sc_idx;
-	struct AQ_API_SEC_IngressSCRecord sc_record = { 0 };
+	struct aq_mss_ingress_sc_record sc_record = { 0 };
 	int ret = 0;
 
 	atl_dev_dbg("set rx_sc: rxsc_idx=%d, sci %#llx, hw_sc_idx=%d\n",
@@ -977,10 +977,10 @@ static int atl_clear_rxsc(struct atl_nic *nic, const int rxsc_idx,
 	}
 
 	if (clear_type & ATL_CLEAR_HW) {
-		struct AQ_API_SEC_IngressPreClassRecord pre_class_record = {
+		struct aq_mss_ingress_preclass_record pre_class_record = {
 			0
 		};
-		struct AQ_API_SEC_IngressSCRecord sc_record = { 0 };
+		struct aq_mss_ingress_sc_record sc_record = { 0 };
 
 		ret = AQ_API_SetIngressPreClassRecord(hw, &pre_class_record,
 						      2 * rxsc_idx);
@@ -1039,8 +1039,8 @@ static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
 			   const struct macsec_rx_sa *rx_sa,
 			   const unsigned char *key, const unsigned char an)
 {
-	struct AQ_API_SEC_IngressSAKeyRecord sa_key_record = { 0 };
-	struct AQ_API_SEC_IngressSARecord sa_record = { 0 };
+	struct aq_mss_ingress_sakey_record sa_key_record = { 0 };
+	struct aq_mss_ingress_sa_record sa_record = { 0 };
 	const int sa_idx = sc_idx | an;
 	int ret = 0;
 
@@ -1144,8 +1144,8 @@ static int atl_clear_rxsa(struct atl_nic *nic, struct atl_macsec_rxsc *atl_rxsc,
 		clear_bit(sa_num, &atl_rxsc->rx_sa_idx_busy);
 
 	if ((clear_type & ATL_CLEAR_HW) && netif_carrier_ok(nic->ndev)) {
-		struct AQ_API_SEC_IngressSAKeyRecord sa_key_record = { 0 };
-		struct AQ_API_SEC_IngressSARecord sa_record = { 0 };
+		struct aq_mss_ingress_sakey_record sa_key_record = { 0 };
+		struct aq_mss_ingress_sa_record sa_record = { 0 };
 
 		sa_record.fresh = 1;
 		ret = AQ_API_SetIngressSARecord(hw, &sa_record, sa_idx);

@@ -4,7 +4,7 @@
 /*! Represents the bitfields of a single row in the Egress CTL Filter
  *  table.
  */
-struct AQ_API_SEC_EgressCTLFRecord {
+struct aq_mss_egress_ctlf_record {
 	/*! This is used to store the 48 bit value used to compare SA, DA or
 	 *  halfDA+half SA value.
 	 */
@@ -37,7 +37,7 @@ struct AQ_API_SEC_EgressCTLFRecord {
 /*! Represents the bitfields of a single row in the Egress Packet
  *  Classifier table.
  */
-struct AQ_API_SEC_EgressClassRecord {
+struct aq_mss_egress_class_record {
 	/*! VLAN ID field. */
 	uint32_t vlan_id;
 	/*! VLAN UP field. */
@@ -224,7 +224,7 @@ struct AQ_API_SEC_EgressClassRecord {
 };
 
 /*! Represents the bitfields of a single row in the Egress SC Lookup table. */
-struct AQ_API_SEC_EgressSCRecord {
+struct aq_mss_egress_sc_record {
 	/*! This is to specify when the SC was first used. Set by HW. */
 	uint32_t start_time;
 	/*! This is to specify when the SC was last used. Set by HW. */
@@ -278,7 +278,7 @@ struct AQ_API_SEC_EgressSCRecord {
 };
 
 /*! Represents the bitfields of a single row in the Egress SA Lookup table. */
-struct AQ_API_SEC_EgressSARecord {
+struct aq_mss_egress_sa_record {
 	/*! This is to specify when the SC was first used. Set by HW. */
 	uint32_t start_time;
 	/*! This is to specify when the SC was last used. Set by HW. */
@@ -304,7 +304,7 @@ struct AQ_API_SEC_EgressSARecord {
 /*! Represents the bitfields of a single row in the Egress SA Key
  *  Lookup table.
  */
-struct AQ_API_SEC_EgressSAKeyRecord {
+struct aq_mss_egress_sakey_record {
 	/*! Key for AES-GCM processing. */
 	uint32_t key[8];
 };
@@ -312,7 +312,7 @@ struct AQ_API_SEC_EgressSAKeyRecord {
 /*! Represents the bitfields of a single row in the Ingress Pre-MACSec
  *  CTL Filter table.
  */
-struct AQ_API_SEC_IngressPreCTLFRecord {
+struct aq_mss_ingress_prectlf_record {
 	/*! This is used to store the 48 bit value used to compare SA, DA
 	 *  or halfDA+half SA value.
 	 */
@@ -345,7 +345,7 @@ struct AQ_API_SEC_IngressPreCTLFRecord {
 /*! Represents the bitfields of a single row in the Ingress Pre-MACSec
  *  Packet Classifier table.
  */
-struct AQ_API_SEC_IngressPreClassRecord {
+struct aq_mss_ingress_preclass_record {
 	/*! The 64 bit SCI field used to compare with extracted value.
 	 *  Should have SCI value in case TCI[SCI_SEND] == 0. This will be
 	 *  used for ICV calculation.
@@ -479,7 +479,7 @@ struct AQ_API_SEC_IngressPreClassRecord {
 };
 
 /*! Represents the bitfields of a single row in the Ingress SC Lookup table. */
-struct AQ_API_SEC_IngressSCRecord {
+struct aq_mss_ingress_sc_record {
 	/*! This is to specify when the SC was first used. Set by HW. */
 	uint32_t stop_time;
 	/*! This is to specify when the SC was first used. Set by HW. */
@@ -524,7 +524,7 @@ struct AQ_API_SEC_IngressSCRecord {
 };
 
 /*! Represents the bitfields of a single row in the Ingress SA Lookup table. */
-struct AQ_API_SEC_IngressSARecord {
+struct aq_mss_ingress_sa_record {
 	/*! This is to specify when the SC was first used. Set by HW. */
 	uint32_t stop_time;
 	/*! This is to specify when the SC was first used. Set by HW. */
@@ -557,7 +557,7 @@ struct AQ_API_SEC_IngressSARecord {
 /*! Represents the bitfields of a single row in the Ingress SA Key
  *  Lookup table.
  */
-struct AQ_API_SEC_IngressSAKeyRecord {
+struct aq_mss_ingress_sakey_record {
 	/*! Key for AES-GCM processing. */
 	uint32_t key[8];
 	/*! AES key size
@@ -572,7 +572,7 @@ struct AQ_API_SEC_IngressSAKeyRecord {
 /*! Represents the bitfields of a single row in the Ingress Post-
  *  MACSec Packet Classifier table.
  */
-struct AQ_API_SEC_IngressPostClassRecord {
+struct aq_mss_ingress_postclass_record {
 	/*! The 8 bit value used to compare with extracted value for byte 0. */
 	uint32_t byte0;
 	/*! The 8 bit value used to compare with extracted value for byte 1. */
@@ -662,7 +662,7 @@ struct AQ_API_SEC_IngressPostClassRecord {
 /*! Represents the bitfields of a single row in the Ingress Post-
  *  MACSec CTL Filter table.
  */
-struct AQ_API_SEC_IngressPostCTLFRecord {
+struct aq_mss_ingress_postctlf_record {
 	/*! This is used to store the 48 bit value used to compare SA, DA
 	 *  or halfDA+half SA value.
 	 */
@@ -695,7 +695,7 @@ struct AQ_API_SEC_IngressPostCTLFRecord {
 /*! Represents the Egress MIB counters for a single SC. Counters are
  *  64 bits, lower 32 bits in field[0].
  */
-struct AQ_API_SEC_EgressSCCounters {
+struct aq_mss_egress_sc_counters {
 	/*! The number of integrity protected but not encrypted packets
 	 *  for this transmitting SC.
 	 */
@@ -717,7 +717,7 @@ struct AQ_API_SEC_EgressSCCounters {
 /*! Represents the Egress MIB counters for a single SA. Counters are
  *  64 bits, lower 32 bits in field[0].
  */
-struct AQ_API_SEC_EgressSACounters {
+struct aq_mss_egress_sa_counters {
 	/*! The number of dropped packets for this transmitting SA. */
 	uint32_t sa_hit_drop_redirect[2];
 	/*! TODO */
@@ -736,7 +736,7 @@ struct AQ_API_SEC_EgressSACounters {
  *  associated with a particular SC/SA. Counters are 64 bits, lower 32
  *  bits in field[0].
  */
-struct AQ_API_SEC_EgressCommonCounters {
+struct aq_mss_egress_common_counters {
 	/*! The number of transmitted packets classified as MAC_CTL packets. */
 	uint32_t ctl_pkt[2];
 	/*! The number of transmitted packets that did not match any rows
@@ -764,7 +764,7 @@ struct AQ_API_SEC_EgressCommonCounters {
 /*! Represents the Ingress MIB counters for a single SA. Counters are
  *  64 bits, lower 32 bits in field[0].
  */
-struct AQ_API_SEC_IngressSACounters {
+struct aq_mss_ingress_sa_counters {
 	/*! For this SA, the number of received packets without a SecTAG. */
 	uint32_t untagged_hit_pkts[2];
 	/*! For this SA, the number of received packets that were dropped. */
@@ -830,7 +830,7 @@ struct AQ_API_SEC_IngressSACounters {
  *  associated with a particular SA. Counters are 64 bits, lower 32
  *  bits in field[0].
  */
-struct AQ_API_SEC_IngressCommonCounters {
+struct aq_mss_ingress_common_counters {
 	/*! The number of received packets classified as MAC_CTL packets. */
 	uint32_t ctl_pkts[2];
 	/*! The number of received packets with the MAC security tag
