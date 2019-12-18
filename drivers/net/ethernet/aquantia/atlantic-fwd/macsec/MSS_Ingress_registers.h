@@ -6,24 +6,24 @@
 #define mssIngressLutControlRegister_ADDR 0x00008081
 #define mssIngressLutDataControlRegister_ADDR 0x000080A0
 
-struct mssIngressControlRegister_t {
+struct mss_ingress_ctl_register {
 	union {
 		struct {
-			unsigned int mssIngressSoftReset : 1;
-			unsigned int mssIngressOperationPointToPoint : 1;
-			unsigned int mssIngressCreateSci : 1;
+			unsigned int soft_reset : 1;
+			unsigned int operation_point_to_point : 1;
+			unsigned int create_sci : 1;
 			/* Unused  */
-			unsigned int mssIngressMaskShortLengthError : 1;
-			unsigned int mssIngressDropKayPacket : 1;
-			unsigned int mssIngressDropIgprcMiss : 1;
+			unsigned int mask_short_length_error : 1;
+			unsigned int drop_kay_packet : 1;
+			unsigned int drop_igprc_miss : 1;
 			/* Unused  */
-			unsigned int mssIngressCheckIcv : 1;
-			unsigned int mssIngressClearGlobalTime : 1;
-			unsigned int mssIngressClearCount : 1;
-			unsigned int mssIngressHighPriority : 1;
-			unsigned int mssIngressRemoveSectag : 1;
-			unsigned int mssIngressGlobalValidateFrames : 2;
-			unsigned int mssIngressIcvLsb_8BytesEnable : 1;
+			unsigned int check_icv : 1;
+			unsigned int clear_global_time : 1;
+			unsigned int clear_count : 1;
+			unsigned int high_prio : 1;
+			unsigned int remove_sectag : 1;
+			unsigned int global_validate_frames : 2;
+			unsigned int icv_lsb_8bytes_enabled : 1;
 			unsigned int reserved0 : 2;
 		} bits_0;
 		unsigned short word_0;
@@ -36,10 +36,10 @@ struct mssIngressControlRegister_t {
 	};
 };
 
-struct mssIngressLutAddressControlRegister_t {
+struct mss_ingress_lut_addr_ctl_register {
 	union {
 		struct {
-			unsigned int mssIngressLutAddress : 9;
+			unsigned int lut_addr : 9;
 			unsigned int reserved0 : 3;
 			/* 0x0 : Ingress Pre-Security MAC Control FIlter
 			 *       (IGPRCTLF) LUT
@@ -52,18 +52,18 @@ struct mssIngressLutAddressControlRegister_t {
 			 *       (IGPOCTLF) LUT
 			 * 0x6 : Ingress MIB (IGMIB)
 			 */
-			unsigned int mssIngressLutSelect : 4;
+			unsigned int lut_select : 4;
 		} bits_0;
 		unsigned short word_0;
 	};
 };
 
-struct mssIngressLutControlRegister_t {
+struct mss_ingress_lut_ctl_register {
 	union {
 		struct {
 			unsigned int reserved0 : 14;
-			unsigned int mssIngressLutRead : 1;
-			unsigned int mssIngressLutWrite : 1;
+			unsigned int lut_read : 1;
+			unsigned int lut_write : 1;
 		} bits_0;
 		unsigned short word_0;
 	};

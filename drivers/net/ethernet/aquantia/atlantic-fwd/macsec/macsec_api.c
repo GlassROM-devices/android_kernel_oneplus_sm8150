@@ -29,8 +29,8 @@ static int SetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 				     uint8_t numWords, uint8_t tableID,
 				     uint16_t tableIndex)
 {
-	struct mssIngressLutAddressControlRegister_t tableSelReg;
-	struct mssIngressLutControlRegister_t readWriteReg;
+	struct mss_ingress_lut_addr_ctl_register tableSelReg;
+	struct mss_ingress_lut_ctl_register readWriteReg;
 
 	unsigned int i;
 
@@ -67,11 +67,11 @@ static int SetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 	}
 
 	/* Select the table and row index to write to */
-	tableSelReg.bits_0.mssIngressLutSelect = tableID;
-	tableSelReg.bits_0.mssIngressLutAddress = tableIndex;
+	tableSelReg.bits_0.lut_select = tableID;
+	tableSelReg.bits_0.lut_addr = tableIndex;
 
-	readWriteReg.bits_0.mssIngressLutRead = 0;
-	readWriteReg.bits_0.mssIngressLutWrite = 1;
+	readWriteReg.bits_0.lut_read = 0;
+	readWriteReg.bits_0.lut_write = 1;
 
 	__atl_mdio_write(hw, 0, MMD_GLOBAL,
 			 mssIngressLutAddressControlRegister_ADDR,
@@ -87,18 +87,18 @@ static int GetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 				     uint8_t numWords, uint8_t tableID,
 				     uint16_t tableIndex)
 {
-	struct mssIngressLutAddressControlRegister_t tableSelReg;
-	struct mssIngressLutControlRegister_t readWriteReg;
+	struct mss_ingress_lut_addr_ctl_register tableSelReg;
+	struct mss_ingress_lut_ctl_register readWriteReg;
 	int ret;
 
 	unsigned int i;
 
 	/* Select the table and row index to read */
-	tableSelReg.bits_0.mssIngressLutSelect = tableID;
-	tableSelReg.bits_0.mssIngressLutAddress = tableIndex;
+	tableSelReg.bits_0.lut_select = tableID;
+	tableSelReg.bits_0.lut_addr = tableIndex;
 
-	readWriteReg.bits_0.mssIngressLutRead = 1;
-	readWriteReg.bits_0.mssIngressLutWrite = 0;
+	readWriteReg.bits_0.lut_read = 1;
+	readWriteReg.bits_0.lut_write = 0;
 
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
 			       mssIngressLutAddressControlRegister_ADDR,
@@ -2709,10 +2709,10 @@ int AQ_API_GetIngressCommonCounters(
 
 static int ClearIngressCounters(struct atl_hw *hw)
 {
-	struct mssIngressControlRegister_t controlReg;
+	struct mss_ingress_ctl_register controlReg;
 	int ret;
 
-	memset(&controlReg, 0, sizeof(struct mssIngressControlRegister_t));
+	memset(&controlReg, 0, sizeof(controlReg));
 
 	ret = __atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressControlRegister_ADDR,
 			      &controlReg.word_0);
@@ -2725,7 +2725,7 @@ static int ClearIngressCounters(struct atl_hw *hw)
 		return ret;
 
 	/* Toggle the Ingress MIB clear bit 0->1->0 */
-	controlReg.bits_0.mssIngressClearCount = 0;
+	controlReg.bits_0.clear_count = 0;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
 			       mssIngressControlRegister_ADDR,
 			       controlReg.word_0);
@@ -2737,7 +2737,7 @@ static int ClearIngressCounters(struct atl_hw *hw)
 	if (unlikely(ret))
 		return ret;
 
-	controlReg.bits_0.mssIngressClearCount = 1;
+	controlReg.bits_0.clear_count = 1;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
 			       mssIngressControlRegister_ADDR,
 			       controlReg.word_0);
@@ -2749,7 +2749,7 @@ static int ClearIngressCounters(struct atl_hw *hw)
 	if (unlikely(ret))
 		return ret;
 
-	controlReg.bits_0.mssIngressClearCount = 0;
+	controlReg.bits_0.clear_count = 0;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
 			       mssIngressControlRegister_ADDR,
 			       controlReg.word_0);
