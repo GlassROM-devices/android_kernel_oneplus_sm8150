@@ -135,8 +135,8 @@ static int SetRawSECEgressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 				    uint8_t numWords, uint8_t tableID,
 				    uint16_t tableIndex)
 {
-	struct mssEgressLutAddressControlRegister_t tableSelReg;
-	struct mssEgressLutControlRegister_t readWriteReg;
+	struct mss_egress_lut_addr_ctl_register tableSelReg;
+	struct mss_egress_lut_ctl_register readWriteReg;
 
 	unsigned int i;
 
@@ -160,11 +160,11 @@ static int SetRawSECEgressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 	}
 
 	/* Select the table and row index to write to */
-	tableSelReg.bits_0.mssEgressLutSelect = tableID;
-	tableSelReg.bits_0.mssEgressLutAddress = tableIndex;
+	tableSelReg.bits_0.lut_select = tableID;
+	tableSelReg.bits_0.lut_addr = tableIndex;
 
-	readWriteReg.bits_0.mssEgressLutRead = 0;
-	readWriteReg.bits_0.mssEgressLutWrite = 1;
+	readWriteReg.bits_0.lut_read = 0;
+	readWriteReg.bits_0.lut_write = 1;
 
 	__atl_mdio_write(hw, 0, MMD_GLOBAL,
 			 mssEgressLutAddressControlRegister_ADDR,
@@ -179,18 +179,18 @@ static int GetRawSECEgressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 				    uint8_t numWords, uint8_t tableID,
 				    uint16_t tableIndex)
 {
-	struct mssEgressLutAddressControlRegister_t tableSelReg;
-	struct mssEgressLutControlRegister_t readWriteReg;
+	struct mss_egress_lut_addr_ctl_register tableSelReg;
+	struct mss_egress_lut_ctl_register readWriteReg;
 	int ret;
 
 	unsigned int i;
 
 	/* Select the table and row index to read */
-	tableSelReg.bits_0.mssEgressLutSelect = tableID;
-	tableSelReg.bits_0.mssEgressLutAddress = tableIndex;
+	tableSelReg.bits_0.lut_select = tableID;
+	tableSelReg.bits_0.lut_addr = tableIndex;
 
-	readWriteReg.bits_0.mssEgressLutRead = 1;
-	readWriteReg.bits_0.mssEgressLutWrite = 0;
+	readWriteReg.bits_0.lut_read = 1;
+	readWriteReg.bits_0.lut_write = 0;
 
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
 			       mssEgressLutAddressControlRegister_ADDR,
@@ -2406,10 +2406,10 @@ int AQ_API_GetEgressCommonCounters(
 
 static int ClearEgressCounters(struct atl_hw *hw)
 {
-	struct mssEgressControlRegister_t controlReg;
+	struct mss_egress_ctl_register controlReg;
 	int ret;
 
-	memset(&controlReg, 0, sizeof(struct mssEgressControlRegister_t));
+	memset(&controlReg, 0, sizeof(controlReg));
 
 	ret = __atl_mdio_read(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR,
 			      &controlReg.word_0);
@@ -2422,7 +2422,7 @@ static int ClearEgressCounters(struct atl_hw *hw)
 		return ret;
 
 	/* Toggle the Egress MIB clear bit 0->1->0 */
-	controlReg.bits_0.mssEgressClearCounter = 0;
+	controlReg.bits_0.clear_counter = 0;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR,
 			       controlReg.word_0);
 	if (unlikely(ret))
@@ -2433,7 +2433,7 @@ static int ClearEgressCounters(struct atl_hw *hw)
 	if (unlikely(ret))
 		return ret;
 
-	controlReg.bits_0.mssEgressClearCounter = 1;
+	controlReg.bits_0.clear_counter = 1;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR,
 			       controlReg.word_0);
 	if (unlikely(ret))
@@ -2444,7 +2444,7 @@ static int ClearEgressCounters(struct atl_hw *hw)
 	if (unlikely(ret))
 		return ret;
 
-	controlReg.bits_0.mssEgressClearCounter = 0;
+	controlReg.bits_0.clear_counter = 0;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL, mssEgressControlRegister_ADDR,
 			       controlReg.word_0);
 	if (unlikely(ret))
