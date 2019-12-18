@@ -1,10 +1,10 @@
 #ifndef MSS_INGRESS_REGS_HEADER
 #define MSS_INGRESS_REGS_HEADER
 
-#define mssIngressControlRegister_ADDR 0x0000800E
-#define mssIngressLutAddressControlRegister_ADDR 0x00008080
-#define mssIngressLutControlRegister_ADDR 0x00008081
-#define mssIngressLutDataControlRegister_ADDR 0x000080A0
+#define MSS_INGRESS_CTL_REGISTER_ADDR 0x0000800E
+#define MSS_INGRESS_LUT_ADDR_CTL_REGISTER_ADDR 0x00008080
+#define MSS_INGRESS_LUT_CTL_REGISTER_ADDR 0x00008081
+#define MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR 0x000080A0
 
 struct mss_ingress_ctl_register {
 	union {

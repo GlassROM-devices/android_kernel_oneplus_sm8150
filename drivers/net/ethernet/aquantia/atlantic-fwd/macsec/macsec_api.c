@@ -50,19 +50,19 @@ static int SetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 	/* Write the packed record words to the data buffer registers. */
 	for (i = 0; i < numWords; i += 2) {
 		__atl_mdio_write(hw, 0, MMD_GLOBAL,
-				 mssIngressLutDataControlRegister_ADDR + i,
+				 MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR + i,
 				 packedRecVal[i]);
 		__atl_mdio_write(hw, 0, MMD_GLOBAL,
-				 mssIngressLutDataControlRegister_ADDR + i + 1,
+				 MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR + i + 1,
 				 packedRecVal[i + 1]);
 	}
 
 	/* Clear out the unused data buffer registers. */
 	for (i = numWords; i < 24; i += 2) {
 		__atl_mdio_write(hw, 0, MMD_GLOBAL,
-				 mssIngressLutDataControlRegister_ADDR + i, 0);
+				 MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR + i, 0);
 		__atl_mdio_write(hw, 0, MMD_GLOBAL,
-				 mssIngressLutDataControlRegister_ADDR + i + 1,
+				 MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR + i + 1,
 				 0);
 	}
 
@@ -74,9 +74,9 @@ static int SetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 	readWriteReg.bits_0.lut_write = 1;
 
 	__atl_mdio_write(hw, 0, MMD_GLOBAL,
-			 mssIngressLutAddressControlRegister_ADDR,
+			 MSS_INGRESS_LUT_ADDR_CTL_REGISTER_ADDR,
 			 tableSelReg.word_0);
-	__atl_mdio_write(hw, 0, MMD_GLOBAL, mssIngressLutControlRegister_ADDR,
+	__atl_mdio_write(hw, 0, MMD_GLOBAL, MSS_INGRESS_LUT_CTL_REGISTER_ADDR,
 			 readWriteReg.word_0);
 
 	return 0;
@@ -101,12 +101,12 @@ static int GetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 	readWriteReg.bits_0.lut_write = 0;
 
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressLutAddressControlRegister_ADDR,
+			       MSS_INGRESS_LUT_ADDR_CTL_REGISTER_ADDR,
 			       tableSelReg.word_0);
 	if (unlikely(ret))
 		return ret;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressLutControlRegister_ADDR,
+			       MSS_INGRESS_LUT_CTL_REGISTER_ADDR,
 			       readWriteReg.word_0);
 	if (unlikely(ret))
 		return ret;
@@ -115,12 +115,12 @@ static int GetRawSECIngressRecordVal(struct atl_hw *hw, uint16_t *packedRecVal,
 
 	for (i = 0; i < numWords; i += 2) {
 		ret = __atl_mdio_read(hw, 0, MMD_GLOBAL,
-				      mssIngressLutDataControlRegister_ADDR + i,
+				      MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR + i,
 				      &packedRecVal[i]);
 		if (unlikely(ret))
 			return ret;
 		ret = __atl_mdio_read(hw, 0, MMD_GLOBAL,
-				      mssIngressLutDataControlRegister_ADDR +
+				      MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR +
 					      i + 1,
 				      &packedRecVal[i + 1]);
 		if (unlikely(ret))
@@ -2714,12 +2714,12 @@ static int ClearIngressCounters(struct atl_hw *hw)
 
 	memset(&controlReg, 0, sizeof(controlReg));
 
-	ret = __atl_mdio_read(hw, 0, MMD_GLOBAL, mssIngressControlRegister_ADDR,
+	ret = __atl_mdio_read(hw, 0, MMD_GLOBAL, MSS_INGRESS_CTL_REGISTER_ADDR,
 			      &controlReg.word_0);
 	if (unlikely(ret))
 		return ret;
 	ret = __atl_mdio_read(hw, 0, MMD_GLOBAL,
-			      mssIngressControlRegister_ADDR + 4,
+			      MSS_INGRESS_CTL_REGISTER_ADDR + 4,
 			      &controlReg.word_1);
 	if (unlikely(ret))
 		return ret;
@@ -2727,36 +2727,36 @@ static int ClearIngressCounters(struct atl_hw *hw)
 	/* Toggle the Ingress MIB clear bit 0->1->0 */
 	controlReg.bits_0.clear_count = 0;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressControlRegister_ADDR,
+			       MSS_INGRESS_CTL_REGISTER_ADDR,
 			       controlReg.word_0);
 	if (unlikely(ret))
 		return ret;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressControlRegister_ADDR + 4,
+			       MSS_INGRESS_CTL_REGISTER_ADDR + 4,
 			       controlReg.word_1);
 	if (unlikely(ret))
 		return ret;
 
 	controlReg.bits_0.clear_count = 1;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressControlRegister_ADDR,
+			       MSS_INGRESS_CTL_REGISTER_ADDR,
 			       controlReg.word_0);
 	if (unlikely(ret))
 		return ret;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressControlRegister_ADDR + 4,
+			       MSS_INGRESS_CTL_REGISTER_ADDR + 4,
 			       controlReg.word_1);
 	if (unlikely(ret))
 		return ret;
 
 	controlReg.bits_0.clear_count = 0;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressControlRegister_ADDR,
+			       MSS_INGRESS_CTL_REGISTER_ADDR,
 			       controlReg.word_0);
 	if (unlikely(ret))
 		return ret;
 	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       mssIngressControlRegister_ADDR + 4,
+			       MSS_INGRESS_CTL_REGISTER_ADDR + 4,
 			       controlReg.word_1);
 	if (unlikely(ret))
 		return ret;
