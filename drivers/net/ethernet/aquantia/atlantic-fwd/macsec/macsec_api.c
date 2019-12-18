@@ -7,7 +7,7 @@
 #define MMD_GLOBAL 0x1E
 
 #define AQ_API_CALL_SAFE(func, ...)                                            \
-	{                                                                      \
+	do {                                                                   \
 		int ret;                                                       \
                                                                                \
 		ret = atl_mdio_hwsem_get(hw);                                  \
@@ -19,7 +19,7 @@
 		atl_mdio_hwsem_put(hw);                                        \
                                                                                \
 		return ret;                                                    \
-	}
+	} while (0)
 
 /*******************************************************************************
  *                          MACSEC config and status
