@@ -207,7 +207,7 @@ struct atl_fw_ops {
 			       struct macsec_msg_fw_response *resp);
 	int (*__get_hbeat)(struct atl_hw *hw, uint16_t *hbeat);
 	int (*get_mac_addr)(struct atl_hw *hw, uint8_t *buf);
-	int (*__update_thermal)(struct atl_hw *hw);
+	int (*update_thermal)(struct atl_hw *hw);
 	int (*deinit)(struct atl_hw *hw);
 };
 

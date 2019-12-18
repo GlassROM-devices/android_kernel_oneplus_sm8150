@@ -1309,11 +1309,13 @@ int atl_setup_datapath(struct atl_nic *nic)
 	struct legacy_irq_work *irq_work = NULL;
 	struct atl_queue_vec *qvec;
 	int nvecs, i, ret;
+	bool legacy_irq;
 
 	nvecs = atl_config_interrupts(nic);
 	if (nvecs < 0)
 		return nvecs;
 	nic->nvecs = nvecs;
+	legacy_irq = !(nic->flags & ATL_FL_MULTIPLE_VECTORS);
 
 	qvec = kcalloc(nvecs, sizeof(*qvec), GFP_KERNEL);
 	if (!qvec) {
@@ -1323,7 +1325,7 @@ int atl_setup_datapath(struct atl_nic *nic)
 	}
 	nic->qvecs = qvec;
 
-	if (unlikely(!(nic->flags & ATL_FL_MULTIPLE_VECTORS))) {
+	if (unlikely(legacy_irq)) {
 		irq_work = kcalloc(nvecs, sizeof(*irq_work), GFP_KERNEL);
 		if (!irq_work) {
 			ret = -ENOMEM;

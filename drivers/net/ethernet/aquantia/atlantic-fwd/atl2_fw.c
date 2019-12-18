@@ -695,7 +695,8 @@ static struct atl_fw_ops atl2_fw_ops = {
 		.enable_wol = atl2_fw_enable_wol,
 		.dump_cfg = (void *)atl2_fw_unsupported,
 		.restore_cfg = (void *)atl2_fw_unsupported,
-};
+		.update_thermal = (void *)atl2_fw_unsupported,
+	};
 
 int atl2_fw_init(struct atl_hw *hw)
 {
