@@ -1,12 +1,12 @@
 #ifndef MSS_EGRESS_REGS_HEADER
 #define MSS_EGRESS_REGS_HEADER
 
-#define mssEgressControlRegister_ADDR 0x00005002
-#define mssEgressSaExpiredStatusRegister_ADDR 0x00005060
-#define mssEgressSaThresholdExpiredStatusRegister_ADDR 0x00005062
-#define mssEgressLutAddressControlRegister_ADDR 0x00005080
-#define mssEgressLutControlRegister_ADDR 0x00005081
-#define mssEgressLutDataControlRegister_ADDR 0x000050A0
+#define MSS_EGRESS_CTL_REGISTER_ADDR 0x00005002
+#define MSS_EGRESS_SA_EXPIRED_STATUS_REGISTER_ADDR 0x00005060
+#define MSS_EGRESS_SA_THRESHOLD_EXPIRED_STATUS_REGISTER_ADDR 0x00005062
+#define MSS_EGRESS_LUT_ADDR_CTL_REGISTER_ADDR 0x00005080
+#define MSS_EGRESS_LUT_CTL_REGISTER_ADDR 0x00005081
+#define MSS_EGRESS_LUT_DATA_CTL_REGISTER_ADDR 0x000050A0
 
 struct mss_egress_ctl_register {
 	union {
