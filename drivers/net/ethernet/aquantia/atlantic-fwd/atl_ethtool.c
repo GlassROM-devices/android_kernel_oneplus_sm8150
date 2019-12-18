@@ -1070,9 +1070,7 @@ int atl_set_media_detect(struct atl_nic *nic, bool on)
 	struct atl_hw *hw = &nic->hw;
 	int ret;
 
-	atl_lock_fw(&nic->hw);
 	ret = hw->mcp.ops->set_mediadetect(hw, on);
-	atl_unlock_fw(&nic->hw);
 
 	return ret;
 }

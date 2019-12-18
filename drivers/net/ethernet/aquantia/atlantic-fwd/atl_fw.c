@@ -652,12 +652,17 @@ static int atl_fw2_set_mediadetect(struct atl_hw *hw, bool on)
 	if (hw->mcp.fw_rev < 0x0301005a)
 		return -EOPNOTSUPP;
 
+	atl_lock_fw(hw);
+
 	ret = atl_write_fwsettings_word(hw, atl_fw2_setings_media_detect, on);
 	if (ret)
-		return ret;
+		goto unlock;
 
 	/* request statistics just to force FW to read settings */
-	return atl_fw2_update_statistics(hw);
+	ret =  atl_fw2_update_statistics(hw);
+unlock:
+	atl_unlock_fw(hw);
+	return ret;
 }
 
 static int atl_fw2_send_macsec_request(struct atl_hw *hw,
