@@ -449,19 +449,22 @@ static struct atl_link_type *atl2_fw_check_link(struct atl_hw *hw)
 {
 	struct atl_link_type *link;
 	struct atl_link_state *lstate = &hw->link_state;
+	struct phy_health_monitor_s phy_health_monitor = {0};
+	int ret = 0;
 
 	atl_lock_fw(hw);
 
 	__atl2_fw_update_link_status(hw);
 
-	/* TODO 
-	__atl_fw2_thermal_check(hw, low);
-	*/
+	ret = atl2_shared_buffer_read_safe(hw, phy_health_monitor,
+					   &phy_health_monitor);
+	atl_unlock_fw(hw);
+
+	atl_thermal_check(hw, phy_health_monitor.phy_hot_warning);
 
 	/* Thermal check might have reset link due to throttling */
 	link = lstate->link;
 
-	atl_unlock_fw(hw);
 	return link;
 }
 
@@ -525,7 +528,7 @@ static int atl2_fw_get_phy_temperature(struct atl_hw *hw, int *temp)
 	ret = atl2_shared_buffer_read_safe(hw, phy_health_monitor,
 					   &phy_health_monitor);
 
-	*temp = (phy_health_monitor.phy_temperature & 0xffff) * 1000 / 256;
+	*temp = (phy_health_monitor.phy_temperature & 0xffff) * 1000;
 
 	atl_unlock_fw(hw);
 
@@ -633,7 +636,30 @@ static int atl2_fw_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 	return ret;
 }
 
+static int atl2_fw_update_thermal(struct atl_hw *hw)
+{
+	bool enable = !!(hw->thermal.flags & atl_thermal_monitor);
+	struct phy_health_monitor_s phy_health_monitor = {0};
+	struct thermal_shutdown_s thermal_shutdown;
+	int ret = 0;
+
+	atl_lock_fw(hw);
+
+	atl2_shared_buffer_get(hw, thermal_shutdown, thermal_shutdown);
+	thermal_shutdown.enable = enable;
+	thermal_shutdown.shutdown_temperature = hw->thermal.crit;
+	thermal_shutdown.warning_temperature = hw->thermal.high;
+	thermal_shutdown.cold_temperature = hw->thermal.low;
+	atl2_shared_buffer_write(hw, thermal_shutdown, thermal_shutdown);
+	ret = atl2_shared_buffer_finish_ack(hw);
+
+	atl2_shared_buffer_read_safe(hw, phy_health_monitor,
+				     &phy_health_monitor);
 	atl_unlock_fw(hw);
+
+	/* Thresholds might have changed, recheck state. */
+	atl_thermal_check(hw, phy_health_monitor.phy_hot_warning);
+
 	return ret;
 }
 
@@ -666,7 +692,7 @@ static struct atl_fw_ops atl2_fw_ops = {
 		.enable_wol = atl2_fw_enable_wol,
 		.dump_cfg = (void *)atl2_fw_unsupported,
 		.restore_cfg = (void *)atl2_fw_unsupported,
-		.update_thermal = (void *)atl2_fw_unsupported,
+		.update_thermal = atl2_fw_update_thermal,
 	};
 
 int atl2_fw_init(struct atl_hw *hw)
@@ -694,15 +720,6 @@ int atl2_fw_init(struct atl_hw *hw)
 	ret = mcp->ops->__get_link_caps(hw);
 	if (ret)
 		return ret;
-
-	if (!(mcp->caps_high & atl_fw2_set_thermal)) {
-		if (hw->thermal.flags & atl_thermal_monitor)
-			atl_dev_warn("Thermal monitoring not supported by firmware\n");
-		hw->thermal.flags &=
-			~(atl_thermal_monitor | atl_thermal_throttle);
-	} else
-		ret = mcp->ops->__update_thermal(hw);
-
 
 	return ret;
 }
