@@ -345,6 +345,7 @@ int atl_get_lpi_timer(struct atl_nic *nic, uint32_t *lpi_delay);
 void atl_refresh_rxfs(struct atl_nic *nic);
 void atl_schedule_work(struct atl_nic *nic);
 int atl_hwmon_init(struct atl_nic *nic);
+void atl_thermal_check(struct atl_hw *hw, bool alarm);
 int atl_update_thermal(struct atl_hw *hw);
 int atl_update_thermal_flag(struct atl_hw *hw, int bit, bool val);
 int atl_verify_thermal_limits(struct atl_hw *hw, struct atl_thermal *thermal);

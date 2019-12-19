@@ -1311,3 +1311,60 @@ int atl_write_mcp_mem(struct atl_hw *hw, uint32_t offt, void *host_addr,
 
 	return 0;
 }
+
+void atl_thermal_check(struct atl_hw *hw, bool alarm)
+{
+	int temp, ret;
+	struct atl_link_state *lstate = &hw->link_state;
+	struct atl_link_type *link = lstate->link;
+	int lowest;
+
+	if (link) {
+		/* ffs() / fls() number bits starting at 1 */
+		lowest = ffs(lstate->lp_advertized) - 1;
+		if (lowest < lstate->lp_lowest) {
+			lstate->lp_lowest = lowest;
+			if (lowest < lstate->throttled_to &&
+				lstate->thermal_throttled && alarm)
+				/* We're still thermal-throttled, and
+				 * just found out we can lower the
+				 * speed even more, so renegotiate. */
+				goto relink;
+		}
+	} else
+		lstate->lp_lowest = fls(lstate->supported) - 1;
+
+	if (alarm == lstate->thermal_throttled)
+		return;
+
+	lstate->thermal_throttled = alarm;
+
+	ret = hw->mcp.ops->get_phy_temperature(hw, &temp);
+	if (ret)
+		temp = 0;
+	else
+		/* Temperature is in millidegrees C */
+		temp = (temp + 50) / 100;
+
+	if (alarm) {
+		if (temp)
+			atl_dev_warn("PHY temperature above threshold: %d.%d\n",
+				temp / 10, temp % 10);
+		else
+			atl_dev_warn("PHY temperature above threshold\n");
+	} else {
+		if (temp)
+			atl_dev_warn("PHY temperature back in range: %d.%d\n",
+				temp / 10, temp % 10);
+		else
+			atl_dev_warn("PHY temperature back in range\n");
+	}
+
+relink:
+	if (hw->thermal.flags & atl_thermal_throttle) {
+		/* If throttling is enabled, renegotiate link */
+		lstate->link = 0;
+		lstate->throttled_to = lstate->lp_lowest;
+		hw->mcp.ops->set_link(hw, true);
+	}
+}

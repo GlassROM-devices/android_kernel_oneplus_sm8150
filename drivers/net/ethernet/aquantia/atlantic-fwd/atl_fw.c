@@ -161,22 +161,22 @@ static struct atl_link_type *atl_fw1_check_link(struct atl_hw *hw)
 	return link;
 }
 
-static void atl_fw2_thermal_check(struct atl_hw *hw, uint32_t sts);
-
 static struct atl_link_type *atl_fw2_check_link(struct atl_hw *hw)
 {
 	struct atl_link_type *link;
 	struct atl_link_state *lstate = &hw->link_state;
+	enum atl_fc_mode fc = atl_fc_none;
 	uint32_t low;
 	uint32_t high;
-	enum atl_fc_mode fc = atl_fc_none;
+	bool alarm;
 
 	low = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_LOW));
 	high = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH));
 
 	link = atl_parse_fw_bits(hw, low, high, 1);
 
-	atl_fw2_thermal_check(hw, low);
+	alarm = !!(low & atl_fw2_thermal_alarm);
+	atl_thermal_check(hw, alarm);
 
 	/* Thermal check might have reset link due to throttling */
 	link = lstate->link;
@@ -523,66 +523,6 @@ static int atl_fw2_get_phy_temperature(struct atl_hw *hw, int *temp)
 	return ret;
 }
 
-static void atl_fw2_thermal_check(struct atl_hw *hw, uint32_t sts)
-{
-	bool alarm;
-	int temp, ret;
-	struct atl_link_state *lstate = &hw->link_state;
-	struct atl_link_type *link = lstate->link;
-	int lowest;
-
-	alarm = !!(sts & atl_fw2_thermal_alarm);
-
-	if (link) {
-		/* ffs() / fls() number bits starting at 1 */
-		lowest = ffs(lstate->lp_advertized) - 1;
-		if (lowest < lstate->lp_lowest) {
-			lstate->lp_lowest = lowest;
-			if (lowest < lstate->throttled_to &&
-				lstate->thermal_throttled && alarm)
-				/* We're still thermal-throttled, and
-				 * just found out we can lower the
-				 * speed even more, so renegotiate. */
-				goto relink;
-		}
-	} else
-		lstate->lp_lowest = fls(lstate->supported) - 1;
-
-	if (alarm == lstate->thermal_throttled)
-		return;
-
-	lstate->thermal_throttled = alarm;
-
-	ret = hw->mcp.ops->get_phy_temperature(hw, &temp);
-	if (ret)
-		temp = 0;
-	else
-		/* Temperature is in millidegrees C */
-		temp = (temp + 50) / 100;
-
-	if (alarm) {
-		if (temp)
-			atl_dev_warn("PHY temperature above threshold: %d.%d\n",
-				temp / 10, temp % 10);
-		else
-			atl_dev_warn("PHY temperature above threshold\n");
-	} else {
-		if (temp)
-			atl_dev_warn("PHY temperature back in range: %d.%d\n",
-				temp / 10, temp % 10);
-		else
-			atl_dev_warn("PHY temperature back in range\n");
-	}
-
-relink:
-	if (hw->thermal.flags & atl_thermal_throttle) {
-		/* If throttling is enabled, renegotiate link */
-		lstate->link = 0;
-		lstate->throttled_to = lstate->lp_lowest;
-		hw->mcp.ops->set_link(hw, true);
-	}
-}
-
 static int atl_fw2_dump_cfg(struct atl_hw *hw)
 {
 	/* save link configuration */
@@ -793,9 +733,10 @@ static int __atl_fw2_set_thermal_monitor(struct atl_hw *hw, bool enable)
 
 static int atl_fw2_update_thermal(struct atl_hw *hw)
 {
+	bool enable = !!(hw->thermal.flags & atl_thermal_monitor);
 	struct atl_mcp *mcp = &hw->mcp;
 	int ret = 0;
-	bool enable = !!(hw->thermal.flags & atl_thermal_monitor);
+	bool alarm;
 
 	if (!(mcp->caps_high & atl_fw2_set_thermal)) {
 		if (hw->thermal.flags & atl_thermal_monitor)
@@ -823,8 +764,10 @@ static int atl_fw2_update_thermal(struct atl_hw *hw)
 	atl_unlock_fw(hw);
 
 	/* Thresholds might have changed, recheck state. */
-	atl_fw2_thermal_check(hw,
-		atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_LOW)));
+	alarm = !!(atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_LOW)) &
+			atl_fw2_thermal_alarm);
+	atl_thermal_check(hw, alarm);
+
 	return ret;
 }
 
