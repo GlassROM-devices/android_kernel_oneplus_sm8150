@@ -82,7 +82,9 @@ static int set_raw_ingress_record(struct atl_hw *hw, uint16_t *packed_record,
 	return 0;
 }
 
-/*! Read the specified Ingress LUT table row.  packed_record holds the row data. */
+/*! Read the specified Ingress LUT table row.
+ *  packed_record - [OUT] The table row data (raw).
+ */
 static int get_raw_ingress_record(struct atl_hw *hw, uint16_t *packed_record,
 				  uint8_t num_words, uint8_t table_id,
 				  uint16_t table_index)

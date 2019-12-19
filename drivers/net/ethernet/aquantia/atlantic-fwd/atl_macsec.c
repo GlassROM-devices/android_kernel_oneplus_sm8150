@@ -406,9 +406,12 @@ int atl_init_macsec(struct atl_hw *hw)
 	/* Init Ethertype bypass filters */
 	uint32_t ctl_ether_types[1] = { ETH_P_PAE };
 	for (index = 0; index < ARRAY_SIZE(ctl_ether_types); index++) {
+		struct aq_mss_ingress_prectlf_record rx_prectlf_rec = { 0 };
+		struct aq_mss_egress_ctlf_record tx_ctlf_rec = { 0 };
+
 		if (ctl_ether_types[index] == 0)
 			continue;
-		struct aq_mss_egress_ctlf_record tx_ctlf_rec = { 0 };
+
 		tx_ctlf_rec.eth_type = ctl_ether_types[index];
 		tx_ctlf_rec.match_type = 4; /* Match eth_type only */
 		tx_ctlf_rec.match_mask = 0xf; /* match for eth_type */
@@ -416,7 +419,6 @@ int atl_init_macsec(struct atl_hw *hw)
 		tbl_idx = NUMROWS_EGRESSCTLFRECORD - num_ctl_ether_types - 1;
 		aq_mss_set_egress_ctlf_record(hw, &tx_ctlf_rec, tbl_idx);
 
-		struct aq_mss_ingress_prectlf_record rx_prectlf_rec = { 0 };
 		rx_prectlf_rec.eth_type = ctl_ether_types[index];
 		rx_prectlf_rec.match_type = 4; /* Match eth_type only */
 		rx_prectlf_rec.match_mask = 0xf; /* match for eth_type */
@@ -792,14 +794,14 @@ static int atl_clear_txsa(struct atl_nic *nic, struct atl_macsec_txsc *atl_txsc,
 		clear_bit(sa_num, &atl_txsc->tx_sa_idx_busy);
 
 	if ((clear_type & ATL_CLEAR_HW) && netif_carrier_ok(nic->ndev)) {
+		struct aq_mss_egress_sakey_record key_rec = { 0 };
 		struct aq_mss_egress_sa_record sa_rec = { 0 };
+
 		sa_rec.fresh = 1;
 
 		ret = aq_mss_set_egress_sa_record(hw, &sa_rec, sa_idx);
 		if (ret)
 			return ret;
-
-		struct aq_mss_egress_sakey_record key_rec = { 0 };
 
 		return aq_mss_set_egress_sakey_record(hw, &key_rec, sa_idx);
 	}
