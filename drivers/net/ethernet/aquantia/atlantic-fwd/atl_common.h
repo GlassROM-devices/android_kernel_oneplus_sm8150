@@ -317,6 +317,7 @@ int atl_intr_init(struct atl_nic *nic);
 void atl_intr_release(struct atl_nic *nic);
 int atl_hw_reset(struct atl_hw *hw);
 int atl_fw_init(struct atl_hw *hw);
+int atl_fw_configure(struct atl_hw *hw);
 int atl_reconfigure(struct atl_nic *nic);
 void atl_reset_stats(struct atl_nic *nic);
 void atl_update_global_stats(struct atl_nic *nic);

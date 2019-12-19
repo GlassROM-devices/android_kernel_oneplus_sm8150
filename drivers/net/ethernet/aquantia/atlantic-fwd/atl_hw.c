@@ -208,7 +208,7 @@ static bool atl2_mcp_boot_complete(struct atl_hw *hw)
 	return false;
 }
 
-static int atl_hw_a2_reset(struct atl_hw *hw)
+static int atl2_hw_reset(struct atl_hw *hw)
 {
 	bool rbl_complete = false;
 	u32 rbl_status = 0;
@@ -284,9 +284,7 @@ unlock:
 	return err;
 }
 
-/* Must be called either during early init when netdev isn't yet
- * registered, or with RTNL lock held */
-int atl_hw_reset(struct atl_hw *hw)
+static int atl1_hw_reset(struct atl_hw *hw)
 {
 	uint32_t reg;
 	uint32_t flb_stat;
@@ -294,8 +292,6 @@ int atl_hw_reset(struct atl_hw *hw)
 	/* bool host_load_done = false; */
 	int ret;
 
-	if (hw->brd_id == ATL_AQC113)
-		return atl_hw_a2_reset(hw);
 	atl_lock_fw(hw);
 
 	reg = atl_read(hw, ATL_MCP_SCRATCH(RBL_STS));
@@ -373,6 +369,24 @@ unlock:
 		set_bit(ATL_ST_RESET_NEEDED, &hw->state);
 	else
 		set_bit(ATL_ST_GLOBAL_CONF_NEEDED, &hw->state);
+
+	return ret;
+}
+
+/* Must be called either during early init when netdev isn't yet
+ * registered, or with RTNL lock held */
+int atl_hw_reset(struct atl_hw *hw)
+{
+	int ret;
+
+	if (hw->brd_id == ATL_AQC113)
+		ret = atl2_hw_reset(hw);
+	else
+		ret = atl1_hw_reset(hw);
+	if (ret)
+		return ret;
+
+	ret = atl_fw_configure(hw);
 
 	return ret;
 }
