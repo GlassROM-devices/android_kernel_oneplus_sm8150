@@ -320,9 +320,8 @@ static void __atl2_fw_set_link(struct atl_hw *hw)
 		link_options.pause_rx = 1;
 		link_options.pause_tx = 1;
 	}
-	if (lstate->fc.req & atl_fc_tx) {
+	if (lstate->fc.req & atl_fc_tx)
 		link_options.pause_tx ^= 1;
-	}
 
 	link_options.link_up = 1;
 	if (lstate->force_off)
@@ -576,7 +575,7 @@ static int atl2_fw_set_phy_loopback(struct atl_nic *nic, u32 mode)
 
 	switch (mode) {
 	case ATL_PF_LPB_INT_PHY:
-		if (!device_link_caps.internal_loopback){
+		if (!device_link_caps.internal_loopback) {
 			ret = -ENOTSUPP;
 			goto unlock;
 		}
@@ -584,7 +583,7 @@ static int atl2_fw_set_phy_loopback(struct atl_nic *nic, u32 mode)
 		link_options.internal_loopback = on;
 		break;
 	case ATL_PF_LPB_EXT_PHY:
-		if (!device_link_caps.external_loopback){
+		if (!device_link_caps.external_loopback) {
 			ret = -ENOTSUPP;
 			goto unlock;
 		}
@@ -617,7 +616,7 @@ static int atl2_fw_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 	}
 
 	if (wol_mode & atl_fw_wake_on_link_rtpm) {
-		/* TODO: add wake_on_link_force - wake alive host upon wake on link */
+		/* TODO: add wake_on_link_force - wake alive host on link up */
 	}
 
 	if (wol_mode & atl_fw_wake_on_magic) {

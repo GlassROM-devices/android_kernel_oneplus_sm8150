@@ -219,7 +219,7 @@ static int atl2_hw_reset(struct atl_hw *hw)
 
 	busy_wait(50, mdelay(1), rbl_status,
 		  atl_read(hw, ATL2_MIF_BOOT_REG_ADR),
-		  !(rbl_status & ATL2_BOOT_STARTED)); 
+		  !(rbl_status & ATL2_BOOT_STARTED));
 	if (!(rbl_status & ATL2_BOOT_STARTED))
 		atl_dev_dbg("Boot code probably hanged, reboot anyway");
 
@@ -242,7 +242,7 @@ static int atl2_hw_reset(struct atl_hw *hw)
 	/* Wait for RBL boot */
 	busy_wait(200, mdelay(1), rbl_status,
 		  atl_read(hw, ATL2_MIF_BOOT_REG_ADR),
-		  !(rbl_status & ATL2_BOOT_STARTED)); 
+		  !(rbl_status & ATL2_BOOT_STARTED));
 	if (!(rbl_status & ATL2_BOOT_STARTED)) {
 		err = -ETIME;
 		atl_dev_err("Boot code hanged");

@@ -753,7 +753,7 @@ static int atl_fw2_update_thermal(struct atl_hw *hw)
 		 * thresholds, we need to temporarily disable thermal
 		 * monitoring first. */
 		ret = __atl_fw2_set_thermal_monitor(hw, false);
-		if (ret){
+		if (ret) {
 			atl_unlock_fw(hw);
 			return ret;
 		}
