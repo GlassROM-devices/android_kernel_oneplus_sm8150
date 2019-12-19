@@ -26,8 +26,8 @@
  ******************************************************************************/
 
 static int set_raw_ingress_record(struct atl_hw *hw, uint16_t *packed_record,
-				     uint8_t num_words, uint8_t table_id,
-				     uint16_t table_index)
+				  uint8_t num_words, uint8_t table_id,
+				  uint16_t table_index)
 {
 	struct mss_ingress_lut_addr_ctl_register lut_sel_reg;
 	struct mss_ingress_lut_ctl_register lut_op_reg;
@@ -84,8 +84,8 @@ static int set_raw_ingress_record(struct atl_hw *hw, uint16_t *packed_record,
 
 /*! Read the specified Ingress LUT table row.  packed_record holds the row data. */
 static int get_raw_ingress_record(struct atl_hw *hw, uint16_t *packed_record,
-				     uint8_t num_words, uint8_t table_id,
-				     uint16_t table_index)
+				  uint8_t num_words, uint8_t table_id,
+				  uint16_t table_index)
 {
 	struct mss_ingress_lut_addr_ctl_register lut_sel_reg;
 	struct mss_ingress_lut_ctl_register lut_op_reg;
@@ -115,7 +115,8 @@ static int get_raw_ingress_record(struct atl_hw *hw, uint16_t *packed_record,
 
 	for (i = 0; i < num_words; i += 2) {
 		ret = __atl_mdio_read(hw, 0, MMD_GLOBAL,
-				      MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR + i,
+				      MSS_INGRESS_LUT_DATA_CTL_REGISTER_ADDR +
+					      i,
 				      &packed_record[i]);
 		if (unlikely(ret))
 			return ret;
@@ -132,8 +133,8 @@ static int get_raw_ingress_record(struct atl_hw *hw, uint16_t *packed_record,
 
 /*! Write packed_record to the specified Egress LUT table row. */
 static int set_raw_egress_record(struct atl_hw *hw, uint16_t *packed_record,
-				    uint8_t num_words, uint8_t table_id,
-				    uint16_t table_index)
+				 uint8_t num_words, uint8_t table_id,
+				 uint16_t table_index)
 {
 	struct mss_egress_lut_addr_ctl_register lut_sel_reg;
 	struct mss_egress_lut_ctl_register lut_op_reg;
@@ -176,8 +177,8 @@ static int set_raw_egress_record(struct atl_hw *hw, uint16_t *packed_record,
 }
 
 static int get_raw_egress_record(struct atl_hw *hw, uint16_t *packed_record,
-				    uint8_t num_words, uint8_t table_id,
-				    uint16_t table_index)
+				 uint8_t num_words, uint8_t table_id,
+				 uint16_t table_index)
 {
 	struct mss_egress_lut_addr_ctl_register lut_sel_reg;
 	struct mss_egress_lut_ctl_register lut_op_reg;
@@ -212,8 +213,8 @@ static int get_raw_egress_record(struct atl_hw *hw, uint16_t *packed_record,
 		if (unlikely(ret))
 			return ret;
 		ret = __atl_mdio_read(hw, 0, MMD_GLOBAL,
-				      MSS_EGRESS_LUT_DATA_CTL_REGISTER_ADDR + i +
-					      1,
+				      MSS_EGRESS_LUT_DATA_CTL_REGISTER_ADDR +
+					      i + 1,
 				      &packed_record[i + 1]);
 		if (unlikely(ret))
 			return ret;
@@ -224,8 +225,8 @@ static int get_raw_egress_record(struct atl_hw *hw, uint16_t *packed_record,
 
 static int
 set_ingress_prectlf_record(struct atl_hw *hw,
-			const struct aq_mss_ingress_prectlf_record *rec,
-			uint16_t table_index)
+			   const struct aq_mss_ingress_prectlf_record *rec,
+			   uint16_t table_index)
 {
 	uint16_t packed_record[6];
 
@@ -235,23 +236,23 @@ set_ingress_prectlf_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 6);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->sa_da[0] >> 0) & 0xFFFF) << 0);
+			   (((rec->sa_da[0] >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->sa_da[0] >> 16) & 0xFFFF) << 0);
+			   (((rec->sa_da[0] >> 16) & 0xFFFF) << 0);
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->sa_da[1] >> 0) & 0xFFFF) << 0);
+			   (((rec->sa_da[1] >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->eth_type >> 0) & 0xFFFF) << 0);
+			   (((rec->eth_type >> 0) & 0xFFFF) << 0);
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->match_mask >> 0) & 0xFFFF) << 0);
+			   (((rec->match_mask >> 0) & 0xFFFF) << 0);
 	packed_record[5] = (packed_record[5] & 0xFFF0) |
-			  (((rec->match_type >> 0) & 0xF) << 0);
+			   (((rec->match_type >> 0) & 0xF) << 0);
 	packed_record[5] =
 		(packed_record[5] & 0xFFEF) | (((rec->action >> 0) & 0x1) << 4);
 
 	return set_raw_ingress_record(hw, packed_record, 6, 0,
-					 ROWOFFSET_INGRESSPRECTLFRECORD +
-						 table_index);
+				      ROWOFFSET_INGRESSPRECTLFRECORD +
+					      table_index);
 }
 
 int aq_mss_set_ingress_prectlf_record(
@@ -262,8 +263,8 @@ int aq_mss_set_ingress_prectlf_record(
 }
 
 static int get_ingress_prectlf_record(struct atl_hw *hw,
-				   struct aq_mss_ingress_prectlf_record *rec,
-				   uint16_t table_index)
+				      struct aq_mss_ingress_prectlf_record *rec,
+				      uint16_t table_index)
 {
 	uint16_t packed_record[6];
 	int ret;
@@ -279,15 +280,15 @@ static int get_ingress_prectlf_record(struct atl_hw *hw,
 	 */
 	if ((table_index % 2) > 0) {
 		ret = get_raw_ingress_record(hw, packed_record, 6, 0,
-						ROWOFFSET_INGRESSPRECTLFRECORD +
-							table_index - 1);
+					     ROWOFFSET_INGRESSPRECTLFRECORD +
+						     table_index - 1);
 		if (unlikely(ret))
 			return ret;
 	}
 
 	ret = get_raw_ingress_record(hw, packed_record, 6, 0,
-					ROWOFFSET_INGRESSPRECTLFRECORD +
-						table_index);
+				     ROWOFFSET_INGRESSPRECTLFRECORD +
+					     table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -315,8 +316,8 @@ static int get_ingress_prectlf_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_ingress_prectlf_record(struct atl_hw *hw,
-				   struct aq_mss_ingress_prectlf_record *rec,
-				   uint16_t table_index)
+				      struct aq_mss_ingress_prectlf_record *rec,
+				      uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -325,8 +326,8 @@ int aq_mss_get_ingress_prectlf_record(struct atl_hw *hw,
 
 static int
 set_ingress_preclass_record(struct atl_hw *hw,
-			 const struct aq_mss_ingress_preclass_record *rec,
-			 uint16_t table_index)
+			    const struct aq_mss_ingress_preclass_record *rec,
+			    uint16_t table_index)
 {
 	uint16_t packed_record[20];
 
@@ -336,31 +337,31 @@ set_ingress_preclass_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 20);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->sci[0] >> 0) & 0xFFFF) << 0);
+			   (((rec->sci[0] >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->sci[0] >> 16) & 0xFFFF) << 0);
+			   (((rec->sci[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->sci[1] >> 0) & 0xFFFF) << 0);
+			   (((rec->sci[1] >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->sci[1] >> 16) & 0xFFFF) << 0);
+			   (((rec->sci[1] >> 16) & 0xFFFF) << 0);
 
 	packed_record[4] =
 		(packed_record[4] & 0xFF00) | (((rec->tci >> 0) & 0xFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0x00FF) |
-			  (((rec->encr_offset >> 0) & 0xFF) << 8);
+			   (((rec->encr_offset >> 0) & 0xFF) << 8);
 
 	packed_record[5] = (packed_record[5] & 0x0000) |
-			  (((rec->eth_type >> 0) & 0xFFFF) << 0);
+			   (((rec->eth_type >> 0) & 0xFFFF) << 0);
 
 	packed_record[6] = (packed_record[6] & 0x0000) |
-			  (((rec->snap[0] >> 0) & 0xFFFF) << 0);
+			   (((rec->snap[0] >> 0) & 0xFFFF) << 0);
 	packed_record[7] = (packed_record[7] & 0x0000) |
-			  (((rec->snap[0] >> 16) & 0xFFFF) << 0);
+			   (((rec->snap[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[8] = (packed_record[8] & 0xFF00) |
-			  (((rec->snap[1] >> 0) & 0xFF) << 0);
+			   (((rec->snap[1] >> 0) & 0xFF) << 0);
 
 	packed_record[8] =
 		(packed_record[8] & 0x00FF) | (((rec->llc >> 0) & 0xFF) << 8);
@@ -368,84 +369,84 @@ set_ingress_preclass_record(struct atl_hw *hw,
 		(packed_record[9] & 0x0000) | (((rec->llc >> 8) & 0xFFFF) << 0);
 
 	packed_record[10] = (packed_record[10] & 0x0000) |
-			   (((rec->mac_sa[0] >> 0) & 0xFFFF) << 0);
+			    (((rec->mac_sa[0] >> 0) & 0xFFFF) << 0);
 	packed_record[11] = (packed_record[11] & 0x0000) |
-			   (((rec->mac_sa[0] >> 16) & 0xFFFF) << 0);
+			    (((rec->mac_sa[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[12] = (packed_record[12] & 0x0000) |
-			   (((rec->mac_sa[1] >> 0) & 0xFFFF) << 0);
+			    (((rec->mac_sa[1] >> 0) & 0xFFFF) << 0);
 
 	packed_record[13] = (packed_record[13] & 0x0000) |
-			   (((rec->mac_da[0] >> 0) & 0xFFFF) << 0);
+			    (((rec->mac_da[0] >> 0) & 0xFFFF) << 0);
 	packed_record[14] = (packed_record[14] & 0x0000) |
-			   (((rec->mac_da[0] >> 16) & 0xFFFF) << 0);
+			    (((rec->mac_da[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[15] = (packed_record[15] & 0x0000) |
-			   (((rec->mac_da[1] >> 0) & 0xFFFF) << 0);
+			    (((rec->mac_da[1] >> 0) & 0xFFFF) << 0);
 
 	packed_record[16] = (packed_record[16] & 0xFFFE) |
-			   (((rec->lpbk_packet >> 0) & 0x1) << 0);
+			    (((rec->lpbk_packet >> 0) & 0x1) << 0);
 
 	packed_record[16] = (packed_record[16] & 0xFFF9) |
-			   (((rec->an_mask >> 0) & 0x3) << 1);
+			    (((rec->an_mask >> 0) & 0x3) << 1);
 
 	packed_record[16] = (packed_record[16] & 0xFE07) |
-			   (((rec->tci_mask >> 0) & 0x3F) << 3);
+			    (((rec->tci_mask >> 0) & 0x3F) << 3);
 
 	packed_record[16] = (packed_record[16] & 0x01FF) |
-			   (((rec->sci_mask >> 0) & 0x7F) << 9);
+			    (((rec->sci_mask >> 0) & 0x7F) << 9);
 	packed_record[17] = (packed_record[17] & 0xFFFE) |
-			   (((rec->sci_mask >> 7) & 0x1) << 0);
+			    (((rec->sci_mask >> 7) & 0x1) << 0);
 
 	packed_record[17] = (packed_record[17] & 0xFFF9) |
-			   (((rec->eth_type_mask >> 0) & 0x3) << 1);
+			    (((rec->eth_type_mask >> 0) & 0x3) << 1);
 
 	packed_record[17] = (packed_record[17] & 0xFF07) |
-			   (((rec->snap_mask >> 0) & 0x1F) << 3);
+			    (((rec->snap_mask >> 0) & 0x1F) << 3);
 
 	packed_record[17] = (packed_record[17] & 0xF8FF) |
-			   (((rec->llc_mask >> 0) & 0x7) << 8);
+			    (((rec->llc_mask >> 0) & 0x7) << 8);
 
 	packed_record[17] = (packed_record[17] & 0xF7FF) |
-			   (((rec->_802_2_encapsulate >> 0) & 0x1) << 11);
+			    (((rec->_802_2_encapsulate >> 0) & 0x1) << 11);
 
 	packed_record[17] = (packed_record[17] & 0x0FFF) |
-			   (((rec->sa_mask >> 0) & 0xF) << 12);
+			    (((rec->sa_mask >> 0) & 0xF) << 12);
 	packed_record[18] = (packed_record[18] & 0xFFFC) |
-			   (((rec->sa_mask >> 4) & 0x3) << 0);
+			    (((rec->sa_mask >> 4) & 0x3) << 0);
 
 	packed_record[18] = (packed_record[18] & 0xFF03) |
-			   (((rec->da_mask >> 0) & 0x3F) << 2);
+			    (((rec->da_mask >> 0) & 0x3F) << 2);
 
 	packed_record[18] = (packed_record[18] & 0xFEFF) |
-			   (((rec->lpbk_mask >> 0) & 0x1) << 8);
+			    (((rec->lpbk_mask >> 0) & 0x1) << 8);
 
 	packed_record[18] = (packed_record[18] & 0xC1FF) |
-			   (((rec->sc_idx >> 0) & 0x1F) << 9);
+			    (((rec->sc_idx >> 0) & 0x1F) << 9);
 
 	packed_record[18] = (packed_record[18] & 0xBFFF) |
-			   (((rec->proc_dest >> 0) & 0x1) << 14);
+			    (((rec->proc_dest >> 0) & 0x1) << 14);
 
 	packed_record[18] = (packed_record[18] & 0x7FFF) |
-			   (((rec->action >> 0) & 0x1) << 15);
-	packed_record[19] =
-		(packed_record[19] & 0xFFFE) | (((rec->action >> 1) & 0x1) << 0);
+			    (((rec->action >> 0) & 0x1) << 15);
+	packed_record[19] = (packed_record[19] & 0xFFFE) |
+			    (((rec->action >> 1) & 0x1) << 0);
 
 	packed_record[19] = (packed_record[19] & 0xFFFD) |
-			   (((rec->ctrl_unctrl >> 0) & 0x1) << 1);
+			    (((rec->ctrl_unctrl >> 0) & 0x1) << 1);
 
 	packed_record[19] = (packed_record[19] & 0xFFFB) |
-			   (((rec->sci_from_table >> 0) & 0x1) << 2);
+			    (((rec->sci_from_table >> 0) & 0x1) << 2);
 
 	packed_record[19] = (packed_record[19] & 0xFF87) |
-			   (((rec->reserved >> 0) & 0xF) << 3);
+			    (((rec->reserved >> 0) & 0xF) << 3);
 
 	packed_record[19] =
 		(packed_record[19] & 0xFF7F) | (((rec->valid >> 0) & 0x1) << 7);
 
 	return set_raw_ingress_record(hw, packed_record, 20, 1,
-					 ROWOFFSET_INGRESSPRECLASSRECORD +
-						 table_index);
+				      ROWOFFSET_INGRESSPRECLASSRECORD +
+					      table_index);
 }
 
 int aq_mss_set_ingress_preclass_record(
@@ -457,8 +458,8 @@ int aq_mss_set_ingress_preclass_record(
 
 static int
 get_ingress_preclass_record(struct atl_hw *hw,
-			 struct aq_mss_ingress_preclass_record *rec,
-			 uint16_t table_index)
+			    struct aq_mss_ingress_preclass_record *rec,
+			    uint16_t table_index)
 {
 	uint16_t packed_record[20];
 	int ret;
@@ -470,16 +471,16 @@ get_ingress_preclass_record(struct atl_hw *hw,
 	 * row, throw that value away, and finally read the desired row.
 	 */
 	if ((table_index % 2) > 0) {
-		ret = get_raw_ingress_record(
-			hw, packed_record, 20, 1,
-			ROWOFFSET_INGRESSPRECLASSRECORD + table_index - 1);
+		ret = get_raw_ingress_record(hw, packed_record, 20, 1,
+					     ROWOFFSET_INGRESSPRECLASSRECORD +
+						     table_index - 1);
 		if (unlikely(ret))
 			return ret;
 	}
 
 	ret = get_raw_ingress_record(hw, packed_record, 20, 1,
-					ROWOFFSET_INGRESSPRECLASSRECORD +
-						table_index);
+				     ROWOFFSET_INGRESSPRECLASSRECORD +
+					     table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -604,8 +605,8 @@ int aq_mss_get_ingress_preclass_record(
 }
 
 static int set_ingress_sc_record(struct atl_hw *hw,
-			      const struct aq_mss_ingress_sc_record *rec,
-			      uint16_t table_index)
+				 const struct aq_mss_ingress_sc_record *rec,
+				 uint16_t table_index)
 {
 	uint16_t packed_record[8];
 
@@ -615,30 +616,30 @@ static int set_ingress_sc_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 8);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->stop_time >> 0) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->stop_time >> 16) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->start_time >> 0) & 0xFFFF) << 0);
+			   (((rec->start_time >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->start_time >> 16) & 0xFFFF) << 0);
+			   (((rec->start_time >> 16) & 0xFFFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0xFFFC) |
-			  (((rec->validate_frames >> 0) & 0x3) << 0);
+			   (((rec->validate_frames >> 0) & 0x3) << 0);
 
 	packed_record[4] = (packed_record[4] & 0xFFFB) |
-			  (((rec->replay_protect >> 0) & 0x1) << 2);
+			   (((rec->replay_protect >> 0) & 0x1) << 2);
 
 	packed_record[4] = (packed_record[4] & 0x0007) |
-			  (((rec->anti_replay_window >> 0) & 0x1FFF) << 3);
+			   (((rec->anti_replay_window >> 0) & 0x1FFF) << 3);
 	packed_record[5] = (packed_record[5] & 0x0000) |
-			  (((rec->anti_replay_window >> 13) & 0xFFFF) << 0);
+			   (((rec->anti_replay_window >> 13) & 0xFFFF) << 0);
 	packed_record[6] = (packed_record[6] & 0xFFF8) |
-			  (((rec->anti_replay_window >> 29) & 0x7) << 0);
+			   (((rec->anti_replay_window >> 29) & 0x7) << 0);
 
 	packed_record[6] = (packed_record[6] & 0xFFF7) |
-			  (((rec->receiving >> 0) & 0x1) << 3);
+			   (((rec->receiving >> 0) & 0x1) << 3);
 
 	packed_record[6] =
 		(packed_record[6] & 0xFFEF) | (((rec->fresh >> 0) & 0x1) << 4);
@@ -647,27 +648,27 @@ static int set_ingress_sc_record(struct atl_hw *hw,
 		(packed_record[6] & 0xFFDF) | (((rec->an_rol >> 0) & 0x1) << 5);
 
 	packed_record[6] = (packed_record[6] & 0x003F) |
-			  (((rec->reserved >> 0) & 0x3FF) << 6);
+			   (((rec->reserved >> 0) & 0x3FF) << 6);
 	packed_record[7] = (packed_record[7] & 0x8000) |
-			  (((rec->reserved >> 10) & 0x7FFF) << 0);
+			   (((rec->reserved >> 10) & 0x7FFF) << 0);
 
 	packed_record[7] =
 		(packed_record[7] & 0x7FFF) | (((rec->valid >> 0) & 0x1) << 15);
 
-	return set_raw_ingress_record(
-		hw, packed_record, 8, 3, ROWOFFSET_INGRESSSCRECORD + table_index);
+	return set_raw_ingress_record(hw, packed_record, 8, 3,
+				      ROWOFFSET_INGRESSSCRECORD + table_index);
 }
 
 int aq_mss_set_ingress_sc_record(struct atl_hw *hw,
-			      const struct aq_mss_ingress_sc_record *rec,
-			      uint16_t table_index)
+				 const struct aq_mss_ingress_sc_record *rec,
+				 uint16_t table_index)
 {
 	AQ_API_CALL_SAFE(set_ingress_sc_record, hw, rec, table_index);
 }
 
 static int get_ingress_sc_record(struct atl_hw *hw,
-			      struct aq_mss_ingress_sc_record *rec,
-			      uint16_t table_index)
+				 struct aq_mss_ingress_sc_record *rec,
+				 uint16_t table_index)
 {
 	uint16_t packed_record[8];
 	int ret;
@@ -676,7 +677,7 @@ static int get_ingress_sc_record(struct atl_hw *hw,
 		return -EINVAL;
 
 	ret = get_raw_ingress_record(hw, packed_record, 8, 3,
-					ROWOFFSET_INGRESSSCRECORD + table_index);
+				     ROWOFFSET_INGRESSSCRECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -724,8 +725,8 @@ static int get_ingress_sc_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_ingress_sc_record(struct atl_hw *hw,
-			      struct aq_mss_ingress_sc_record *rec,
-			      uint16_t table_index)
+				 struct aq_mss_ingress_sc_record *rec,
+				 uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -733,8 +734,8 @@ int aq_mss_get_ingress_sc_record(struct atl_hw *hw,
 }
 
 static int set_ingress_sa_record(struct atl_hw *hw,
-			      const struct aq_mss_ingress_sa_record *rec,
-			      uint16_t table_index)
+				 const struct aq_mss_ingress_sa_record *rec,
+				 uint16_t table_index)
 {
 	uint16_t packed_record[8];
 
@@ -744,22 +745,22 @@ static int set_ingress_sa_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 8);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->stop_time >> 0) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->stop_time >> 16) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->start_time >> 0) & 0xFFFF) << 0);
+			   (((rec->start_time >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->start_time >> 16) & 0xFFFF) << 0);
+			   (((rec->start_time >> 16) & 0xFFFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->next_pn >> 0) & 0xFFFF) << 0);
+			   (((rec->next_pn >> 0) & 0xFFFF) << 0);
 	packed_record[5] = (packed_record[5] & 0x0000) |
-			  (((rec->next_pn >> 16) & 0xFFFF) << 0);
+			   (((rec->next_pn >> 16) & 0xFFFF) << 0);
 
 	packed_record[6] = (packed_record[6] & 0xFFFE) |
-			  (((rec->sat_nextpn >> 0) & 0x1) << 0);
+			   (((rec->sat_nextpn >> 0) & 0x1) << 0);
 
 	packed_record[6] =
 		(packed_record[6] & 0xFFFD) | (((rec->in_use >> 0) & 0x1) << 1);
@@ -768,27 +769,27 @@ static int set_ingress_sa_record(struct atl_hw *hw,
 		(packed_record[6] & 0xFFFB) | (((rec->fresh >> 0) & 0x1) << 2);
 
 	packed_record[6] = (packed_record[6] & 0x0007) |
-			  (((rec->reserved >> 0) & 0x1FFF) << 3);
+			   (((rec->reserved >> 0) & 0x1FFF) << 3);
 	packed_record[7] = (packed_record[7] & 0x8000) |
-			  (((rec->reserved >> 13) & 0x7FFF) << 0);
+			   (((rec->reserved >> 13) & 0x7FFF) << 0);
 
 	packed_record[7] =
 		(packed_record[7] & 0x7FFF) | (((rec->valid >> 0) & 0x1) << 15);
 
-	return set_raw_ingress_record(
-		hw, packed_record, 8, 3, ROWOFFSET_INGRESSSARECORD + table_index);
+	return set_raw_ingress_record(hw, packed_record, 8, 3,
+				      ROWOFFSET_INGRESSSARECORD + table_index);
 }
 
 int aq_mss_set_ingress_sa_record(struct atl_hw *hw,
-			      const struct aq_mss_ingress_sa_record *rec,
-			      uint16_t table_index)
+				 const struct aq_mss_ingress_sa_record *rec,
+				 uint16_t table_index)
 {
 	AQ_API_CALL_SAFE(set_ingress_sa_record, hw, rec, table_index);
 }
 
 static int get_ingress_sa_record(struct atl_hw *hw,
-			      struct aq_mss_ingress_sa_record *rec,
-			      uint16_t table_index)
+				 struct aq_mss_ingress_sa_record *rec,
+				 uint16_t table_index)
 {
 	uint16_t packed_record[8];
 	int ret;
@@ -797,7 +798,7 @@ static int get_ingress_sa_record(struct atl_hw *hw,
 		return -EINVAL;
 
 	ret = get_raw_ingress_record(hw, packed_record, 8, 3,
-					ROWOFFSET_INGRESSSARECORD + table_index);
+				     ROWOFFSET_INGRESSSARECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -837,8 +838,8 @@ static int get_ingress_sa_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_ingress_sa_record(struct atl_hw *hw,
-			      struct aq_mss_ingress_sa_record *rec,
-			      uint16_t table_index)
+				 struct aq_mss_ingress_sa_record *rec,
+				 uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -847,8 +848,8 @@ int aq_mss_get_ingress_sa_record(struct atl_hw *hw,
 
 static int
 set_ingress_sakey_record(struct atl_hw *hw,
-		      const struct aq_mss_ingress_sakey_record *rec,
-		      uint16_t table_index)
+			 const struct aq_mss_ingress_sakey_record *rec,
+			 uint16_t table_index)
 {
 	uint16_t packed_record[18];
 
@@ -858,51 +859,51 @@ set_ingress_sakey_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 18);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->key[0] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[0] >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->key[0] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->key[1] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[1] >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->key[1] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[1] >> 16) & 0xFFFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->key[2] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[2] >> 0) & 0xFFFF) << 0);
 	packed_record[5] = (packed_record[5] & 0x0000) |
-			  (((rec->key[2] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[2] >> 16) & 0xFFFF) << 0);
 
 	packed_record[6] = (packed_record[6] & 0x0000) |
-			  (((rec->key[3] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[3] >> 0) & 0xFFFF) << 0);
 	packed_record[7] = (packed_record[7] & 0x0000) |
-			  (((rec->key[3] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[3] >> 16) & 0xFFFF) << 0);
 
 	packed_record[8] = (packed_record[8] & 0x0000) |
-			  (((rec->key[4] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[4] >> 0) & 0xFFFF) << 0);
 	packed_record[9] = (packed_record[9] & 0x0000) |
-			  (((rec->key[4] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[4] >> 16) & 0xFFFF) << 0);
 
 	packed_record[10] = (packed_record[10] & 0x0000) |
-			   (((rec->key[5] >> 0) & 0xFFFF) << 0);
+			    (((rec->key[5] >> 0) & 0xFFFF) << 0);
 	packed_record[11] = (packed_record[11] & 0x0000) |
-			   (((rec->key[5] >> 16) & 0xFFFF) << 0);
+			    (((rec->key[5] >> 16) & 0xFFFF) << 0);
 
 	packed_record[12] = (packed_record[12] & 0x0000) |
-			   (((rec->key[6] >> 0) & 0xFFFF) << 0);
+			    (((rec->key[6] >> 0) & 0xFFFF) << 0);
 	packed_record[13] = (packed_record[13] & 0x0000) |
-			   (((rec->key[6] >> 16) & 0xFFFF) << 0);
+			    (((rec->key[6] >> 16) & 0xFFFF) << 0);
 
 	packed_record[14] = (packed_record[14] & 0x0000) |
-			   (((rec->key[7] >> 0) & 0xFFFF) << 0);
+			    (((rec->key[7] >> 0) & 0xFFFF) << 0);
 	packed_record[15] = (packed_record[15] & 0x0000) |
-			   (((rec->key[7] >> 16) & 0xFFFF) << 0);
+			    (((rec->key[7] >> 16) & 0xFFFF) << 0);
 
 	packed_record[16] = (packed_record[16] & 0xFFFC) |
-			   (((rec->key_len >> 0) & 0x3) << 0);
+			    (((rec->key_len >> 0) & 0x3) << 0);
 
 	return set_raw_ingress_record(hw, packed_record, 18, 2,
-					 ROWOFFSET_INGRESSSAKEYRECORD +
-						 table_index);
+				      ROWOFFSET_INGRESSSAKEYRECORD +
+					      table_index);
 }
 
 int aq_mss_set_ingress_sakey_record(
@@ -913,8 +914,8 @@ int aq_mss_set_ingress_sakey_record(
 }
 
 static int get_ingress_sakey_record(struct atl_hw *hw,
-				 struct aq_mss_ingress_sakey_record *rec,
-				 uint16_t table_index)
+				    struct aq_mss_ingress_sakey_record *rec,
+				    uint16_t table_index)
 {
 	uint16_t packed_record[18];
 	int ret;
@@ -923,8 +924,8 @@ static int get_ingress_sakey_record(struct atl_hw *hw,
 		return -EINVAL;
 
 	ret = get_raw_ingress_record(hw, packed_record, 18, 2,
-					ROWOFFSET_INGRESSSAKEYRECORD +
-						table_index);
+				     ROWOFFSET_INGRESSSAKEYRECORD +
+					     table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -975,8 +976,8 @@ static int get_ingress_sakey_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_ingress_sakey_record(struct atl_hw *hw,
-				 struct aq_mss_ingress_sakey_record *rec,
-				 uint16_t table_index)
+				    struct aq_mss_ingress_sakey_record *rec,
+				    uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -985,8 +986,8 @@ int aq_mss_get_ingress_sakey_record(struct atl_hw *hw,
 
 static int
 set_ingress_postclass_record(struct atl_hw *hw,
-			  const struct aq_mss_ingress_postclass_record *rec,
-			  uint16_t table_index)
+			     const struct aq_mss_ingress_postclass_record *rec,
+			     uint16_t table_index)
 {
 	uint16_t packed_record[8];
 
@@ -1008,92 +1009,92 @@ set_ingress_postclass_record(struct atl_hw *hw,
 		(packed_record[1] & 0x00FF) | (((rec->byte3 >> 0) & 0xFF) << 8);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->eth_type >> 0) & 0xFFFF) << 0);
+			   (((rec->eth_type >> 0) & 0xFFFF) << 0);
 
 	packed_record[3] = (packed_record[3] & 0xFFFE) |
-			  (((rec->eth_type_valid >> 0) & 0x1) << 0);
+			   (((rec->eth_type_valid >> 0) & 0x1) << 0);
 
 	packed_record[3] = (packed_record[3] & 0xE001) |
-			  (((rec->vlan_id >> 0) & 0xFFF) << 1);
+			   (((rec->vlan_id >> 0) & 0xFFF) << 1);
 
 	packed_record[3] = (packed_record[3] & 0x1FFF) |
-			  (((rec->vlan_up >> 0) & 0x7) << 13);
+			   (((rec->vlan_up >> 0) & 0x7) << 13);
 
 	packed_record[4] = (packed_record[4] & 0xFFFE) |
-			  (((rec->vlan_valid >> 0) & 0x1) << 0);
+			   (((rec->vlan_valid >> 0) & 0x1) << 0);
 
 	packed_record[4] =
 		(packed_record[4] & 0xFFC1) | (((rec->sai >> 0) & 0x1F) << 1);
 
-	packed_record[4] =
-		(packed_record[4] & 0xFFBF) | (((rec->sai_hit >> 0) & 0x1) << 6);
+	packed_record[4] = (packed_record[4] & 0xFFBF) |
+			   (((rec->sai_hit >> 0) & 0x1) << 6);
 
 	packed_record[4] = (packed_record[4] & 0xF87F) |
-			  (((rec->eth_type_mask >> 0) & 0xF) << 7);
+			   (((rec->eth_type_mask >> 0) & 0xF) << 7);
 
 	packed_record[4] = (packed_record[4] & 0x07FF) |
-			  (((rec->byte3_location >> 0) & 0x1F) << 11);
+			   (((rec->byte3_location >> 0) & 0x1F) << 11);
 	packed_record[5] = (packed_record[5] & 0xFFFE) |
-			  (((rec->byte3_location >> 5) & 0x1) << 0);
+			   (((rec->byte3_location >> 5) & 0x1) << 0);
 
 	packed_record[5] = (packed_record[5] & 0xFFF9) |
-			  (((rec->byte3_mask >> 0) & 0x3) << 1);
+			   (((rec->byte3_mask >> 0) & 0x3) << 1);
 
 	packed_record[5] = (packed_record[5] & 0xFE07) |
-			  (((rec->byte2_location >> 0) & 0x3F) << 3);
+			   (((rec->byte2_location >> 0) & 0x3F) << 3);
 
 	packed_record[5] = (packed_record[5] & 0xF9FF) |
-			  (((rec->byte2_mask >> 0) & 0x3) << 9);
+			   (((rec->byte2_mask >> 0) & 0x3) << 9);
 
 	packed_record[5] = (packed_record[5] & 0x07FF) |
-			  (((rec->byte1_location >> 0) & 0x1F) << 11);
+			   (((rec->byte1_location >> 0) & 0x1F) << 11);
 	packed_record[6] = (packed_record[6] & 0xFFFE) |
-			  (((rec->byte1_location >> 5) & 0x1) << 0);
+			   (((rec->byte1_location >> 5) & 0x1) << 0);
 
 	packed_record[6] = (packed_record[6] & 0xFFF9) |
-			  (((rec->byte1_mask >> 0) & 0x3) << 1);
+			   (((rec->byte1_mask >> 0) & 0x3) << 1);
 
 	packed_record[6] = (packed_record[6] & 0xFE07) |
-			  (((rec->byte0_location >> 0) & 0x3F) << 3);
+			   (((rec->byte0_location >> 0) & 0x3F) << 3);
 
 	packed_record[6] = (packed_record[6] & 0xF9FF) |
-			  (((rec->byte0_mask >> 0) & 0x3) << 9);
+			   (((rec->byte0_mask >> 0) & 0x3) << 9);
 
 	packed_record[6] = (packed_record[6] & 0xE7FF) |
-			  (((rec->eth_type_valid_mask >> 0) & 0x3) << 11);
+			   (((rec->eth_type_valid_mask >> 0) & 0x3) << 11);
 
 	packed_record[6] = (packed_record[6] & 0x1FFF) |
-			  (((rec->vlan_id_mask >> 0) & 0x7) << 13);
+			   (((rec->vlan_id_mask >> 0) & 0x7) << 13);
 	packed_record[7] = (packed_record[7] & 0xFFFE) |
-			  (((rec->vlan_id_mask >> 3) & 0x1) << 0);
+			   (((rec->vlan_id_mask >> 3) & 0x1) << 0);
 
 	packed_record[7] = (packed_record[7] & 0xFFF9) |
-			  (((rec->vlan_up_mask >> 0) & 0x3) << 1);
+			   (((rec->vlan_up_mask >> 0) & 0x3) << 1);
 
 	packed_record[7] = (packed_record[7] & 0xFFE7) |
-			  (((rec->vlan_valid_mask >> 0) & 0x3) << 3);
+			   (((rec->vlan_valid_mask >> 0) & 0x3) << 3);
 
 	packed_record[7] = (packed_record[7] & 0xFF9F) |
-			  (((rec->sai_mask >> 0) & 0x3) << 5);
+			   (((rec->sai_mask >> 0) & 0x3) << 5);
 
 	packed_record[7] = (packed_record[7] & 0xFE7F) |
-			  (((rec->sai_hit_mask >> 0) & 0x3) << 7);
+			   (((rec->sai_hit_mask >> 0) & 0x3) << 7);
 
 	packed_record[7] = (packed_record[7] & 0xFDFF) |
-			  (((rec->firstlevel_actions >> 0) & 0x1) << 9);
+			   (((rec->firstlevel_actions >> 0) & 0x1) << 9);
 
 	packed_record[7] = (packed_record[7] & 0xFBFF) |
-			  (((rec->secondlevel_actions >> 0) & 0x1) << 10);
+			   (((rec->secondlevel_actions >> 0) & 0x1) << 10);
 
 	packed_record[7] = (packed_record[7] & 0x87FF) |
-			  (((rec->reserved >> 0) & 0xF) << 11);
+			   (((rec->reserved >> 0) & 0xF) << 11);
 
 	packed_record[7] =
 		(packed_record[7] & 0x7FFF) | (((rec->valid >> 0) & 0x1) << 15);
 
 	return set_raw_ingress_record(hw, packed_record, 8, 4,
-					 ROWOFFSET_INGRESSPOSTCLASSRECORD +
-						 table_index);
+				      ROWOFFSET_INGRESSPOSTCLASSRECORD +
+					      table_index);
 }
 
 int aq_mss_set_ingress_postclass_record(
@@ -1105,8 +1106,8 @@ int aq_mss_set_ingress_postclass_record(
 
 static int
 get_ingress_postclass_record(struct atl_hw *hw,
-			  struct aq_mss_ingress_postclass_record *rec,
-			  uint16_t table_index)
+			     struct aq_mss_ingress_postclass_record *rec,
+			     uint16_t table_index)
 {
 	uint16_t packed_record[8];
 	int ret;
@@ -1118,16 +1119,16 @@ get_ingress_postclass_record(struct atl_hw *hw,
 	 * row, throw that value away, and finally read the desired row.
 	 */
 	if ((table_index % 2) > 0) {
-		ret = get_raw_ingress_record(
-			hw, packed_record, 8, 4,
-			ROWOFFSET_INGRESSPOSTCLASSRECORD + table_index - 1);
+		ret = get_raw_ingress_record(hw, packed_record, 8, 4,
+					     ROWOFFSET_INGRESSPOSTCLASSRECORD +
+						     table_index - 1);
 		if (unlikely(ret))
 			return ret;
 	}
 
 	ret = get_raw_ingress_record(hw, packed_record, 8, 4,
-					ROWOFFSET_INGRESSPOSTCLASSRECORD +
-						table_index);
+				     ROWOFFSET_INGRESSPOSTCLASSRECORD +
+					     table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -1241,8 +1242,8 @@ int aq_mss_get_ingress_postclass_record(
 
 static int
 set_ingress_postctlf_record(struct atl_hw *hw,
-			 const struct aq_mss_ingress_postctlf_record *rec,
-			 uint16_t table_index)
+			    const struct aq_mss_ingress_postctlf_record *rec,
+			    uint16_t table_index)
 {
 	uint16_t packed_record[6];
 
@@ -1252,28 +1253,28 @@ set_ingress_postctlf_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 6);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->sa_da[0] >> 0) & 0xFFFF) << 0);
+			   (((rec->sa_da[0] >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->sa_da[0] >> 16) & 0xFFFF) << 0);
+			   (((rec->sa_da[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->sa_da[1] >> 0) & 0xFFFF) << 0);
+			   (((rec->sa_da[1] >> 0) & 0xFFFF) << 0);
 
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->eth_type >> 0) & 0xFFFF) << 0);
+			   (((rec->eth_type >> 0) & 0xFFFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->match_mask >> 0) & 0xFFFF) << 0);
+			   (((rec->match_mask >> 0) & 0xFFFF) << 0);
 
 	packed_record[5] = (packed_record[5] & 0xFFF0) |
-			  (((rec->match_type >> 0) & 0xF) << 0);
+			   (((rec->match_type >> 0) & 0xF) << 0);
 
 	packed_record[5] =
 		(packed_record[5] & 0xFFEF) | (((rec->action >> 0) & 0x1) << 4);
 
 	return set_raw_ingress_record(hw, packed_record, 6, 5,
-					 ROWOFFSET_INGRESSPOSTCTLFRECORD +
-						 table_index);
+				      ROWOFFSET_INGRESSPOSTCTLFRECORD +
+					      table_index);
 }
 
 int aq_mss_set_ingress_postctlf_record(
@@ -1285,8 +1286,8 @@ int aq_mss_set_ingress_postctlf_record(
 
 static int
 get_ingress_postctlf_record(struct atl_hw *hw,
-			 struct aq_mss_ingress_postctlf_record *rec,
-			 uint16_t table_index)
+			    struct aq_mss_ingress_postctlf_record *rec,
+			    uint16_t table_index)
 {
 	uint16_t packed_record[6];
 	int ret;
@@ -1298,16 +1299,16 @@ get_ingress_postctlf_record(struct atl_hw *hw,
 	 * row, throw that value away, and finally read the desired row.
 	 */
 	if ((table_index % 2) > 0) {
-		ret = get_raw_ingress_record(
-			hw, packed_record, 6, 5,
-			ROWOFFSET_INGRESSPOSTCTLFRECORD + table_index - 1);
+		ret = get_raw_ingress_record(hw, packed_record, 6, 5,
+					     ROWOFFSET_INGRESSPOSTCTLFRECORD +
+						     table_index - 1);
 		if (unlikely(ret))
 			return ret;
 	}
 
 	ret = get_raw_ingress_record(hw, packed_record, 6, 5,
-					ROWOFFSET_INGRESSPOSTCTLFRECORD +
-						table_index);
+				     ROWOFFSET_INGRESSPOSTCTLFRECORD +
+					     table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -1344,8 +1345,8 @@ int aq_mss_get_ingress_postctlf_record(
 }
 
 static int set_egress_ctlf_record(struct atl_hw *hw,
-			       const struct aq_mss_egress_ctlf_record *rec,
-			       uint16_t table_index)
+				  const struct aq_mss_egress_ctlf_record *rec,
+				  uint16_t table_index)
 {
 	uint16_t packed_record[6];
 
@@ -1355,40 +1356,39 @@ static int set_egress_ctlf_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 6);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->sa_da[0] >> 0) & 0xFFFF) << 0);
+			   (((rec->sa_da[0] >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->sa_da[0] >> 16) & 0xFFFF) << 0);
+			   (((rec->sa_da[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->sa_da[1] >> 0) & 0xFFFF) << 0);
+			   (((rec->sa_da[1] >> 0) & 0xFFFF) << 0);
 
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->eth_type >> 0) & 0xFFFF) << 0);
+			   (((rec->eth_type >> 0) & 0xFFFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->match_mask >> 0) & 0xFFFF) << 0);
+			   (((rec->match_mask >> 0) & 0xFFFF) << 0);
 
 	packed_record[5] = (packed_record[5] & 0xFFF0) |
-			  (((rec->match_type >> 0) & 0xF) << 0);
+			   (((rec->match_type >> 0) & 0xF) << 0);
 
 	packed_record[5] =
 		(packed_record[5] & 0xFFEF) | (((rec->action >> 0) & 0x1) << 4);
 
 	return set_raw_egress_record(hw, packed_record, 6, 0,
-					ROWOFFSET_EGRESSCTLFRECORD +
-						table_index);
+				     ROWOFFSET_EGRESSCTLFRECORD + table_index);
 }
 
 int aq_mss_set_egress_ctlf_record(struct atl_hw *hw,
-			       const struct aq_mss_egress_ctlf_record *rec,
-			       uint16_t table_index)
+				  const struct aq_mss_egress_ctlf_record *rec,
+				  uint16_t table_index)
 {
 	AQ_API_CALL_SAFE(set_egress_ctlf_record, hw, rec, table_index);
 }
 
 static int get_egress_ctlf_record(struct atl_hw *hw,
-			       struct aq_mss_egress_ctlf_record *rec,
-			       uint16_t table_index)
+				  struct aq_mss_egress_ctlf_record *rec,
+				  uint16_t table_index)
 {
 	uint16_t packed_record[6];
 	int ret;
@@ -1401,14 +1401,14 @@ static int get_egress_ctlf_record(struct atl_hw *hw,
 	 */
 	if ((table_index % 2) > 0) {
 		ret = get_raw_egress_record(hw, packed_record, 6, 0,
-					       ROWOFFSET_EGRESSCTLFRECORD +
-						       table_index - 1);
+					    ROWOFFSET_EGRESSCTLFRECORD +
+						    table_index - 1);
 		if (unlikely(ret))
 			return ret;
 	}
 
 	ret = get_raw_egress_record(hw, packed_record, 6, 0,
-				       ROWOFFSET_EGRESSCTLFRECORD + table_index);
+				    ROWOFFSET_EGRESSCTLFRECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -1436,8 +1436,8 @@ static int get_egress_ctlf_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_egress_ctlf_record(struct atl_hw *hw,
-			       struct aq_mss_egress_ctlf_record *rec,
-			       uint16_t table_index)
+				  struct aq_mss_egress_ctlf_record *rec,
+				  uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -1445,8 +1445,8 @@ int aq_mss_get_egress_ctlf_record(struct atl_hw *hw,
 }
 
 static int set_egress_class_record(struct atl_hw *hw,
-				const struct aq_mss_egress_class_record *rec,
-				uint16_t table_index)
+				   const struct aq_mss_egress_class_record *rec,
+				   uint16_t table_index)
 {
 	uint16_t packed_record[28];
 
@@ -1456,13 +1456,13 @@ static int set_egress_class_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 28);
 
 	packed_record[0] = (packed_record[0] & 0xF000) |
-			  (((rec->vlan_id >> 0) & 0xFFF) << 0);
+			   (((rec->vlan_id >> 0) & 0xFFF) << 0);
 
 	packed_record[0] = (packed_record[0] & 0x8FFF) |
-			  (((rec->vlan_up >> 0) & 0x7) << 12);
+			   (((rec->vlan_up >> 0) & 0x7) << 12);
 
 	packed_record[0] = (packed_record[0] & 0x7FFF) |
-			  (((rec->vlan_valid >> 0) & 0x1) << 15);
+			   (((rec->vlan_valid >> 0) & 0x1) << 15);
 
 	packed_record[1] =
 		(packed_record[1] & 0xFF00) | (((rec->byte3 >> 0) & 0xFF) << 0);
@@ -1479,63 +1479,63 @@ static int set_egress_class_record(struct atl_hw *hw,
 	packed_record[3] =
 		(packed_record[3] & 0xFF00) | (((rec->tci >> 0) & 0xFF) << 0);
 
-	packed_record[3] =
-		(packed_record[3] & 0x00FF) | (((rec->sci[0] >> 0) & 0xFF) << 8);
+	packed_record[3] = (packed_record[3] & 0x00FF) |
+			   (((rec->sci[0] >> 0) & 0xFF) << 8);
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->sci[0] >> 8) & 0xFFFF) << 0);
+			   (((rec->sci[0] >> 8) & 0xFFFF) << 0);
 	packed_record[5] = (packed_record[5] & 0xFF00) |
-			  (((rec->sci[0] >> 24) & 0xFF) << 0);
+			   (((rec->sci[0] >> 24) & 0xFF) << 0);
 
-	packed_record[5] =
-		(packed_record[5] & 0x00FF) | (((rec->sci[1] >> 0) & 0xFF) << 8);
+	packed_record[5] = (packed_record[5] & 0x00FF) |
+			   (((rec->sci[1] >> 0) & 0xFF) << 8);
 	packed_record[6] = (packed_record[6] & 0x0000) |
-			  (((rec->sci[1] >> 8) & 0xFFFF) << 0);
+			   (((rec->sci[1] >> 8) & 0xFFFF) << 0);
 	packed_record[7] = (packed_record[7] & 0xFF00) |
-			  (((rec->sci[1] >> 24) & 0xFF) << 0);
+			   (((rec->sci[1] >> 24) & 0xFF) << 0);
 
 	packed_record[7] = (packed_record[7] & 0x00FF) |
-			  (((rec->eth_type >> 0) & 0xFF) << 8);
+			   (((rec->eth_type >> 0) & 0xFF) << 8);
 	packed_record[8] = (packed_record[8] & 0xFF00) |
-			  (((rec->eth_type >> 8) & 0xFF) << 0);
+			   (((rec->eth_type >> 8) & 0xFF) << 0);
 
 	packed_record[8] = (packed_record[8] & 0x00FF) |
-			  (((rec->snap[0] >> 0) & 0xFF) << 8);
+			   (((rec->snap[0] >> 0) & 0xFF) << 8);
 	packed_record[9] = (packed_record[9] & 0x0000) |
-			  (((rec->snap[0] >> 8) & 0xFFFF) << 0);
+			   (((rec->snap[0] >> 8) & 0xFFFF) << 0);
 	packed_record[10] = (packed_record[10] & 0xFF00) |
-			   (((rec->snap[0] >> 24) & 0xFF) << 0);
+			    (((rec->snap[0] >> 24) & 0xFF) << 0);
 
 	packed_record[10] = (packed_record[10] & 0x00FF) |
-			   (((rec->snap[1] >> 0) & 0xFF) << 8);
+			    (((rec->snap[1] >> 0) & 0xFF) << 8);
 
-	packed_record[11] =
-		(packed_record[11] & 0x0000) | (((rec->llc >> 0) & 0xFFFF) << 0);
+	packed_record[11] = (packed_record[11] & 0x0000) |
+			    (((rec->llc >> 0) & 0xFFFF) << 0);
 	packed_record[12] =
 		(packed_record[12] & 0xFF00) | (((rec->llc >> 16) & 0xFF) << 0);
 
 	packed_record[12] = (packed_record[12] & 0x00FF) |
-			   (((rec->mac_sa[0] >> 0) & 0xFF) << 8);
+			    (((rec->mac_sa[0] >> 0) & 0xFF) << 8);
 	packed_record[13] = (packed_record[13] & 0x0000) |
-			   (((rec->mac_sa[0] >> 8) & 0xFFFF) << 0);
+			    (((rec->mac_sa[0] >> 8) & 0xFFFF) << 0);
 	packed_record[14] = (packed_record[14] & 0xFF00) |
-			   (((rec->mac_sa[0] >> 24) & 0xFF) << 0);
+			    (((rec->mac_sa[0] >> 24) & 0xFF) << 0);
 
 	packed_record[14] = (packed_record[14] & 0x00FF) |
-			   (((rec->mac_sa[1] >> 0) & 0xFF) << 8);
+			    (((rec->mac_sa[1] >> 0) & 0xFF) << 8);
 	packed_record[15] = (packed_record[15] & 0xFF00) |
-			   (((rec->mac_sa[1] >> 8) & 0xFF) << 0);
+			    (((rec->mac_sa[1] >> 8) & 0xFF) << 0);
 
 	packed_record[15] = (packed_record[15] & 0x00FF) |
-			   (((rec->mac_da[0] >> 0) & 0xFF) << 8);
+			    (((rec->mac_da[0] >> 0) & 0xFF) << 8);
 	packed_record[16] = (packed_record[16] & 0x0000) |
-			   (((rec->mac_da[0] >> 8) & 0xFFFF) << 0);
+			    (((rec->mac_da[0] >> 8) & 0xFFFF) << 0);
 	packed_record[17] = (packed_record[17] & 0xFF00) |
-			   (((rec->mac_da[0] >> 24) & 0xFF) << 0);
+			    (((rec->mac_da[0] >> 24) & 0xFF) << 0);
 
 	packed_record[17] = (packed_record[17] & 0x00FF) |
-			   (((rec->mac_da[1] >> 0) & 0xFF) << 8);
+			    (((rec->mac_da[1] >> 0) & 0xFF) << 8);
 	packed_record[18] = (packed_record[18] & 0xFF00) |
-			   (((rec->mac_da[1] >> 8) & 0xFF) << 0);
+			    (((rec->mac_da[1] >> 8) & 0xFF) << 0);
 
 	packed_record[18] =
 		(packed_record[18] & 0x00FF) | (((rec->pn >> 0) & 0xFF) << 8);
@@ -1545,112 +1545,111 @@ static int set_egress_class_record(struct atl_hw *hw,
 		(packed_record[20] & 0xFF00) | (((rec->pn >> 24) & 0xFF) << 0);
 
 	packed_record[20] = (packed_record[20] & 0xC0FF) |
-			   (((rec->byte3_location >> 0) & 0x3F) << 8);
+			    (((rec->byte3_location >> 0) & 0x3F) << 8);
 
 	packed_record[20] = (packed_record[20] & 0xBFFF) |
-			   (((rec->byte3_mask >> 0) & 0x1) << 14);
+			    (((rec->byte3_mask >> 0) & 0x1) << 14);
 
 	packed_record[20] = (packed_record[20] & 0x7FFF) |
-			   (((rec->byte2_location >> 0) & 0x1) << 15);
+			    (((rec->byte2_location >> 0) & 0x1) << 15);
 	packed_record[21] = (packed_record[21] & 0xFFE0) |
-			   (((rec->byte2_location >> 1) & 0x1F) << 0);
+			    (((rec->byte2_location >> 1) & 0x1F) << 0);
 
 	packed_record[21] = (packed_record[21] & 0xFFDF) |
-			   (((rec->byte2_mask >> 0) & 0x1) << 5);
+			    (((rec->byte2_mask >> 0) & 0x1) << 5);
 
 	packed_record[21] = (packed_record[21] & 0xF03F) |
-			   (((rec->byte1_location >> 0) & 0x3F) << 6);
+			    (((rec->byte1_location >> 0) & 0x3F) << 6);
 
 	packed_record[21] = (packed_record[21] & 0xEFFF) |
-			   (((rec->byte1_mask >> 0) & 0x1) << 12);
+			    (((rec->byte1_mask >> 0) & 0x1) << 12);
 
 	packed_record[21] = (packed_record[21] & 0x1FFF) |
-			   (((rec->byte0_location >> 0) & 0x7) << 13);
+			    (((rec->byte0_location >> 0) & 0x7) << 13);
 	packed_record[22] = (packed_record[22] & 0xFFF8) |
-			   (((rec->byte0_location >> 3) & 0x7) << 0);
+			    (((rec->byte0_location >> 3) & 0x7) << 0);
 
 	packed_record[22] = (packed_record[22] & 0xFFF7) |
-			   (((rec->byte0_mask >> 0) & 0x1) << 3);
+			    (((rec->byte0_mask >> 0) & 0x1) << 3);
 
 	packed_record[22] = (packed_record[22] & 0xFFCF) |
-			   (((rec->vlan_id_mask >> 0) & 0x3) << 4);
+			    (((rec->vlan_id_mask >> 0) & 0x3) << 4);
 
 	packed_record[22] = (packed_record[22] & 0xFFBF) |
-			   (((rec->vlan_up_mask >> 0) & 0x1) << 6);
+			    (((rec->vlan_up_mask >> 0) & 0x1) << 6);
 
 	packed_record[22] = (packed_record[22] & 0xFF7F) |
-			   (((rec->vlan_valid_mask >> 0) & 0x1) << 7);
+			    (((rec->vlan_valid_mask >> 0) & 0x1) << 7);
 
 	packed_record[22] = (packed_record[22] & 0x00FF) |
-			   (((rec->tci_mask >> 0) & 0xFF) << 8);
+			    (((rec->tci_mask >> 0) & 0xFF) << 8);
 
 	packed_record[23] = (packed_record[23] & 0xFF00) |
-			   (((rec->sci_mask >> 0) & 0xFF) << 0);
+			    (((rec->sci_mask >> 0) & 0xFF) << 0);
 
 	packed_record[23] = (packed_record[23] & 0xFCFF) |
-			   (((rec->eth_type_mask >> 0) & 0x3) << 8);
+			    (((rec->eth_type_mask >> 0) & 0x3) << 8);
 
 	packed_record[23] = (packed_record[23] & 0x83FF) |
-			   (((rec->snap_mask >> 0) & 0x1F) << 10);
+			    (((rec->snap_mask >> 0) & 0x1F) << 10);
 
 	packed_record[23] = (packed_record[23] & 0x7FFF) |
-			   (((rec->llc_mask >> 0) & 0x1) << 15);
+			    (((rec->llc_mask >> 0) & 0x1) << 15);
 	packed_record[24] = (packed_record[24] & 0xFFFC) |
-			   (((rec->llc_mask >> 1) & 0x3) << 0);
+			    (((rec->llc_mask >> 1) & 0x3) << 0);
 
 	packed_record[24] = (packed_record[24] & 0xFF03) |
-			   (((rec->sa_mask >> 0) & 0x3F) << 2);
+			    (((rec->sa_mask >> 0) & 0x3F) << 2);
 
 	packed_record[24] = (packed_record[24] & 0xC0FF) |
-			   (((rec->da_mask >> 0) & 0x3F) << 8);
+			    (((rec->da_mask >> 0) & 0x3F) << 8);
 
 	packed_record[24] = (packed_record[24] & 0x3FFF) |
-			   (((rec->pn_mask >> 0) & 0x3) << 14);
+			    (((rec->pn_mask >> 0) & 0x3) << 14);
 	packed_record[25] = (packed_record[25] & 0xFFFC) |
-			   (((rec->pn_mask >> 2) & 0x3) << 0);
+			    (((rec->pn_mask >> 2) & 0x3) << 0);
 
 	packed_record[25] = (packed_record[25] & 0xFFFB) |
-			   (((rec->eight02dot2 >> 0) & 0x1) << 2);
+			    (((rec->eight02dot2 >> 0) & 0x1) << 2);
 
-	packed_record[25] =
-		(packed_record[25] & 0xFFF7) | (((rec->tci_sc >> 0) & 0x1) << 3);
+	packed_record[25] = (packed_record[25] & 0xFFF7) |
+			    (((rec->tci_sc >> 0) & 0x1) << 3);
 
 	packed_record[25] = (packed_record[25] & 0xFFEF) |
-			   (((rec->tci_87543 >> 0) & 0x1) << 4);
+			    (((rec->tci_87543 >> 0) & 0x1) << 4);
 
 	packed_record[25] = (packed_record[25] & 0xFFDF) |
-			   (((rec->exp_sectag_en >> 0) & 0x1) << 5);
+			    (((rec->exp_sectag_en >> 0) & 0x1) << 5);
 
 	packed_record[25] = (packed_record[25] & 0xF83F) |
-			   (((rec->sc_idx >> 0) & 0x1F) << 6);
+			    (((rec->sc_idx >> 0) & 0x1F) << 6);
 
-	packed_record[25] =
-		(packed_record[25] & 0xE7FF) | (((rec->sc_sa >> 0) & 0x3) << 11);
+	packed_record[25] = (packed_record[25] & 0xE7FF) |
+			    (((rec->sc_sa >> 0) & 0x3) << 11);
 
-	packed_record[25] =
-		(packed_record[25] & 0xDFFF) | (((rec->debug >> 0) & 0x1) << 13);
+	packed_record[25] = (packed_record[25] & 0xDFFF) |
+			    (((rec->debug >> 0) & 0x1) << 13);
 
 	packed_record[25] = (packed_record[25] & 0x3FFF) |
-			   (((rec->action >> 0) & 0x3) << 14);
+			    (((rec->action >> 0) & 0x3) << 14);
 
 	packed_record[26] =
 		(packed_record[26] & 0xFFF7) | (((rec->valid >> 0) & 0x1) << 3);
 
 	return set_raw_egress_record(hw, packed_record, 28, 1,
-					ROWOFFSET_EGRESSCLASSRECORD +
-						table_index);
+				     ROWOFFSET_EGRESSCLASSRECORD + table_index);
 }
 
 int aq_mss_set_egress_class_record(struct atl_hw *hw,
-				const struct aq_mss_egress_class_record *rec,
-				uint16_t table_index)
+				   const struct aq_mss_egress_class_record *rec,
+				   uint16_t table_index)
 {
 	AQ_API_CALL_SAFE(set_egress_class_record, hw, rec, table_index);
 }
 
 static int get_egress_class_record(struct atl_hw *hw,
-				struct aq_mss_egress_class_record *rec,
-				uint16_t table_index)
+				   struct aq_mss_egress_class_record *rec,
+				   uint16_t table_index)
 {
 	uint16_t packed_record[28];
 	int ret;
@@ -1663,15 +1662,14 @@ static int get_egress_class_record(struct atl_hw *hw,
 	 */
 	if ((table_index % 2) > 0) {
 		ret = get_raw_egress_record(hw, packed_record, 28, 1,
-					       ROWOFFSET_EGRESSCLASSRECORD +
-						       table_index - 1);
+					    ROWOFFSET_EGRESSCLASSRECORD +
+						    table_index - 1);
 		if (unlikely(ret))
 			return ret;
 	}
 
 	ret = get_raw_egress_record(hw, packed_record, 28, 1,
-				       ROWOFFSET_EGRESSCLASSRECORD +
-					       table_index);
+				    ROWOFFSET_EGRESSCLASSRECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -1860,8 +1858,8 @@ static int get_egress_class_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_egress_class_record(struct atl_hw *hw,
-				struct aq_mss_egress_class_record *rec,
-				uint16_t table_index)
+				   struct aq_mss_egress_class_record *rec,
+				   uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -1869,8 +1867,8 @@ int aq_mss_get_egress_class_record(struct atl_hw *hw,
 }
 
 static int set_egress_sc_record(struct atl_hw *hw,
-			     const struct aq_mss_egress_sc_record *rec,
-			     uint16_t table_index)
+				const struct aq_mss_egress_sc_record *rec,
+				uint16_t table_index)
 {
 	uint16_t packed_record[8];
 
@@ -1880,31 +1878,31 @@ static int set_egress_sc_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 8);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->start_time >> 0) & 0xFFFF) << 0);
+			   (((rec->start_time >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->start_time >> 16) & 0xFFFF) << 0);
+			   (((rec->start_time >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->stop_time >> 0) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->stop_time >> 16) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 16) & 0xFFFF) << 0);
 
-	packed_record[4] =
-		(packed_record[4] & 0xFFFC) | (((rec->curr_an >> 0) & 0x3) << 0);
+	packed_record[4] = (packed_record[4] & 0xFFFC) |
+			   (((rec->curr_an >> 0) & 0x3) << 0);
 
-	packed_record[4] =
-		(packed_record[4] & 0xFFFB) | (((rec->an_roll >> 0) & 0x1) << 2);
+	packed_record[4] = (packed_record[4] & 0xFFFB) |
+			   (((rec->an_roll >> 0) & 0x1) << 2);
 
 	packed_record[4] =
 		(packed_record[4] & 0xFE07) | (((rec->tci >> 0) & 0x3F) << 3);
 
 	packed_record[4] = (packed_record[4] & 0x01FF) |
-			  (((rec->enc_off >> 0) & 0x7F) << 9);
-	packed_record[5] =
-		(packed_record[5] & 0xFFFE) | (((rec->enc_off >> 7) & 0x1) << 0);
+			   (((rec->enc_off >> 0) & 0x7F) << 9);
+	packed_record[5] = (packed_record[5] & 0xFFFE) |
+			   (((rec->enc_off >> 7) & 0x1) << 0);
 
-	packed_record[5] =
-		(packed_record[5] & 0xFFFD) | (((rec->protect >> 0) & 0x1) << 1);
+	packed_record[5] = (packed_record[5] & 0xFFFD) |
+			   (((rec->protect >> 0) & 0x1) << 1);
 
 	packed_record[5] =
 		(packed_record[5] & 0xFFFB) | (((rec->recv >> 0) & 0x1) << 2);
@@ -1912,26 +1910,26 @@ static int set_egress_sc_record(struct atl_hw *hw,
 	packed_record[5] =
 		(packed_record[5] & 0xFFF7) | (((rec->fresh >> 0) & 0x1) << 3);
 
-	packed_record[5] =
-		(packed_record[5] & 0xFFCF) | (((rec->sak_len >> 0) & 0x3) << 4);
+	packed_record[5] = (packed_record[5] & 0xFFCF) |
+			   (((rec->sak_len >> 0) & 0x3) << 4);
 
 	packed_record[7] =
 		(packed_record[7] & 0x7FFF) | (((rec->valid >> 0) & 0x1) << 15);
 
 	return set_raw_egress_record(hw, packed_record, 8, 2,
-					ROWOFFSET_EGRESSSCRECORD + table_index);
+				     ROWOFFSET_EGRESSSCRECORD + table_index);
 }
 
 int aq_mss_set_egress_sc_record(struct atl_hw *hw,
-			     const struct aq_mss_egress_sc_record *rec,
-			     uint16_t table_index)
+				const struct aq_mss_egress_sc_record *rec,
+				uint16_t table_index)
 {
 	AQ_API_CALL_SAFE(set_egress_sc_record, hw, rec, table_index);
 }
 
 static int get_egress_sc_record(struct atl_hw *hw,
-			     struct aq_mss_egress_sc_record *rec,
-			     uint16_t table_index)
+				struct aq_mss_egress_sc_record *rec,
+				uint16_t table_index)
 {
 	uint16_t packed_record[8];
 	int ret;
@@ -1940,7 +1938,7 @@ static int get_egress_sc_record(struct atl_hw *hw,
 		return -EINVAL;
 
 	ret = get_raw_egress_record(hw, packed_record, 8, 2,
-				       ROWOFFSET_EGRESSSCRECORD + table_index);
+				    ROWOFFSET_EGRESSSCRECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -1987,8 +1985,8 @@ static int get_egress_sc_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_egress_sc_record(struct atl_hw *hw,
-			     struct aq_mss_egress_sc_record *rec,
-			     uint16_t table_index)
+				struct aq_mss_egress_sc_record *rec,
+				uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -1996,8 +1994,8 @@ int aq_mss_get_egress_sc_record(struct atl_hw *hw,
 }
 
 static int set_egress_sa_record(struct atl_hw *hw,
-			     const struct aq_mss_egress_sa_record *rec,
-			     uint16_t table_index)
+				const struct aq_mss_egress_sa_record *rec,
+				uint16_t table_index)
 {
 	uint16_t packed_record[8];
 
@@ -2007,19 +2005,19 @@ static int set_egress_sa_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 8);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->start_time >> 0) & 0xFFFF) << 0);
+			   (((rec->start_time >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->start_time >> 16) & 0xFFFF) << 0);
+			   (((rec->start_time >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->stop_time >> 0) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->stop_time >> 16) & 0xFFFF) << 0);
+			   (((rec->stop_time >> 16) & 0xFFFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->next_pn >> 0) & 0xFFFF) << 0);
+			   (((rec->next_pn >> 0) & 0xFFFF) << 0);
 	packed_record[5] = (packed_record[5] & 0x0000) |
-			  (((rec->next_pn >> 16) & 0xFFFF) << 0);
+			   (((rec->next_pn >> 16) & 0xFFFF) << 0);
 
 	packed_record[6] =
 		(packed_record[6] & 0xFFFE) | (((rec->sat_pn >> 0) & 0x1) << 0);
@@ -2031,19 +2029,19 @@ static int set_egress_sa_record(struct atl_hw *hw,
 		(packed_record[7] & 0x7FFF) | (((rec->valid >> 0) & 0x1) << 15);
 
 	return set_raw_egress_record(hw, packed_record, 8, 2,
-					ROWOFFSET_EGRESSSARECORD + table_index);
+				     ROWOFFSET_EGRESSSARECORD + table_index);
 }
 
 int aq_mss_set_egress_sa_record(struct atl_hw *hw,
-			     const struct aq_mss_egress_sa_record *rec,
-			     uint16_t table_index)
+				const struct aq_mss_egress_sa_record *rec,
+				uint16_t table_index)
 {
 	AQ_API_CALL_SAFE(set_egress_sa_record, hw, rec, table_index);
 }
 
 static int get_egress_sa_record(struct atl_hw *hw,
-			     struct aq_mss_egress_sa_record *rec,
-			     uint16_t table_index)
+				struct aq_mss_egress_sa_record *rec,
+				uint16_t table_index)
 {
 	uint16_t packed_record[8];
 	int ret;
@@ -2052,7 +2050,7 @@ static int get_egress_sa_record(struct atl_hw *hw,
 		return -EINVAL;
 
 	ret = get_raw_egress_record(hw, packed_record, 8, 2,
-				       ROWOFFSET_EGRESSSARECORD + table_index);
+				    ROWOFFSET_EGRESSSARECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 
@@ -2084,8 +2082,8 @@ static int get_egress_sa_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_egress_sa_record(struct atl_hw *hw,
-			     struct aq_mss_egress_sa_record *rec,
-			     uint16_t table_index)
+				struct aq_mss_egress_sa_record *rec,
+				uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -2093,8 +2091,8 @@ int aq_mss_get_egress_sa_record(struct atl_hw *hw,
 }
 
 static int set_egress_sakey_record(struct atl_hw *hw,
-				const struct aq_mss_egress_sakey_record *rec,
-				uint16_t table_index)
+				   const struct aq_mss_egress_sakey_record *rec,
+				   uint16_t table_index)
 {
 	uint16_t packed_record[16];
 	int ret;
@@ -2105,53 +2103,52 @@ static int set_egress_sakey_record(struct atl_hw *hw,
 	memset(packed_record, 0, sizeof(uint16_t) * 16);
 
 	packed_record[0] = (packed_record[0] & 0x0000) |
-			  (((rec->key[0] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[0] >> 0) & 0xFFFF) << 0);
 	packed_record[1] = (packed_record[1] & 0x0000) |
-			  (((rec->key[0] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[0] >> 16) & 0xFFFF) << 0);
 
 	packed_record[2] = (packed_record[2] & 0x0000) |
-			  (((rec->key[1] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[1] >> 0) & 0xFFFF) << 0);
 	packed_record[3] = (packed_record[3] & 0x0000) |
-			  (((rec->key[1] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[1] >> 16) & 0xFFFF) << 0);
 
 	packed_record[4] = (packed_record[4] & 0x0000) |
-			  (((rec->key[2] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[2] >> 0) & 0xFFFF) << 0);
 	packed_record[5] = (packed_record[5] & 0x0000) |
-			  (((rec->key[2] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[2] >> 16) & 0xFFFF) << 0);
 
 	packed_record[6] = (packed_record[6] & 0x0000) |
-			  (((rec->key[3] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[3] >> 0) & 0xFFFF) << 0);
 	packed_record[7] = (packed_record[7] & 0x0000) |
-			  (((rec->key[3] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[3] >> 16) & 0xFFFF) << 0);
 
 	packed_record[8] = (packed_record[8] & 0x0000) |
-			  (((rec->key[4] >> 0) & 0xFFFF) << 0);
+			   (((rec->key[4] >> 0) & 0xFFFF) << 0);
 	packed_record[9] = (packed_record[9] & 0x0000) |
-			  (((rec->key[4] >> 16) & 0xFFFF) << 0);
+			   (((rec->key[4] >> 16) & 0xFFFF) << 0);
 
 	packed_record[10] = (packed_record[10] & 0x0000) |
-			   (((rec->key[5] >> 0) & 0xFFFF) << 0);
+			    (((rec->key[5] >> 0) & 0xFFFF) << 0);
 	packed_record[11] = (packed_record[11] & 0x0000) |
-			   (((rec->key[5] >> 16) & 0xFFFF) << 0);
+			    (((rec->key[5] >> 16) & 0xFFFF) << 0);
 
 	packed_record[12] = (packed_record[12] & 0x0000) |
-			   (((rec->key[6] >> 0) & 0xFFFF) << 0);
+			    (((rec->key[6] >> 0) & 0xFFFF) << 0);
 	packed_record[13] = (packed_record[13] & 0x0000) |
-			   (((rec->key[6] >> 16) & 0xFFFF) << 0);
+			    (((rec->key[6] >> 16) & 0xFFFF) << 0);
 
 	packed_record[14] = (packed_record[14] & 0x0000) |
-			   (((rec->key[7] >> 0) & 0xFFFF) << 0);
+			    (((rec->key[7] >> 0) & 0xFFFF) << 0);
 	packed_record[15] = (packed_record[15] & 0x0000) |
-			   (((rec->key[7] >> 16) & 0xFFFF) << 0);
+			    (((rec->key[7] >> 16) & 0xFFFF) << 0);
 
 	ret = set_raw_egress_record(hw, packed_record, 8, 2,
-				       ROWOFFSET_EGRESSSAKEYRECORD +
-					       table_index);
+				    ROWOFFSET_EGRESSSAKEYRECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 	ret = set_raw_egress_record(hw, packed_record + 8, 8, 2,
-				       ROWOFFSET_EGRESSSAKEYRECORD +
-					       table_index - 32);
+				    ROWOFFSET_EGRESSSAKEYRECORD + table_index -
+					    32);
 	if (unlikely(ret))
 		return ret;
 
@@ -2159,15 +2156,15 @@ static int set_egress_sakey_record(struct atl_hw *hw,
 }
 
 int aq_mss_set_egress_sakey_record(struct atl_hw *hw,
-				const struct aq_mss_egress_sakey_record *rec,
-				uint16_t table_index)
+				   const struct aq_mss_egress_sakey_record *rec,
+				   uint16_t table_index)
 {
 	AQ_API_CALL_SAFE(set_egress_sakey_record, hw, rec, table_index);
 }
 
 static int get_egress_sakey_record(struct atl_hw *hw,
-				struct aq_mss_egress_sakey_record *rec,
-				uint16_t table_index)
+				   struct aq_mss_egress_sakey_record *rec,
+				   uint16_t table_index)
 {
 	uint16_t packed_record[16];
 	int ret;
@@ -2176,13 +2173,12 @@ static int get_egress_sakey_record(struct atl_hw *hw,
 		return -EINVAL;
 
 	ret = get_raw_egress_record(hw, packed_record, 8, 2,
-				       ROWOFFSET_EGRESSSAKEYRECORD +
-					       table_index);
+				    ROWOFFSET_EGRESSSAKEYRECORD + table_index);
 	if (unlikely(ret))
 		return ret;
 	ret = get_raw_egress_record(hw, packed_record + 8, 8, 2,
-				       ROWOFFSET_EGRESSSAKEYRECORD +
-					       table_index - 32);
+				    ROWOFFSET_EGRESSSAKEYRECORD + table_index -
+					    32);
 	if (unlikely(ret))
 		return ret;
 
@@ -2230,8 +2226,8 @@ static int get_egress_sakey_record(struct atl_hw *hw,
 }
 
 int aq_mss_get_egress_sakey_record(struct atl_hw *hw,
-				struct aq_mss_egress_sakey_record *rec,
-				uint16_t table_index)
+				   struct aq_mss_egress_sakey_record *rec,
+				   uint16_t table_index)
 {
 	memset(rec, 0, sizeof(*rec));
 
@@ -2239,8 +2235,8 @@ int aq_mss_get_egress_sakey_record(struct atl_hw *hw,
 }
 
 static int get_egress_sc_counters(struct atl_hw *hw,
-			       struct aq_mss_egress_sc_counters *counters,
-			       uint16_t sc_index)
+				  struct aq_mss_egress_sc_counters *counters,
+				  uint16_t sc_index)
 {
 	uint16_t packed_record[4];
 	int ret;
@@ -2284,8 +2280,8 @@ static int get_egress_sc_counters(struct atl_hw *hw,
 }
 
 int aq_mss_get_egress_sc_counters(struct atl_hw *hw,
-			       struct aq_mss_egress_sc_counters *counters,
-			       uint16_t sc_index)
+				  struct aq_mss_egress_sc_counters *counters,
+				  uint16_t sc_index)
 {
 	memset(counters, 0, sizeof(*counters));
 
@@ -2293,8 +2289,8 @@ int aq_mss_get_egress_sc_counters(struct atl_hw *hw,
 }
 
 static int get_egress_sa_counters(struct atl_hw *hw,
-			       struct aq_mss_egress_sa_counters *counters,
-			       uint16_t sa_index)
+				  struct aq_mss_egress_sa_counters *counters,
+				  uint16_t sa_index)
 {
 	uint16_t packed_record[4];
 	int ret;
@@ -2338,8 +2334,8 @@ static int get_egress_sa_counters(struct atl_hw *hw,
 }
 
 int aq_mss_get_egress_sa_counters(struct atl_hw *hw,
-			       struct aq_mss_egress_sa_counters *counters,
-			       uint16_t sa_index)
+				  struct aq_mss_egress_sa_counters *counters,
+				  uint16_t sa_index)
 {
 	memset(counters, 0, sizeof(*counters));
 
@@ -2348,7 +2344,7 @@ int aq_mss_get_egress_sa_counters(struct atl_hw *hw,
 
 static int
 get_egress_common_counters(struct atl_hw *hw,
-			struct aq_mss_egress_common_counters *counters)
+			   struct aq_mss_egress_common_counters *counters)
 {
 	uint16_t packed_record[4];
 	int ret;
@@ -2370,8 +2366,10 @@ get_egress_common_counters(struct atl_hw *hw,
 	ret = get_raw_egress_record(hw, packed_record, 4, 3, 256 + 2);
 	if (unlikely(ret))
 		return ret;
-	counters->untagged_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->untagged_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->untagged_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->untagged_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_egress_record(hw, packed_record, 4, 3, 256 + 3);
 	if (unlikely(ret))
@@ -2382,8 +2380,10 @@ get_egress_common_counters(struct atl_hw *hw,
 	ret = get_raw_egress_record(hw, packed_record, 4, 3, 256 + 4);
 	if (unlikely(ret))
 		return ret;
-	counters->ecc_error_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->ecc_error_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->ecc_error_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->ecc_error_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_egress_record(hw, packed_record, 4, 3, 256 + 5);
 	if (unlikely(ret))
@@ -2464,8 +2464,8 @@ int aq_mss_clear_egress_counters(struct atl_hw *hw)
 }
 
 static int get_ingress_sa_counters(struct atl_hw *hw,
-				struct aq_mss_ingress_sa_counters *counters,
-				uint16_t sa_index)
+				   struct aq_mss_ingress_sa_counters *counters,
+				   uint16_t sa_index)
 {
 	uint16_t packed_record[4];
 	int ret;
@@ -2474,7 +2474,7 @@ static int get_ingress_sa_counters(struct atl_hw *hw,
 		return -EINVAL;
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 0);
+				     sa_index * 12 + 0);
 	if (unlikely(ret))
 		return ret;
 	counters->untagged_hit_pkts[0] =
@@ -2483,7 +2483,7 @@ static int get_ingress_sa_counters(struct atl_hw *hw,
 		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 1);
+				     sa_index * 12 + 1);
 	if (unlikely(ret))
 		return ret;
 	counters->ctrl_hit_drop_redir_pkts[0] =
@@ -2492,63 +2492,67 @@ static int get_ingress_sa_counters(struct atl_hw *hw,
 		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 2);
+				     sa_index * 12 + 2);
 	if (unlikely(ret))
 		return ret;
 	counters->not_using_sa[0] = packed_record[0] | (packed_record[1] << 16);
 	counters->not_using_sa[1] = packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 3);
+				     sa_index * 12 + 3);
 	if (unlikely(ret))
 		return ret;
 	counters->unused_sa[0] = packed_record[0] | (packed_record[1] << 16);
 	counters->unused_sa[1] = packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 4);
+				     sa_index * 12 + 4);
 	if (unlikely(ret))
 		return ret;
-	counters->not_valid_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->not_valid_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->not_valid_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->not_valid_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 5);
+				     sa_index * 12 + 5);
 	if (unlikely(ret))
 		return ret;
 	counters->invalid_pkts[0] = packed_record[0] | (packed_record[1] << 16);
 	counters->invalid_pkts[1] = packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 6);
+				     sa_index * 12 + 6);
 	if (unlikely(ret))
 		return ret;
 	counters->ok_pkts[0] = packed_record[0] | (packed_record[1] << 16);
 	counters->ok_pkts[1] = packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 7);
+				     sa_index * 12 + 7);
 	if (unlikely(ret))
 		return ret;
 	counters->late_pkts[0] = packed_record[0] | (packed_record[1] << 16);
 	counters->late_pkts[1] = packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 8);
+				     sa_index * 12 + 8);
 	if (unlikely(ret))
 		return ret;
 	counters->delayed_pkts[0] = packed_record[0] | (packed_record[1] << 16);
 	counters->delayed_pkts[1] = packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 9);
+				     sa_index * 12 + 9);
 	if (unlikely(ret))
 		return ret;
-	counters->unchecked_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->unchecked_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->unchecked_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->unchecked_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 10);
+				     sa_index * 12 + 10);
 	if (unlikely(ret))
 		return ret;
 	counters->validated_octets[0] =
@@ -2557,7 +2561,7 @@ static int get_ingress_sa_counters(struct atl_hw *hw,
 		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6,
-					sa_index * 12 + 11);
+				     sa_index * 12 + 11);
 	if (unlikely(ret))
 		return ret;
 	counters->decrypted_octets[0] =
@@ -2569,8 +2573,8 @@ static int get_ingress_sa_counters(struct atl_hw *hw,
 }
 
 int aq_mss_get_ingress_sa_counters(struct atl_hw *hw,
-				struct aq_mss_ingress_sa_counters *counters,
-				uint16_t sa_index)
+				   struct aq_mss_ingress_sa_counters *counters,
+				   uint16_t sa_index)
 {
 	memset(counters, 0, sizeof(*counters));
 
@@ -2579,7 +2583,7 @@ int aq_mss_get_ingress_sa_counters(struct atl_hw *hw,
 
 static int
 get_ingress_common_counters(struct atl_hw *hw,
-			 struct aq_mss_ingress_common_counters *counters)
+			    struct aq_mss_ingress_common_counters *counters)
 {
 	uint16_t packed_record[4];
 	int ret;
@@ -2615,8 +2619,10 @@ get_ingress_common_counters(struct atl_hw *hw,
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6, 385 + 4);
 	if (unlikely(ret))
 		return ret;
-	counters->untagged_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->untagged_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->untagged_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->untagged_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6, 385 + 5);
 	if (unlikely(ret))
@@ -2673,20 +2679,26 @@ get_ingress_common_counters(struct atl_hw *hw,
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6, 385 + 12);
 	if (unlikely(ret))
 		return ret;
-	counters->too_long_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->too_long_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->too_long_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->too_long_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6, 385 + 13);
 	if (unlikely(ret))
 		return ret;
-	counters->igpoc_ctl_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->igpoc_ctl_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->igpoc_ctl_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->igpoc_ctl_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6, 385 + 14);
 	if (unlikely(ret))
 		return ret;
-	counters->ecc_error_pkts[0] = packed_record[0] | (packed_record[1] << 16);
-	counters->ecc_error_pkts[1] = packed_record[2] | (packed_record[3] << 16);
+	counters->ecc_error_pkts[0] =
+		packed_record[0] | (packed_record[1] << 16);
+	counters->ecc_error_pkts[1] =
+		packed_record[2] | (packed_record[3] << 16);
 
 	ret = get_raw_ingress_record(hw, packed_record, 4, 6, 385 + 15);
 	if (unlikely(ret))
@@ -2726,8 +2738,7 @@ static int clear_ingress_counters(struct atl_hw *hw)
 
 	/* Toggle the Ingress MIB clear bit 0->1->0 */
 	ctl_reg.bits_0.clear_count = 0;
-	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       MSS_INGRESS_CTL_REGISTER_ADDR,
+	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL, MSS_INGRESS_CTL_REGISTER_ADDR,
 			       ctl_reg.word_0);
 	if (unlikely(ret))
 		return ret;
@@ -2738,8 +2749,7 @@ static int clear_ingress_counters(struct atl_hw *hw)
 		return ret;
 
 	ctl_reg.bits_0.clear_count = 1;
-	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       MSS_INGRESS_CTL_REGISTER_ADDR,
+	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL, MSS_INGRESS_CTL_REGISTER_ADDR,
 			       ctl_reg.word_0);
 	if (unlikely(ret))
 		return ret;
@@ -2750,8 +2760,7 @@ static int clear_ingress_counters(struct atl_hw *hw)
 		return ret;
 
 	ctl_reg.bits_0.clear_count = 0;
-	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       MSS_INGRESS_CTL_REGISTER_ADDR,
+	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL, MSS_INGRESS_CTL_REGISTER_ADDR,
 			       ctl_reg.word_0);
 	if (unlikely(ret))
 		return ret;
@@ -2782,7 +2791,8 @@ static int get_egress_sa_expired(struct atl_hw *hw, uint32_t *expired)
 	*expired = val;
 
 	ret = __atl_mdio_read(hw, 0, MMD_GLOBAL,
-			      MSS_EGRESS_SA_EXPIRED_STATUS_REGISTER_ADDR + 1, &val);
+			      MSS_EGRESS_SA_EXPIRED_STATUS_REGISTER_ADDR + 1,
+			      &val);
 	if (unlikely(ret))
 		return ret;
 
@@ -2803,9 +2813,9 @@ static int get_egress_sa_threshold_expired(struct atl_hw *hw, uint32_t *expired)
 	uint16_t val;
 	int ret;
 
-	ret = __atl_mdio_read(hw, 0, MMD_GLOBAL,
-			      MSS_EGRESS_SA_THRESHOLD_EXPIRED_STATUS_REGISTER_ADDR,
-			      &val);
+	ret = __atl_mdio_read(
+		hw, 0, MMD_GLOBAL,
+		MSS_EGRESS_SA_THRESHOLD_EXPIRED_STATUS_REGISTER_ADDR, &val);
 	if (unlikely(ret))
 		return ret;
 
@@ -2857,16 +2867,17 @@ static int set_egress_sa_threshold_expired(struct atl_hw *hw, uint32_t expired)
 {
 	int ret;
 
-	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       MSS_EGRESS_SA_THRESHOLD_EXPIRED_STATUS_REGISTER_ADDR,
-			       expired & 0xFFFF);
+	ret = __atl_mdio_write(
+		hw, 0, MMD_GLOBAL,
+		MSS_EGRESS_SA_THRESHOLD_EXPIRED_STATUS_REGISTER_ADDR,
+		expired & 0xFFFF);
 	if (unlikely(ret))
 		return ret;
 
-	ret = __atl_mdio_write(hw, 0, MMD_GLOBAL,
-			       MSS_EGRESS_SA_THRESHOLD_EXPIRED_STATUS_REGISTER_ADDR +
-				       1,
-			       expired >> 16);
+	ret = __atl_mdio_write(
+		hw, 0, MMD_GLOBAL,
+		MSS_EGRESS_SA_THRESHOLD_EXPIRED_STATUS_REGISTER_ADDR + 1,
+		expired >> 16);
 	if (unlikely(ret))
 		return ret;
 

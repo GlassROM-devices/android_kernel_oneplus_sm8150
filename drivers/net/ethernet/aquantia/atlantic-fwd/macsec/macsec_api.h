@@ -46,8 +46,8 @@
  *  table_index - The table row to read (max 23).
  */
 int aq_mss_get_egress_ctlf_record(struct atl_hw *hw,
-			       struct aq_mss_egress_ctlf_record *rec,
-			       uint16_t table_index);
+				  struct aq_mss_egress_ctlf_record *rec,
+				  uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress CTL Filter table.
@@ -55,8 +55,8 @@ int aq_mss_get_egress_ctlf_record(struct atl_hw *hw,
  *  table_index - The table row to write(max 23).
  */
 int aq_mss_set_egress_ctlf_record(struct atl_hw *hw,
-			       const struct aq_mss_egress_ctlf_record *rec,
-			       uint16_t table_index);
+				  const struct aq_mss_egress_ctlf_record *rec,
+				  uint16_t table_index);
 
 /*!  Read the raw table data from the specified row of the Egress
  *   Packet Classifier table, and unpack it into the fields of rec.
@@ -64,8 +64,8 @@ int aq_mss_set_egress_ctlf_record(struct atl_hw *hw,
  *  table_index - The table row to read (max 47).
  */
 int aq_mss_get_egress_class_record(struct atl_hw *hw,
-				struct aq_mss_egress_class_record *rec,
-				uint16_t table_index);
+				   struct aq_mss_egress_class_record *rec,
+				   uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress Packet Classifier table.
@@ -73,8 +73,8 @@ int aq_mss_get_egress_class_record(struct atl_hw *hw,
  *  table_index - The table row to write (max 47).
  */
 int aq_mss_set_egress_class_record(struct atl_hw *hw,
-				const struct aq_mss_egress_class_record *rec,
-				uint16_t table_index);
+				   const struct aq_mss_egress_class_record *rec,
+				   uint16_t table_index);
 
 /*!  Read the raw table data from the specified row of the Egress SC
  *   Lookup table, and unpack it into the fields of rec.
@@ -82,8 +82,8 @@ int aq_mss_set_egress_class_record(struct atl_hw *hw,
  *  table_index - The table row to read (max 31).
  */
 int aq_mss_get_egress_sc_record(struct atl_hw *hw,
-			     struct aq_mss_egress_sc_record *rec,
-			     uint16_t table_index);
+				struct aq_mss_egress_sc_record *rec,
+				uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress SC Lookup table.
@@ -91,8 +91,8 @@ int aq_mss_get_egress_sc_record(struct atl_hw *hw,
  *  table_index - The table row to write (max 31).
  */
 int aq_mss_set_egress_sc_record(struct atl_hw *hw,
-			     const struct aq_mss_egress_sc_record *rec,
-			     uint16_t table_index);
+				const struct aq_mss_egress_sc_record *rec,
+				uint16_t table_index);
 
 /*!  Read the raw table data from the specified row of the Egress SA
  *   Lookup table, and unpack it into the fields of rec.
@@ -100,8 +100,8 @@ int aq_mss_set_egress_sc_record(struct atl_hw *hw,
  *  table_index - The table row to read (max 31).
  */
 int aq_mss_get_egress_sa_record(struct atl_hw *hw,
-			     struct aq_mss_egress_sa_record *rec,
-			     uint16_t table_index);
+				struct aq_mss_egress_sa_record *rec,
+				uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress SA Lookup table.
@@ -109,8 +109,8 @@ int aq_mss_get_egress_sa_record(struct atl_hw *hw,
  *  table_index - The table row to write (max 31).
  */
 int aq_mss_set_egress_sa_record(struct atl_hw *hw,
-			     const struct aq_mss_egress_sa_record *rec,
-			     uint16_t table_index);
+				const struct aq_mss_egress_sa_record *rec,
+				uint16_t table_index);
 
 /*!  Read the raw table data from the specified row of the Egress SA
  *   Key Lookup table, and unpack it into the fields of rec.
@@ -118,8 +118,8 @@ int aq_mss_set_egress_sa_record(struct atl_hw *hw,
  *  table_index - The table row to read (max 31).
  */
 int aq_mss_get_egress_sakey_record(struct atl_hw *hw,
-				struct aq_mss_egress_sakey_record *rec,
-				uint16_t table_index);
+				   struct aq_mss_egress_sakey_record *rec,
+				   uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress SA Key Lookup table.
@@ -127,8 +127,8 @@ int aq_mss_get_egress_sakey_record(struct atl_hw *hw,
  *  table_index - The table row to write (max 31).
  */
 int aq_mss_set_egress_sakey_record(struct atl_hw *hw,
-				const struct aq_mss_egress_sakey_record *rec,
-				uint16_t table_index);
+				   const struct aq_mss_egress_sakey_record *rec,
+				   uint16_t table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress
  *   Pre-MACSec CTL Filter table, and unpack it into the fields of rec.
@@ -136,8 +136,8 @@ int aq_mss_set_egress_sakey_record(struct atl_hw *hw,
  *  table_index - The table row to read (max 23).
  */
 int aq_mss_get_ingress_prectlf_record(struct atl_hw *hw,
-				   struct aq_mss_ingress_prectlf_record *rec,
-				   uint16_t table_index);
+				      struct aq_mss_ingress_prectlf_record *rec,
+				      uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress Pre-MACSec CTL Filter table.
@@ -172,8 +172,8 @@ int aq_mss_set_ingress_preclass_record(
  *  table_index - The table row to read (max 31).
  */
 int aq_mss_get_ingress_sc_record(struct atl_hw *hw,
-			      struct aq_mss_ingress_sc_record *rec,
-			      uint16_t table_index);
+				 struct aq_mss_ingress_sc_record *rec,
+				 uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress SC Lookup table.
@@ -181,8 +181,8 @@ int aq_mss_get_ingress_sc_record(struct atl_hw *hw,
  *  table_index - The table row to write(max 31).
  */
 int aq_mss_set_ingress_sc_record(struct atl_hw *hw,
-			      const struct aq_mss_ingress_sc_record *rec,
-			      uint16_t table_index);
+				 const struct aq_mss_ingress_sc_record *rec,
+				 uint16_t table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress SA
  *   Lookup table, and unpack it into the fields of rec.
@@ -190,8 +190,8 @@ int aq_mss_set_ingress_sc_record(struct atl_hw *hw,
  *  table_index - The table row to read (max 31).
  */
 int aq_mss_get_ingress_sa_record(struct atl_hw *hw,
-			      struct aq_mss_ingress_sa_record *rec,
-			      uint16_t table_index);
+				 struct aq_mss_ingress_sa_record *rec,
+				 uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress SA Lookup table.
@@ -199,8 +199,8 @@ int aq_mss_get_ingress_sa_record(struct atl_hw *hw,
  *  table_index - The table row to write(max 31).
  */
 int aq_mss_set_ingress_sa_record(struct atl_hw *hw,
-			      const struct aq_mss_ingress_sa_record *rec,
-			      uint16_t table_index);
+				 const struct aq_mss_ingress_sa_record *rec,
+				 uint16_t table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress SA
  *   Key Lookup table, and unpack it into the fields of rec.
@@ -208,8 +208,8 @@ int aq_mss_set_ingress_sa_record(struct atl_hw *hw,
  *  table_index - The table row to read (max 31).
  */
 int aq_mss_get_ingress_sakey_record(struct atl_hw *hw,
-				 struct aq_mss_ingress_sakey_record *rec,
-				 uint16_t table_index);
+				    struct aq_mss_ingress_sakey_record *rec,
+				    uint16_t table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress SA Key Lookup table.
@@ -263,8 +263,8 @@ int aq_mss_set_ingress_postctlf_record(
  *  sc_index - The table row to read (max 31).
  */
 int aq_mss_get_egress_sc_counters(struct atl_hw *hw,
-			       struct aq_mss_egress_sc_counters *counters,
-			       uint16_t sc_index);
+				  struct aq_mss_egress_sc_counters *counters,
+				  uint16_t sc_index);
 
 /*!  Read the counters for the specified SA, and unpack them into the
  *   fields of counters.
@@ -272,8 +272,8 @@ int aq_mss_get_egress_sc_counters(struct atl_hw *hw,
  *  sa_index - The table row to read (max 31).
  */
 int aq_mss_get_egress_sa_counters(struct atl_hw *hw,
-			       struct aq_mss_egress_sa_counters *counters,
-			       uint16_t sa_index);
+				  struct aq_mss_egress_sa_counters *counters,
+				  uint16_t sa_index);
 
 /*!  Read the counters for the common egress counters, and unpack them
  *   into the fields of counters.
@@ -291,8 +291,8 @@ int aq_mss_clear_egress_counters(struct atl_hw *hw);
  *  sa_index - The table row to read (max 31).
  */
 int aq_mss_get_ingress_sa_counters(struct atl_hw *hw,
-				struct aq_mss_ingress_sa_counters *counters,
-				uint16_t sa_index);
+				   struct aq_mss_ingress_sa_counters *counters,
+				   uint16_t sa_index);
 
 /*!  Read the counters for the common ingress counters, and unpack them
  *   into the fields of counters.
@@ -307,7 +307,8 @@ int aq_mss_clear_ingress_counters(struct atl_hw *hw);
 /*!  Get Egress SA expired. */
 int aq_mss_get_egress_sa_expired(struct atl_hw *hw, uint32_t *expired);
 /*!  Get Egress SA threshold expired. */
-int aq_mss_get_egress_sa_threshold_expired(struct atl_hw *hw, uint32_t *expired);
+int aq_mss_get_egress_sa_threshold_expired(struct atl_hw *hw,
+					   uint32_t *expired);
 /*!  Set Egress SA expired. */
 int aq_mss_set_egress_sa_expired(struct atl_hw *hw, uint32_t expired);
 /*!  Set Egress SA threshold expired. */
