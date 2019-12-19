@@ -223,20 +223,13 @@ static int __a2_fw_wait_init(struct atl_hw *hw)
 static int atl2_fw_deinit(struct atl_hw *hw)
 {
 	struct link_control_s link_control;
-	uint32_t val;
 	int err = 0;
 
 	atl2_shared_buffer_get(hw, link_control, link_control);
 	link_control.mode = ATL2_HOST_MODE_SHUTDOWN;
 
 	atl2_shared_buffer_write(hw, link_control, link_control);
-	atl2_mif_host_finished_write_set(hw, 1U);
-	busy_wait(1000, udelay(100), val,
-		  atl2_mif_mcp_finished_read_get(hw),
-		  val != 0);
-
-	if (val != 0)
-		err = -ETIME;
+	err = atl2_shared_buffer_finish_ack(hw);
 
 	return err;
 }
@@ -318,7 +311,6 @@ static void __atl2_fw_set_link(struct atl_hw *hw)
 {
 	struct atl_link_state *lstate = &hw->link_state;
 	struct link_options_s link_options;
-	uint32_t val;
 	int err = 0;
 
 	atl2_shared_buffer_get(hw, link_options, link_options);
@@ -340,13 +332,7 @@ static void __atl2_fw_set_link(struct atl_hw *hw)
 	atl2_set_eee(lstate, &link_options, lstate->eee_enabled);
 
 	atl2_shared_buffer_write(hw, link_options, link_options);
-	atl2_mif_host_finished_write_set(hw, 1);
-	busy_wait(1000, udelay(100), val,
-		  atl2_mif_mcp_finished_read_get(hw),
-		  val != 0);
-
-	if (val != 0)
-		err = -ETIME;
+	err = atl2_shared_buffer_finish_ack(hw);
 
 	lstate->prev_advertized = atl_link_adv(lstate);
 	lstate->fc.prev_req = lstate->fc.req;
@@ -503,7 +489,6 @@ static int __atl2_fw_get_link_caps(struct atl_hw *hw)
 static int atl2_fw_restart_aneg(struct atl_hw *hw)
 {
 	struct link_options_s link_options;
-	uint32_t val;
 	int ret = 0;
 
 	atl2_shared_buffer_get(hw, link_options, link_options);
@@ -511,13 +496,7 @@ static int atl2_fw_restart_aneg(struct atl_hw *hw)
 	link_options.link_renegotiate = 1;
 
 	atl2_shared_buffer_write(hw, link_options, link_options);
-	atl2_mif_host_finished_write_set(hw, 1);
-	busy_wait(1000, udelay(100), val,
-		  atl2_mif_mcp_finished_read_get(hw),
-		  val != 0);
-
-	if (val != 0)
-		ret = -ETIME;
+	ret = atl2_shared_buffer_finish_ack(hw);
 
 	link_options.link_renegotiate = 0;
 	atl2_shared_buffer_write(hw, link_options, link_options);
@@ -585,7 +564,6 @@ static int atl2_fw_set_phy_loopback(struct atl_nic *nic, u32 mode)
 	bool on = !!(nic->priv_flags & BIT(mode));
 	struct atl_hw *hw = &nic->hw;
 	struct link_options_s link_options;
-	uint32_t val;
 	int ret = 0;
 
 	atl_lock_fw(hw);
@@ -612,24 +590,18 @@ static int atl2_fw_set_phy_loopback(struct atl_nic *nic, u32 mode)
 	}
 
 	atl2_shared_buffer_write(hw, link_options, link_options);
-	atl2_mif_host_finished_write_set(hw, 1);
-	busy_wait(1000, udelay(100), val,
-		  atl2_mif_mcp_finished_read_get(hw),
-		  val != 0);
+	ret = atl2_shared_buffer_finish_ack(hw);
 
-	if (val != 0)
-		ret = -ETIME;
 unlock:
 	atl_unlock_fw(hw);
 
-	return 0;
+	return ret;
 }
 
 static int atl2_fw_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 {
 	struct wake_on_lan_s wake_on_lan;
 	struct mac_address_s mac_address;
-	uint32_t val;
 	int ret = 0;
 
 	atl_lock_fw(hw);
@@ -655,12 +627,11 @@ static int atl2_fw_enable_wol(struct atl_hw *hw, unsigned int wol_mode)
 	atl2_shared_buffer_write(hw, mac_address, mac_address);
 	atl2_shared_buffer_write(hw, sleep_proxy, wake_on_lan);
 	atl2_mif_host_finished_write_set(hw, 1);
-	busy_wait(1000, udelay(100), val,
-		  atl2_mif_mcp_finished_read_get(hw),
-		  val != 0);
+	ret = atl2_shared_buffer_finish_ack(hw);
 
-	if (val != 0)
-		ret = -ETIME;
+	atl_unlock_fw(hw);
+	return ret;
+}
 
 	atl_unlock_fw(hw);
 	return ret;
