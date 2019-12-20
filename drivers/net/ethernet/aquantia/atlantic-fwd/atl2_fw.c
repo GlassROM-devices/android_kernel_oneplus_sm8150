@@ -247,7 +247,7 @@ static inline unsigned int atl_link_adv(struct atl_link_state *lstate)
 		 * all the lower rates as well. That way if LP changes
 		 * or dynamically starts to adverize a lower rate than
 		 * throttled_to, we will notice that in
-		 * atl_fw2_thermal_check() and switch to that lower
+		 * atl_thermal_check() and switch to that lower
 		 * rate there.
 		 */
 		return (lstate->advertized & ATL_EEE_MASK) |
@@ -261,10 +261,8 @@ static bool atl2_fw_set_link_needed(struct atl_link_state *lstate)
 	struct atl_fc_state *fc = &lstate->fc;
 	bool ret = false;
 
-	if (fc->req != fc->prev_req) {
+	if (fc->req != fc->prev_req)
 		ret = true;
-		fc->prev_req = fc->req;
-	}
 
 	if (atl_link_adv(lstate) != lstate->prev_advertized)
 		ret = true;
