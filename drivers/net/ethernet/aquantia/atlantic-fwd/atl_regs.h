@@ -161,6 +161,7 @@ enum mcp_scratchpad {
 #define ATL_TX_LSO_TCP_CTRL2 0x7824
 #define ATL_TX_PBUF_CTRL1 0x7900
 #define ATL_TX_PBUF_REG1(idx) ATL_REG_STRIDE(0x7910, 0x10, idx)
+#define ATL_TX_PBUF_REG2(idx) ATL_REG_STRIDE(0x7914, 0x10, idx)
 #define ATL_TX_INTR_CTRL 0x7b40
 
 /* Tx rings */

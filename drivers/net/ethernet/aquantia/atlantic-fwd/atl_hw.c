@@ -657,8 +657,14 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* Alloc TPB */
 	/* TC1: space for offload engine iface */
 	atl_write(hw, ATL_TX_PBUF_REG1(1), atl_fwd_tx_buf_reserve);
+	atl_write(hw, ATL_TX_PBUF_REG2(1),
+		(atl_fwd_tx_buf_reserve * 32 * 66 / 100) << 16 |
+		(atl_fwd_tx_buf_reserve * 32 * 50 / 100));
 	/* TC0: 160k minus TC1 size */
 	atl_write(hw, ATL_TX_PBUF_REG1(0), tpb_size - atl_fwd_tx_buf_reserve);
+	atl_write(hw, ATL_TX_PBUF_REG2(0),
+		((tpb_size - atl_fwd_tx_buf_reserve) * 32 * 66 / 100) << 16 |
+		((tpb_size - atl_fwd_tx_buf_reserve) * 32 * 50 / 100));
 	/* 4-TC | Enable TPB */
 	atl_set_bits(hw, ATL_TX_PBUF_CTRL1, BIT(8) | BIT(0));
 	/* TX Buffer clk gate  off */
