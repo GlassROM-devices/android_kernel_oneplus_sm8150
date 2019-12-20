@@ -46,31 +46,28 @@ static void atl2_mif_shared_buf_get(struct atl_hw *hw, int offset,
 				       u32 *data, int len)
 {
 	int i;
-	int j = 0;
 
-	for (i = offset; i < offset + len; i++, j++)
-		data[j] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_IN(i));
+	for (i = 0; i < len; i++)
+		data[i] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_IN(offset + i));
 }
 
 static void atl2_mif_shared_buf_write(struct atl_hw *hw, int offset,
 				  u32 *data, int len)
 {
 	int i;
-	int j = 0;
 
-	for (i = offset; i < offset + len; i++, j++)
-		atl_write(hw, ATL2_MIF_SHARED_BUFFER_IN(i),
-				data[j]);
+	for (i = 0; i < len; i++)
+		atl_write(hw, ATL2_MIF_SHARED_BUFFER_IN(offset + i),
+				data[i]);
 }
 
 static void atl2_mif_shared_buf_read(struct atl_hw *hw, int offset,
 				     u32 *data, int len)
 {
 	int i;
-	int j = 0;
 
-	for (i = offset; i < offset + len; i++, j++)
-		data[j] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_OUT(i));
+	for (i = 0; i < len; i++)
+		data[i] = atl_read(hw, ATL2_MIF_SHARED_BUFFER_OUT(offset + i));
 }
 
 static void atl2_mif_host_finished_write_set(struct atl_hw *hw, u32 finish)
@@ -89,6 +86,10 @@ static u32 atl2_mif_mcp_finished_read_get(struct atl_hw *hw)
 		sizeof(((struct fw_interface_out *)0)->ITEM) / sizeof(u32),\
 		(DATA))
 
+/* There are two 16bit transaction counters. The one is incremented at start of
+ * changing non atomic value, the other one - at the end. So we need to wait for
+ * ma moment when they are equal each other at the reading non atomic memory and
+ * at the end of read.  */
 static int _atl2_shared_buffer_read_safe(struct atl_hw *hw,
 		     uint32_t offset, uint32_t dwords,
 		     void *data)
@@ -139,7 +140,7 @@ static inline int atl2_shared_buffer_finish_ack(struct atl_hw *hw)
 	return err;
 }
 
-static int __a2_fw_wait_init(struct atl_hw *hw)
+static int __atl2_fw_wait_init(struct atl_hw *hw)
 {
 	struct link_control_s link_control;
 	uint32_t mtu;
@@ -669,13 +670,17 @@ static int atl2_fw_unsupported(struct atl_hw *hw)
 
 int atl2_get_fw_version(struct atl_hw *hw, u32 *fw_version)
 {
-	*fw_version = atl_read(hw, 0x13008);
+	struct mac_version_t mac_version;
+
+	atl2_shared_buffer_read(hw, version.mac, mac_version);
+	*fw_version = mac_version.major << 24 | mac_version.minor << 16 |
+		      mac_version.build;
 
 	return 0;
 }
 
 static struct atl_fw_ops atl2_fw_ops = {
-		.__wait_fw_init = __a2_fw_wait_init,
+		.__wait_fw_init = __atl2_fw_wait_init,
 		.deinit = atl2_fw_deinit,
 		.set_link = atl2_fw_set_link,
 		.check_link = atl2_fw_check_link,

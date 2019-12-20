@@ -136,6 +136,7 @@ enum mcp_scratchpad {
 #define ATL_RX_PBUF_CTRL1 0x5700
 #define ATL_RX_PBUF_REG1(idx) ATL_REG_STRIDE(0x5710, 0x10, idx)
 #define ATL_RX_PBUF_REG2(idx) ATL_REG_STRIDE(0x5714, 0x10, idx)
+#define ATL2_RX_Q_TO_TC_MAP(tc) ATL_REG_STRIDE(0x5900, 0x4, tc)
 #define ATL_RX_INTR_CTRL 0x5a30
 #define ATL_RX_INTR_MOD_CTRL(idx) ATL_REG_STRIDE(0x5a40, 4, idx)
 

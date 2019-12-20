@@ -717,10 +717,10 @@ void atl_start_hw_global(struct atl_nic *nic)
 		atl_set_bits(hw, ATL2_RX_RSS_HASH_TYPE_ADR, BIT(9) - 1);
 
 		/* ATL2 Apply legacy ring to TC mapping */
-		atl_write(hw, 0x5900, 0x00000000);
-		atl_write(hw, 0x5904, 0x11111111);
-		atl_write(hw, 0x5908, 0x22222222);
-		atl_write(hw, 0x590c, 0x33333333);
+		atl_write(hw, ATL2_RX_Q_TO_TC_MAP(0), 0x00000000);
+		atl_write(hw, ATL2_RX_Q_TO_TC_MAP(1), 0x11111111);
+		atl_write(hw, ATL2_RX_Q_TO_TC_MAP(2), 0x22222222);
+		atl_write(hw, ATL2_RX_Q_TO_TC_MAP(3), 0x33333333);
 	}
 
 	/* Reprogram ethtool Rx filters */
