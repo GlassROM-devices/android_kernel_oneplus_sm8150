@@ -22,6 +22,9 @@ struct atl_link_type atl_link_types[] = {
 		},							\
 	},
 
+	LINK_TYPE(atl_link_type_idx_10m,
+		"10BaseTX-FD", 10, ETHTOOL_LINK_MODE_10baseT_Full_BIT,
+		0, BIT(1))
 	LINK_TYPE(atl_link_type_idx_100m,
 		"100BaseTX-FD", 100, ETHTOOL_LINK_MODE_100baseT_Full_BIT,
 		0x20, BIT(5))

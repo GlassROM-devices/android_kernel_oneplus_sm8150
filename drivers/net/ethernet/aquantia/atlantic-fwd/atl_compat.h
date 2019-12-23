@@ -241,6 +241,7 @@ static inline void page_ref_inc(struct page *page)
 #define napi_consume_skb(__skb, __budget) dev_consume_skb_any(__skb)
 
 /* from commit 3f1ac7a700d039c61d8d8b99f28d605d489a60cf */
+#define ETHTOOL_LINK_MODE_10baseT_Full_BIT 1
 #define ETHTOOL_LINK_MODE_100baseT_Full_BIT 3
 #define ETHTOOL_LINK_MODE_1000baseT_Full_BIT 5
 #define ETHTOOL_LINK_MODE_10000baseT_Full_BIT 12

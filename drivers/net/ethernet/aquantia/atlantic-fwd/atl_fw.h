@@ -43,6 +43,7 @@ struct atl_link_type {
 };
 
 enum atl_link_type_index {
+	atl_link_type_idx_10m,
 	atl_link_type_idx_100m,
 	atl_link_type_idx_1g,
 	atl_link_type_idx_2p5g,

@@ -275,6 +275,7 @@ static void atl2_set_rate(struct atl_hw *hw,
 {
 	unsigned int adv = atl_link_adv(&hw->link_state);
 
+	link_options->rate_10M = !!(adv & BIT(atl_link_type_idx_10m));
 	link_options->rate_100M = !!(adv & BIT(atl_link_type_idx_100m));
 	link_options->rate_1G   = !!(adv & BIT(atl_link_type_idx_1g));
 	link_options->rate_2P5G = !!(adv & BIT(atl_link_type_idx_2p5g));
@@ -360,6 +361,8 @@ static u32 a2_fw_caps_to_mask(struct device_link_caps_s *link_caps)
 		supported |= BIT(atl_link_type_idx_1g);
 	if (link_caps->rate_100M)
 		supported |= BIT(atl_link_type_idx_100m);
+	if (link_caps->rate_10M)
+		supported |= BIT(atl_link_type_idx_10m);
 
 	if (link_caps->eee_10G)
 		supported |= BIT(atl_link_type_idx_10g) << ATL_EEE_BIT_OFFT;
@@ -387,6 +390,8 @@ static u32 a2_fw_lkp_to_mask(struct lkp_link_caps_s *lkp_link_caps)
 		rate |= BIT(atl_link_type_idx_1g);
 	if (lkp_link_caps->rate_100M)
 		rate |= BIT(atl_link_type_idx_100m);
+	if (lkp_link_caps->rate_10M)
+		rate |= BIT(atl_link_type_idx_10m);
 
 	if (lkp_link_caps->eee_10G)
 		rate |= BIT(atl_link_type_idx_10g) << ATL_EEE_BIT_OFFT;
@@ -424,6 +429,9 @@ static int __atl2_fw_update_link_status(struct atl_hw *hw)
 		break;
 	case ATL2_FW_LINK_RATE_100M:
 		lstate->link = &atl_link_types[atl_link_type_idx_100m];
+		break;
+	case ATL2_FW_LINK_RATE_10M:
+		lstate->link = &atl_link_types[atl_link_type_idx_10m];
 		break;
 	default:
 		lstate->link = NULL;
