@@ -577,6 +577,7 @@ void atl_set_uc_flt(struct atl_hw *hw, int idx, uint8_t mac_addr[ETH_ALEN])
 	atl_write(hw, ATL_RX_UC_FLT_REG2(idx),
 		(uint32_t)be16_to_cpu(*(uint16_t *)mac_addr) |
 		1 << 16 | 1 << 31);
+	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(idx), 22, 6, ATL2_RPF_TAG_BASE_UC);
 }
 
 static void atl_disable_uc_flt(struct atl_hw *hw, int idx)
@@ -1419,46 +1420,6 @@ relink:
 }
 
 /* Atlanic2 new filters implementation */
-
-#define ATL2_RPF_L2_PROMISC_OFF_INDEX   0
-#define ATL2_RPF_VLAN_PROMISC_OFF_INDEX 1
-#define ATL2_RPF_L3L4_USER_INDEX        48
-#define ATL2_RPF_ET_PCP_USER_INDEX      64
-#define ATL2_RPF_VLAN_USER_INDEX        80
-#define ATL2_RPF_VLAN_INDEX             122
-#define ATL2_RPF_MAC_INDEX              123
-#define ATL2_RPF_ALLMC_INDEX            124
-#define ATL2_RPF_UNTAG_INDEX            125
-#define ATL2_RPF_VLAN_PROMISC_ON_INDEX  126
-#define ATL2_RPF_L2_PROMISC_ON_INDEX    127
-
-#define ATL2_RPF_TAG_UC_OFFSET      0x0
-#define ATL2_RPF_TAG_ALLMC_OFFSET   0x6
-#define ATL2_RPF_TAG_ET_OFFSET      0x7
-#define ATL2_RPF_TAG_VLAN_OFFSET    0xA
-#define ATL2_RPF_TAG_UNTAG_OFFSET   0xE
-#define ATL2_RPF_TAG_L3_V4_OFFSET   0xF
-#define ATL2_RPF_TAG_L3_V6_OFFSET   0x12
-#define ATL2_RPF_TAG_L4_OFFSET      0x15
-#define ATL2_RPF_TAG_L4_FLEX_OFFSET 0x18
-#define ATL2_RPF_TAG_FLEX_OFFSET    0x1B
-#define ATL2_RPF_TAG_PCP_OFFSET     0x1D
-
-#define ATL2_RPF_TAG_UC_MASK    (0x0000003F << ATL2_RPF_TAG_UC_OFFSET)
-#define ATL2_RPF_TAG_ALLMC_MASK (0x00000001 << ATL2_RPF_TAG_ALLMC_OFFSET)
-#define ATL2_RPF_TAG_UNTAG_MASK (0x00000001 << ATL2_RPF_TAG_UNTAG_OFFSET)
-#define ATL2_RPF_TAG_VLAN_MASK  (0x0000000F << ATL2_RPF_TAG_VLAN_OFFSET)
-#define ATL2_RPF_TAG_ET_MASK    (0x00000007 << ATL2_RPF_TAG_ET_OFFSET)
-#define ATL2_RPF_TAG_L3_V4_MASK (0x00000007 << ATL2_RPF_TAG_L3_V4_OFFSET)
-#define ATL2_RPF_TAG_L3_V6_MASK (0x00000007 << ATL2_RPF_TAG_L3_V6_OFFSET)
-#define ATL2_RPF_TAG_L4_MASK    (0x00000007 << ATL2_RPF_TAG_L4_OFFSET)
-#define ATL2_RPF_TAG_PCP_MASK   (0x00000007 << ATL2_RPF_TAG_PCP_OFFSET)
-
-#define ATL2_RPF_TAG_BASE_UC    (1 << ATL2_RPF_TAG_UC_OFFSET)
-#define ATL2_RPF_TAG_BASE_ALLMC (1 << ATL2_RPF_TAG_ALLMC_OFFSET)
-#define ATL2_RPF_TAG_BASE_UNTAG (1 << ATL2_RPF_TAG_UNTAG_OFFSET)
-#define ATL2_RPF_TAG_BASE_VLAN  (1 << ATL2_RPF_TAG_VLAN_OFFSET)
-
 
 #define ATL2_ACTION(ACTION, RSS, INDEX, VALID, TS_VALID) \
 	(((ACTION & 0x3U) << 8) | \
