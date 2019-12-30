@@ -324,6 +324,7 @@ void atl_update_global_stats(struct atl_nic *nic);
 void atl_set_loopback(struct atl_nic *nic, int idx, bool on);
 void atl_set_intr_mod(struct atl_nic *nic);
 void atl_update_ntuple_flt(struct atl_nic *nic, int idx);
+void atl_set_vlan_promisc(struct atl_hw *hw, int promisc);
 int atl_hwsem_get(struct atl_hw *hw, int idx);
 void atl_hwsem_put(struct atl_hw *hw, int idx);
 int __atl_msm_read(struct atl_hw *hw, uint32_t addr, uint32_t *val);

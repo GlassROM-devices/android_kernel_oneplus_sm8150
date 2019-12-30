@@ -102,12 +102,30 @@ static inline void atl_glb_soft_reset_full(struct atl_hw *hw)
 	atl_glb_soft_reset(hw);
 }
 
+static void atl2_hw_new_rx_filter_vlan_promisc(struct atl_hw *hw, bool promisc);
+static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc);
+static void atl2_hw_init_new_rx_filters(struct atl_hw *hw);
+
+static void atl_set_promisc(struct atl_hw *hw, bool enabled)
+{
+	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, enabled);
+	if (hw->brd_id == ATL_AQC113)
+		atl2_hw_new_rx_filter_promisc(hw, enabled);
+}
+
+void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
+{
+	atl_write_bit(hw, ATL_RX_VLAN_FLT_CTRL1, 1, !!promisc);
+	if (hw->brd_id == ATL_AQC113)
+		atl2_hw_new_rx_filter_vlan_promisc(hw, !!promisc);
+}
+
 static inline void atl_enable_dma_net_lpb_mode(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
 
 	atl_set_vlan_promisc(hw, 1);
-	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, 1);
+	atl_set_promisc(hw, 1);
 	atl_write_bit(hw, ATL_TX_PBUF_CTRL1, 4, 0);
 	atl_write_bit(hw, ATL_TX_CTRL1, 4, 1);
 	atl_write_bit(hw, ATL_RX_CTRL1, 4, 1);
@@ -743,6 +761,10 @@ void atl_start_hw_global(struct atl_nic *nic)
 		atl_write(hw, ATL2_TX_Q_TO_TC_MAP(5), 0x02020202);
 		atl_write(hw, ATL2_TX_Q_TO_TC_MAP(6), 0x03030303);
 		atl_write(hw, ATL2_TX_Q_TO_TC_MAP(7), 0x03030303);
+
+		/* Turn new filters on*/
+		atl_set_bits(hw, ATL_RX_FLT_CTRL2, BIT(0xB));
+		atl2_hw_init_new_rx_filters(hw);
 	}
 
 	/* Reprogram ethtool Rx filters */
@@ -834,7 +856,7 @@ void atl_set_rx_mode(struct net_device *ndev)
 		ndev->flags & IFF_PROMISC || nic->rxf_vlan.promisc_count ||
 		!nic->rxf_vlan.vlans_active);
 
-	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, promisc_needed);
+	atl_set_promisc(hw, promisc_needed);
 	if (promisc_needed)
 		return;
 
@@ -1391,3 +1413,195 @@ relink:
 		hw->mcp.ops->set_link(hw, true);
 	}
 }
+
+/* Atlanic2 new filters implementation */
+
+static unsigned int atl_newrpf = 1;
+atl_module_param(newrpf, uint, 0644);
+
+#define ATL2_RPF_L2_PROMISC_OFF_INDEX   0
+#define ATL2_RPF_VLAN_PROMISC_OFF_INDEX 1
+#define ATL2_RPF_L3L4_USER_INDEX        48
+#define ATL2_RPF_ET_PCP_USER_INDEX      64
+#define ATL2_RPF_VLAN_USER_INDEX        80
+#define ATL2_RPF_VLAN_INDEX             122
+#define ATL2_RPF_MAC_INDEX              123
+#define ATL2_RPF_ALLMC_INDEX            124
+#define ATL2_RPF_UNTAG_INDEX            125
+#define ATL2_RPF_VLAN_PROMISC_ON_INDEX  126
+#define ATL2_RPF_L2_PROMISC_ON_INDEX    127
+
+#define ATL2_RPF_TAG_UC_OFFSET      0x0
+#define ATL2_RPF_TAG_ALLMC_OFFSET   0x6
+#define ATL2_RPF_TAG_ET_OFFSET      0x7
+#define ATL2_RPF_TAG_VLAN_OFFSET    0xA
+#define ATL2_RPF_TAG_UNTAG_OFFSET   0xE
+#define ATL2_RPF_TAG_L3_V4_OFFSET   0xF
+#define ATL2_RPF_TAG_L3_V6_OFFSET   0x12
+#define ATL2_RPF_TAG_L4_OFFSET      0x15
+#define ATL2_RPF_TAG_L4_FLEX_OFFSET 0x18
+#define ATL2_RPF_TAG_FLEX_OFFSET    0x1B
+#define ATL2_RPF_TAG_PCP_OFFSET     0x1D
+
+#define ATL2_RPF_TAG_UC_MASK    (0x0000003F << ATL2_RPF_TAG_UC_OFFSET)
+#define ATL2_RPF_TAG_ALLMC_MASK (0x00000001 << ATL2_RPF_TAG_ALLMC_OFFSET)
+#define ATL2_RPF_TAG_UNTAG_MASK (0x00000001 << ATL2_RPF_TAG_UNTAG_OFFSET)
+#define ATL2_RPF_TAG_VLAN_MASK  (0x0000000F << ATL2_RPF_TAG_VLAN_OFFSET)
+#define ATL2_RPF_TAG_ET_MASK    (0x00000007 << ATL2_RPF_TAG_ET_OFFSET)
+#define ATL2_RPF_TAG_L3_V4_MASK (0x00000007 << ATL2_RPF_TAG_L3_V4_OFFSET)
+#define ATL2_RPF_TAG_L3_V6_MASK (0x00000007 << ATL2_RPF_TAG_L3_V6_OFFSET)
+#define ATL2_RPF_TAG_L4_MASK    (0x00000007 << ATL2_RPF_TAG_L4_OFFSET)
+#define ATL2_RPF_TAG_PCP_MASK   (0x00000007 << ATL2_RPF_TAG_PCP_OFFSET)
+
+#define ATL2_RPF_TAG_BASE_UC    (1 << ATL2_RPF_TAG_UC_OFFSET)
+#define ATL2_RPF_TAG_BASE_ALLMC (1 << ATL2_RPF_TAG_ALLMC_OFFSET)
+#define ATL2_RPF_TAG_BASE_UNTAG (1 << ATL2_RPF_TAG_UNTAG_OFFSET)
+#define ATL2_RPF_TAG_BASE_VLAN  (1 << ATL2_RPF_TAG_VLAN_OFFSET)
+
+
+#define ATL2_ACTION(ACTION, RSS, INDEX, VALID, TS_VALID) \
+	(((ACTION & 0x3U) << 8) | \
+	((RSS & 0x1U) << 7) | \
+	((INDEX & 0x3FU) << 2) | \
+	((TS_VALID & 0x1U) << 1)) | \
+	((VALID & 0x1U) << 0)
+
+#define ATL2_ACTION_DROP ATL2_ACTION(0, 0, 0, 1, 0)
+#define ATL2_ACTION_DISABLE ATL2_ACTION(0, 0, 0, 0, 0)
+#define ATL2_ACTION_ASSIGN_QUEUE(QUEUE) ATL2_ACTION(1, 0, (QUEUE), 1, 0)
+#define ATL2_ACTION_ASSIGN_TC(TC) ATL2_ACTION(1, 1, (TC), 1, 0)
+
+/* set action resolver record */
+static void atl2_rpf_act_rslvr_record_set(struct atl_hw *hw, u8 location,
+				   u32 tag, u32 mask, u32 action)
+{
+	atl_write(hw, ATL2_RPF_ACT_RSLVR_REQ_TAG(location), tag);
+	atl_write(hw, ATL2_RPF_ACT_RSLVR_TAG_MASK(location), mask);
+	atl_write(hw, ATL2_RPF_ACT_RSLVR_ACTN(location), action);
+}
+
+static void atl2_rpfl2_uc_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
+{
+	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(filter), 22, 6, tag);
+}
+
+static int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
+				      u32 tag, u32 mask, u32 action)
+{
+	int err = 0;
+
+	err = atl_hwsem_get(hw, ATL2_MCP_SEM_ACT_RSLVR);
+	if (err)
+		return err;
+
+	atl2_rpf_act_rslvr_record_set(hw, location, tag, mask, action);
+
+	atl_hwsem_put(hw, ATL2_MCP_SEM_ACT_RSLVR);
+
+	return err;
+}
+
+/** Initialise new rx filters
+ * L2 promisc OFF
+ * VLAN promisc OFF
+ *
+ * VLAN
+ * MAC
+ * ALLMULTI
+ * UT
+ * VLAN promisc ON
+ * L2 promisc ON
+ */
+static void atl2_hw_init_new_rx_filters(struct atl_hw *hw)
+{
+	atl_write(hw, ATL2_RPF_REC_TAB_EN, 0xFFFF);
+	atl2_rpfl2_uc_flr_tag_set(hw, ATL2_RPF_TAG_BASE_UC, 0);
+	atl_write_bits(hw, ATL2_RX_FLT_L2_BC_TAG, 0, 6, ATL2_RPF_TAG_BASE_UC);
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_L2_PROMISC_OFF_INDEX,
+				 0,
+				 ATL2_RPF_TAG_UC_MASK | ATL2_RPF_TAG_ALLMC_MASK,
+				 ATL2_ACTION_DROP);
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_VLAN_PROMISC_OFF_INDEX,
+				 0,
+				 ATL2_RPF_TAG_VLAN_MASK | ATL2_RPF_TAG_UNTAG_MASK,
+				 ATL2_ACTION_DROP);
+
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_VLAN_INDEX,
+				 ATL2_RPF_TAG_BASE_VLAN,
+				 ATL2_RPF_TAG_VLAN_MASK,
+				 ATL2_ACTION_ASSIGN_TC(0));
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_MAC_INDEX,
+				 ATL2_RPF_TAG_BASE_UC,
+				 ATL2_RPF_TAG_UC_MASK,
+				 ATL2_ACTION_ASSIGN_TC(0));
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_ALLMC_INDEX,
+				 ATL2_RPF_TAG_BASE_ALLMC,
+				 ATL2_RPF_TAG_ALLMC_MASK,
+				 ATL2_ACTION_ASSIGN_TC(0));
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_UNTAG_INDEX,
+				 ATL2_RPF_TAG_UNTAG_MASK,
+				 ATL2_RPF_TAG_UNTAG_MASK,
+				 ATL2_ACTION_ASSIGN_TC(0));
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_VLAN_PROMISC_ON_INDEX,
+				 0,
+				 ATL2_RPF_TAG_VLAN_MASK,
+				 ATL2_ACTION_DISABLE);
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_L2_PROMISC_ON_INDEX,
+				 0,
+				 ATL2_RPF_TAG_UC_MASK,
+				 ATL2_ACTION_DISABLE);
+}
+
+
+static void atl2_hw_new_rx_filter_vlan_promisc(struct atl_hw *hw, bool promisc)
+{
+	u16 on_action = promisc ? ATL2_ACTION_ASSIGN_TC(0) : ATL2_ACTION_DISABLE;
+	u16 off_action = !promisc ? ATL2_ACTION_DROP : ATL2_ACTION_DISABLE;
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_VLAN_PROMISC_ON_INDEX,
+				 0,
+				 ATL2_RPF_TAG_VLAN_MASK,
+				 on_action);
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_VLAN_PROMISC_OFF_INDEX,
+				 0,
+				 ATL2_RPF_TAG_VLAN_MASK | ATL2_RPF_TAG_UNTAG_MASK,
+				 off_action);
+}
+
+static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc)
+{
+	u16 on_action = promisc ? ATL2_ACTION_ASSIGN_TC(0) : ATL2_ACTION_DISABLE;
+	u16 off_action = promisc ? ATL2_ACTION_DISABLE : ATL2_ACTION_DROP;
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_L2_PROMISC_OFF_INDEX,
+				 0,
+				 ATL2_RPF_TAG_UC_MASK | ATL2_RPF_TAG_ALLMC_MASK,
+				 off_action);
+
+	atl2_act_rslvr_table_set(hw,
+				 ATL2_RPF_L2_PROMISC_ON_INDEX,
+				 0,
+				 ATL2_RPF_TAG_UC_MASK,
+				 on_action);
+}
+

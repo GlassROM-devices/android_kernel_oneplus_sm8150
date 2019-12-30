@@ -210,10 +210,6 @@ static inline void atl_init_rss_table(struct atl_hw *hw, int nvecs)
 		hw->rss_tbl[i] = i % nvecs;
 }
 
-static inline void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
-{
-	atl_write_bit(hw, ATL_RX_VLAN_FLT_CTRL1, 1, !!promisc);
-}
 
 int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 	unsigned size);

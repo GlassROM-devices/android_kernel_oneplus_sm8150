@@ -52,6 +52,7 @@
 #define ATL_MCP_SEM(idx) ATL_REG_STRIDE(0x3a0, 0x4, idx)
 #define ATL_MCP_SEM_MDIO 0
 #define ATL_MCP_SEM_MSM 1
+#define ATL2_MCP_SEM_ACT_RSLVR 3
 #define ATL_GLOBAL_CTRL2 0x404
 #define ATL_GLOBAL_DAISY_CHAIN_STS1 0x704
 
@@ -93,6 +94,7 @@ enum mcp_scratchpad {
 
 /* RX @ 0x5000 */
 #define ATL_RX_CTRL1 0x5000
+#define ATL2_RX_FLT_L2_BC_TAG 0x50F0
 #define ATL_RX_FLT_CTRL1 0x5100
 #define ATL_RX_FLT_CTRL2 0x5104
 #define ATL_UC_FLT_NUM 37
@@ -141,6 +143,10 @@ enum mcp_scratchpad {
 #define ATL_RX_INTR_MOD_CTRL(idx) ATL_REG_STRIDE(0x5a40, 4, idx)
 #define ATL2_RPF_RSS_REDIR(TC, INDEX) (0x6200 + \
 				       (0x100 * !!(TC > 3)) + (INDEX) * 4)
+#define ATL2_RPF_REC_TAB_EN 0x00006ff0
+#define ATL2_RPF_ACT_RSLVR_REQ_TAG(filter) ATL_REG_STRIDE(0x14000, 0x10, filter)
+#define ATL2_RPF_ACT_RSLVR_TAG_MASK(filter) ATL_REG_STRIDE(0x14004, 0x10, filter)
+#define ATL2_RPF_ACT_RSLVR_ACTN(filter) ATL_REG_STRIDE(0x14008, 0x10, filter)
 
 /* Rx rings */
 #define ATL_RX_RING(idx) ATL_REG_STRIDE(0x5b00, 0x20, idx)
