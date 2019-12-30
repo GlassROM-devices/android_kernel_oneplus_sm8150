@@ -658,6 +658,9 @@ unsigned int atl_fwd_tx_buf_reserve =
 module_param_named(fwd_tx_buf_reserve, atl_fwd_tx_buf_reserve, uint, 0444);
 module_param_named(fwd_rx_buf_reserve, atl_fwd_rx_buf_reserve, uint, 0444);
 
+static unsigned int atl_newrpf = 1;
+atl_module_param(newrpf, uint, 0644);
+
 /* Must be called either during early init when netdev isn't yet
  * registered, or with RTNL lock held */
 void atl_start_hw_global(struct atl_nic *nic)
@@ -763,7 +766,8 @@ void atl_start_hw_global(struct atl_nic *nic)
 		atl_write(hw, ATL2_TX_Q_TO_TC_MAP(7), 0x03030303);
 
 		/* Turn new filters on*/
-		atl_set_bits(hw, ATL_RX_FLT_CTRL2, BIT(0xB));
+		if (atl_newrpf) 
+			atl_set_bits(hw, ATL_RX_FLT_CTRL2, BIT(0xB));
 		atl2_hw_init_new_rx_filters(hw);
 	}
 
@@ -1415,9 +1419,6 @@ relink:
 }
 
 /* Atlanic2 new filters implementation */
-
-static unsigned int atl_newrpf = 1;
-atl_module_param(newrpf, uint, 0644);
 
 #define ATL2_RPF_L2_PROMISC_OFF_INDEX   0
 #define ATL2_RPF_VLAN_PROMISC_OFF_INDEX 1
