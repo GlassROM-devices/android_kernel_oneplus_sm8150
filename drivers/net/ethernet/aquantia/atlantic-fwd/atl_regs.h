@@ -139,6 +139,8 @@ enum mcp_scratchpad {
 #define ATL2_RX_Q_TO_TC_MAP(tc) ATL_REG_STRIDE(0x5900, 0x4, tc)
 #define ATL_RX_INTR_CTRL 0x5a30
 #define ATL_RX_INTR_MOD_CTRL(idx) ATL_REG_STRIDE(0x5a40, 4, idx)
+#define ATL2_RPF_RSS_REDIR(TC, INDEX) (0x6200 + \
+				       (0x100 * !!(TC > 3)) + (INDEX) * 4)
 
 /* Rx rings */
 #define ATL_RX_RING(idx) ATL_REG_STRIDE(0x5b00, 0x20, idx)
