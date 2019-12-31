@@ -614,7 +614,7 @@ int atl_set_rss_tbl(struct atl_hw *hw)
 	if (hw->brd_id == ATL_AQC113)
 		for (i = ATL_RSS_TBL_SIZE; i--;) {
 			atl_write_bits(hw, ATL2_RPF_RSS_REDIR(tc, i),
-				       5 * ((tc) % 4), 5, val);
+				       5 * ((tc) % 4), 5, hw->rss_tbl[i]);
 		}
 
 	for (i = 0; i < ATL_RSS_TBL_SIZE; i++) {
