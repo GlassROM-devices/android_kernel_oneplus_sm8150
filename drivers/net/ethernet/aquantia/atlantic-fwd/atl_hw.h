@@ -27,6 +27,18 @@ struct atl_nic;
 /* clock is 3.2 ns*/
 #define ATL_HW_CLOCK_TO_US(clk)  (clk * 32 / 10000)
 
+#define ATL2_ACTION(ACTION, RSS, INDEX, VALID, TS_VALID) \
+	(((ACTION & 0x3U) << 8) | \
+	((RSS & 0x1U) << 7) | \
+	((INDEX & 0x3FU) << 2) | \
+	((TS_VALID & 0x1U) << 1)) | \
+	((VALID & 0x1U) << 0)
+
+#define ATL2_ACTION_DROP ATL2_ACTION(0, 0, 0, 1, 0)
+#define ATL2_ACTION_DISABLE ATL2_ACTION(0, 0, 0, 0, 0)
+#define ATL2_ACTION_ASSIGN_QUEUE(QUEUE) ATL2_ACTION(1, 0, (QUEUE), 1, 0)
+#define ATL2_ACTION_ASSIGN_TC(TC) ATL2_ACTION(1, 1, (TC), 1, 0)
+
 #define ATL2_RPF_L2_PROMISC_OFF_INDEX   0
 #define ATL2_RPF_VLAN_PROMISC_OFF_INDEX 1
 #define ATL2_RPF_L3L4_USER_INDEX        48
@@ -249,6 +261,12 @@ static inline void atl_init_rss_table(struct atl_hw *hw, int nvecs)
 		hw->rss_tbl[i] = i % nvecs;
 }
 
+int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
+			     u32 tag, u32 mask, u32 action);
+static inline void atl2_rpf_vlan_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
+{
+	atl_write_bits(hw, ATL_RX_VLAN_FLT(filter), 12, 4, tag);
+}
 
 int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 	unsigned size);

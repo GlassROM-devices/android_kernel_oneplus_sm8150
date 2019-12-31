@@ -1870,7 +1870,42 @@ static int atl_rxf_set_flex(const struct atl_rxf_flt_desc *desc,
 
 static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 {
-	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), nic->rxf_vlan.cmd[idx]);
+	uint32_t cmd = nic->rxf_vlan.cmd[idx];
+	struct atl_hw *hw = &nic->hw;
+
+	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), cmd);
+
+	if (nic->hw.brd_id != ATL_AQC113)
+		return;
+
+	if (!(cmd & ATL_RXF_EN)) {
+		atl2_act_rslvr_table_set(hw,
+			ATL2_RPF_VLAN_USER_INDEX + idx,
+			0,
+			0,
+			ATL2_ACTION_DISABLE);
+		return ;
+	}
+
+	if (!(cmd & ATL_RXF_ACT_TOHOST)) {
+		atl2_rpf_vlan_flr_tag_set(hw, idx + 2, idx);
+		atl2_act_rslvr_table_set(hw,
+			ATL2_RPF_VLAN_USER_INDEX + idx,
+			(idx + 2) << ATL2_RPF_TAG_VLAN_OFFSET,
+			ATL2_RPF_TAG_VLAN_MASK,
+			ATL2_ACTION_DROP);
+	} else if (!(cmd & ATL_VLAN_RXQ)) {
+		atl2_rpf_vlan_flr_tag_set(hw, 1, idx);
+	} else {
+		int queue = (cmd >> ATL_VLAN_RXQ_SHIFT) & ATL_RXF_RXQ_MSK;
+
+		atl2_rpf_vlan_flr_tag_set(hw, idx + 2, idx);
+		atl2_act_rslvr_table_set(hw,
+			ATL2_RPF_VLAN_USER_INDEX + idx,
+			(idx + 2) << ATL2_RPF_TAG_VLAN_OFFSET,
+			ATL2_RPF_TAG_VLAN_MASK,
+			ATL2_ACTION_ASSIGN_QUEUE(queue));
+	}
 }
 
 static void atl_rxf_update_etype(struct atl_nic *nic, int idx)

@@ -1421,18 +1421,6 @@ relink:
 
 /* Atlanic2 new filters implementation */
 
-#define ATL2_ACTION(ACTION, RSS, INDEX, VALID, TS_VALID) \
-	(((ACTION & 0x3U) << 8) | \
-	((RSS & 0x1U) << 7) | \
-	((INDEX & 0x3FU) << 2) | \
-	((TS_VALID & 0x1U) << 1)) | \
-	((VALID & 0x1U) << 0)
-
-#define ATL2_ACTION_DROP ATL2_ACTION(0, 0, 0, 1, 0)
-#define ATL2_ACTION_DISABLE ATL2_ACTION(0, 0, 0, 0, 0)
-#define ATL2_ACTION_ASSIGN_QUEUE(QUEUE) ATL2_ACTION(1, 0, (QUEUE), 1, 0)
-#define ATL2_ACTION_ASSIGN_TC(TC) ATL2_ACTION(1, 1, (TC), 1, 0)
-
 /* set action resolver record */
 static void atl2_rpf_act_rslvr_record_set(struct atl_hw *hw, u8 location,
 				   u32 tag, u32 mask, u32 action)
@@ -1447,8 +1435,8 @@ static void atl2_rpfl2_uc_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
 	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(filter), 22, 6, tag);
 }
 
-static int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
-				      u32 tag, u32 mask, u32 action)
+int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
+			     u32 tag, u32 mask, u32 action)
 {
 	int err = 0;
 
