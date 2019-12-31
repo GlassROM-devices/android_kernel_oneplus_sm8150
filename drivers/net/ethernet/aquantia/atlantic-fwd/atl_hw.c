@@ -1430,11 +1430,6 @@ static void atl2_rpf_act_rslvr_record_set(struct atl_hw *hw, u8 location,
 	atl_write(hw, ATL2_RPF_ACT_RSLVR_ACTN(location), action);
 }
 
-static void atl2_rpfl2_uc_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
-{
-	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(filter), 22, 6, tag);
-}
-
 int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
 			     u32 tag, u32 mask, u32 action)
 {
@@ -1465,7 +1460,7 @@ int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
 static void atl2_hw_init_new_rx_filters(struct atl_hw *hw)
 {
 	atl_write(hw, ATL2_RPF_REC_TAB_EN, 0xFFFF);
-	atl2_rpfl2_uc_flr_tag_set(hw, ATL2_RPF_TAG_BASE_UC, 0);
+	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(0), 22, 6, ATL2_RPF_TAG_BASE_UC);
 	atl_write_bits(hw, ATL2_RX_FLT_L2_BC_TAG, 0, 6, ATL2_RPF_TAG_BASE_UC);
 
 	atl2_act_rslvr_table_set(hw,
