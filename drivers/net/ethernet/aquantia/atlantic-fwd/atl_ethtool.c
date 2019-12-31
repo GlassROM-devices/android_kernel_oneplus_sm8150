@@ -1872,6 +1872,7 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 {
 	uint32_t cmd = nic->rxf_vlan.cmd[idx];
 	struct atl_hw *hw = &nic->hw;
+	u16 action;
 
 	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), cmd);
 
@@ -1888,29 +1889,61 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 	}
 
 	if (!(cmd & ATL_RXF_ACT_TOHOST)) {
-		atl2_rpf_vlan_flr_tag_set(hw, idx + 2, idx);
-		atl2_act_rslvr_table_set(hw,
-			ATL2_RPF_VLAN_USER_INDEX + idx,
-			(idx + 2) << ATL2_RPF_TAG_VLAN_OFFSET,
-			ATL2_RPF_TAG_VLAN_MASK,
-			ATL2_ACTION_DROP);
+		action = ATL2_ACTION_DROP;
 	} else if (!(cmd & ATL_VLAN_RXQ)) {
 		atl2_rpf_vlan_flr_tag_set(hw, 1, idx);
+		return;
 	} else {
 		int queue = (cmd >> ATL_VLAN_RXQ_SHIFT) & ATL_RXF_RXQ_MSK;
 
-		atl2_rpf_vlan_flr_tag_set(hw, idx + 2, idx);
-		atl2_act_rslvr_table_set(hw,
-			ATL2_RPF_VLAN_USER_INDEX + idx,
-			(idx + 2) << ATL2_RPF_TAG_VLAN_OFFSET,
-			ATL2_RPF_TAG_VLAN_MASK,
-			ATL2_ACTION_ASSIGN_QUEUE(queue));
+		action = ATL2_ACTION_ASSIGN_QUEUE(queue);
 	}
+
+	atl2_rpf_vlan_flr_tag_set(hw, idx + 2, idx);
+	atl2_act_rslvr_table_set(hw,
+		ATL2_RPF_VLAN_USER_INDEX + idx,
+		(idx + 2) << ATL2_RPF_TAG_VLAN_OFFSET,
+		ATL2_RPF_TAG_VLAN_MASK,
+		action);
+
 }
 
 static void atl_rxf_update_etype(struct atl_nic *nic, int idx)
 {
-	atl_write(&nic->hw, ATL_RX_ETYPE_FLT(idx), nic->rxf_etype.cmd[idx]);
+	uint32_t cmd = nic->rxf_etype.cmd[idx];
+	struct atl_hw *hw = &nic->hw;
+	u16 action;
+
+	atl_write(&nic->hw, ATL_RX_ETYPE_FLT(idx), cmd);
+
+	if (nic->hw.brd_id != ATL_AQC113)
+		return;
+
+	if (cmd & ATL_RXF_EN) {
+		atl2_act_rslvr_table_set(hw,
+			ATL2_RPF_ET_PCP_USER_INDEX + idx,
+			0,
+			0,
+			ATL2_ACTION_DISABLE);
+		return;
+	}
+
+	if (!(cmd & ATL_RXF_ACT_TOHOST)) {
+		action = ATL2_ACTION_DROP;
+	} else if (!(cmd & ATL_ETYPE_RXQ)) {
+		action = ATL2_ACTION_ASSIGN_TC(0);
+	} else {
+		int queue = (cmd >> ATL_ETYPE_RXQ_SHIFT) & ATL_RXF_RXQ_MSK;
+
+		action = ATL2_ACTION_ASSIGN_QUEUE(queue);
+	}
+
+	atl2_rpf_etht_flr_tag_set(hw, idx + 1, idx);
+	atl2_act_rslvr_table_set(hw,
+		ATL2_RPF_ET_PCP_USER_INDEX + idx,
+		(idx + 1) << ATL2_RPF_TAG_ET_OFFSET,
+		ATL2_RPF_TAG_ET_MASK,
+		action);
 }
 
 static void atl_rxf_update_flex(struct atl_nic *nic, int idx)

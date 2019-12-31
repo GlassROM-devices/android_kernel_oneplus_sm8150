@@ -268,6 +268,11 @@ static inline void atl2_rpf_vlan_flr_tag_set(struct atl_hw *hw, u32 tag, u32 fil
 	atl_write_bits(hw, ATL_RX_VLAN_FLT(filter), 12, 4, tag);
 }
 
+static inline void atl2_rpf_etht_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
+{
+	atl_write_bits(hw, ATL_RX_ETYPE_FLT(filter), 0, 3, tag);
+}
+
 int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 	unsigned size);
 int atl_hwinit(struct atl_hw *hw, enum atl_board brd_id);
