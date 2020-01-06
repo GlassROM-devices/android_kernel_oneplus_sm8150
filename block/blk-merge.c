@@ -663,6 +663,7 @@ static void blk_account_io_merge(struct request *req)
 		part_stat_unlock();
 	}
 }
+
 /*
  * Two cases of handling DISCARD merge:
  * If max_discard_segments > 1, the driver takes every bio
@@ -777,7 +778,7 @@ static struct request *attempt_merge(struct request_queue *q,
 
 	req->__data_len += blk_rq_bytes(next);
 
-	if (req_op(req) != REQ_OP_DISCARD)
+	if (!blk_discard_mergable(req))
 		elv_merge_requests(q, req, next);
 
 	/*
