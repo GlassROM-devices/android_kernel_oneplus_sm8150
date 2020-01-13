@@ -1311,13 +1311,13 @@ static int atl_rxf_get_ntuple(const struct atl_rxf_flt_desc *desc,
 
 		if (cmd & ATL_NTC_SA) {
 			atl_ntuple_swap_v6(rule->ip6src,
-				ntuples->src_ip6[idx / 4]);
+				ntuples->src_ip6[idx]);
 			memset(mask->ip6src, 0xff, sizeof(mask->ip6src));
 		}
 
 		if (cmd & ATL_NTC_DA) {
 			atl_ntuple_swap_v6(rule->ip6dst,
-				ntuples->dst_ip6[idx / 4]);
+				ntuples->dst_ip6[idx]);
 			memset(mask->ip6dst, 0xff, sizeof(mask->ip6dst));
 		}
 
@@ -1764,17 +1764,19 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 	if (cmd & ATL_NTC_V6) {
 		int i;
 
-		if (idx & 3) {
-			atl_nic_err("IPv6 filters only supported in locations 8 and 12\n");
-			return -EINVAL;
-		}
-
-		for (i = idx + 1; i < idx + 4; i++)
-			if (ntuple->cmd[i] & ATL_NTC_EN) {
-				atl_nic_err("IPv6 filter %d overlaps an IPv4 filter %d\n",
-					    idx, i);
+		if (nic->hw.brd_id != ATL_AQC113) {
+			if (idx & 3) {
+				atl_nic_err("IPv6 filters only supported in locations 8 and 12\n");
 				return -EINVAL;
 			}
+
+			for (i = idx + 1; i < idx + 4; i++)
+				if (ntuple->cmd[i] & ATL_NTC_EN) {
+					atl_nic_err("IPv6 filter %d overlaps an IPv4 filter %d\n",
+						    idx, i);
+					return -EINVAL;
+				}
+		}
 
 		ret = atl_check_mask((uint8_t *)fsp->m_u.tcp_ip6_spec.ip6src,
 			sizeof(fsp->m_u.tcp_ip6_spec.ip6src), &cmd, ATL_NTC_SA);
@@ -1797,15 +1799,6 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 			sizeof(fsp->m_u.tcp_ip6_spec.pdst), &cmd, ATL_NTC_DP);
 		if (ret)
 			return ret;
-
-		if (cmd & ATL_NTC_SA)
-			atl_ntuple_swap_v6(ntuple->src_ip6[idx / 4],
-				fsp->h_u.tcp_ip6_spec.ip6src);
-
-		if (cmd & ATL_NTC_DA)
-			atl_ntuple_swap_v6(ntuple->dst_ip6[idx / 4],
-				fsp->h_u.tcp_ip6_spec.ip6dst);
-
 	} else
 #endif
 	{
@@ -1831,13 +1824,27 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 			sizeof(fsp->m_u.tcp_ip4_spec.psrc), &cmd, ATL_NTC_DP);
 		if (ret)
 			return ret;
+	}
 
+#ifdef ATL_HAVE_IPV6_NTUPLE
+	if (cmd & ATL_NTC_V6) {
+		if (cmd & ATL_NTC_SA)
+			atl_ntuple_swap_v6(ntuple->src_ip6[idx],
+				fsp->h_u.tcp_ip6_spec.ip6src);
+
+		if (cmd & ATL_NTC_DA)
+			atl_ntuple_swap_v6(ntuple->dst_ip6[idx],
+				fsp->h_u.tcp_ip6_spec.ip6dst);
+	} else
+#endif
+	{
 		if (cmd & ATL_NTC_SA)
 			ntuple->src_ip4[idx] = fsp->h_u.tcp_ip4_spec.ip4src;
 
 		if (cmd & ATL_NTC_DA)
 			ntuple->dst_ip4[idx] = fsp->h_u.tcp_ip4_spec.ip4dst;
 	}
+
 
 	if (cmd & ATL_NTC_SP)
 		ntuple->src_port[idx] = sport;

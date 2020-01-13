@@ -74,6 +74,26 @@ enum atl_ntuple_cmd {
 	ATL_NTC_L4_ICMP = 3,
 };
 
+struct atl_rxf_l3 {
+	union {
+		struct {
+			__be32 dst_ip4;
+			__be32 src_ip4;
+		};
+		struct {
+			__be32 dst_ip6[4];
+			__be32 src_ip6[4];
+		};
+	};
+	u16 usage;
+};
+
+struct atl_rxf_l4 {
+	__be16 dst_port;
+	__be16 src_port;
+	u16 usage;
+};
+
 struct atl_rxf_ntuple {
 	union {
 		struct {
@@ -81,12 +101,17 @@ struct atl_rxf_ntuple {
 			__be32 src_ip4[ATL_RXF_NTUPLE_MAX];
 		};
 		struct {
-			__be32 dst_ip6[ATL_RXF_NTUPLE_MAX / 4][4];
-			__be32 src_ip6[ATL_RXF_NTUPLE_MAX / 4][4];
+			__be32 dst_ip6[ATL_RXF_NTUPLE_MAX][4];
+			__be32 src_ip6[ATL_RXF_NTUPLE_MAX][4];
 		};
 	};
 	__be16 dst_port[ATL_RXF_NTUPLE_MAX];
 	__be16 src_port[ATL_RXF_NTUPLE_MAX];
+
+	struct atl2_rxf_l3 l3[ATL_RXF_NTUPLE_MAX];
+	struct atl2_rxf_l4 l4[ATL_RXF_NTUPLE_MAX];
+	s8 l3_idx[ATL_RXF_NTUPLE_MAX];
+	s8 l4_idx[ATL_RXF_NTUPLE_MAX];
 	uint32_t cmd[ATL_RXF_NTUPLE_MAX];
 	int count;
 };
