@@ -74,7 +74,27 @@ enum atl_ntuple_cmd {
 	ATL_NTC_L4_ICMP = 3,
 };
 
-struct atl_rxf_l3 {
+enum atl2_ntuple_cmd {
+	ATL2_NTC_L3_IPV4_EN = BIT(0), /* Filter enabled */
+	ATL2_NTC_L3_IPV4_SA = BIT(1),
+	ATL2_NTC_L3_IPV4_DA = BIT(2),
+	ATL2_NTC_L3_IPV4_PROTO = BIT(3),
+	ATL2_NTC_L3_IPV4_TAG_SHIFT = 4,
+	ATL2_NTC_L3_IPV4_PROTO_SHIFT = 8,
+
+	ATL2_NTC_L3_IPV6_EN = BIT(0x10), /* Filter enabled */
+	ATL2_NTC_L3_IPV6_SA = BIT(0x11),
+	ATL2_NTC_L3_IPV6_DA = BIT(0x12),
+	ATL2_NTC_L3_IPV6_PROTO = BIT(0x13),
+	ATL2_NTC_L3_IPV6_TAG_SHIFT = 0x14,
+	ATL2_NTC_L3_IPV6_PROTO_SHIFT = 0x18,
+
+	ATL2_NTC_L4_EN = BIT(0), /* Filter enabled */
+	ATL2_NTC_L4_SP = BIT(1),
+	ATL2_NTC_L4_DP = BIT(2),
+};
+
+struct atl2_rxf_l3 {
 	union {
 		struct {
 			__be32 dst_ip4;
@@ -85,12 +105,15 @@ struct atl_rxf_l3 {
 			__be32 src_ip6[4];
 		};
 	};
+	u16 proto;
+	u16 cmd;
 	u16 usage;
 };
 
-struct atl_rxf_l4 {
+struct atl2_rxf_l4 {
 	__be16 dst_port;
 	__be16 src_port;
+	u16 cmd;
 	u16 usage;
 };
 

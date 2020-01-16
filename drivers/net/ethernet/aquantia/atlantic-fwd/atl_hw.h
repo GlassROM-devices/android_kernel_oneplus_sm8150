@@ -273,6 +273,36 @@ static inline void atl2_rpf_etht_flr_tag_set(struct atl_hw *hw, u32 tag, u32 fil
 	atl_write_bits(hw, ATL_RX_ETYPE_FLT(filter), 0, 3, tag);
 }
 
+static inline void atl2_rpf_l3_v4_da_set(struct atl_hw *hw, u32 filter, u32 val)
+{
+	u32 dword = filter % 4;
+	u32 addr_set = 6 + ((filter < 4) ? (0) :  (1));
+
+	atl_write(hw, ATL2_RPF_L3_DA(addr_set) + 4 * dword, swab32(val));
+}
+
+static inline void atl2_rpf_l3_v4_sa_set(struct atl_hw *hw, u32 filter, u32 val)
+{
+	u32 dword = filter % 4;
+	u32 addr_set = 6 + ((filter < 4) ? (0) :  (1));
+
+	atl_write(hw, ATL2_RPF_L3_SA(addr_set) + 4 * dword, swab32(val));
+}
+
+static inline void atl2_rpf_l3_v6_sa_set(struct atl_hw *hw, u32 filter, u32 val[4])
+{
+	int i;
+	for (i = 0; i < 4; i++)
+		atl_write(hw, ATL2_RPF_L3_SA(filter) + 4 * i, swab32(val[i]));
+}
+
+static inline void atl2_rpf_l3_v6_da_set(struct atl_hw *hw, u32 filter, u32 val[4])
+{
+	int i;
+	for (i = 0; i < 4; i++)
+		atl_write(hw, ATL2_RPF_L3_DA(filter) + 4 * i, swab32(val[i]));
+}
+
 int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 	unsigned size);
 int atl_hwinit(struct atl_hw *hw, enum atl_board brd_id);

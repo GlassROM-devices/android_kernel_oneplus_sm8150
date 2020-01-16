@@ -143,6 +143,10 @@ enum mcp_scratchpad {
 #define ATL_RX_INTR_MOD_CTRL(idx) ATL_REG_STRIDE(0x5a40, 4, idx)
 #define ATL2_RPF_RSS_REDIR(TC, INDEX) (0x6200 + \
 				       (0x100 * !!(TC > 3)) + (INDEX) * 4)
+#define ATL2_RPF_L3_FLT(filter) ATL_REG_STRIDE(0x6500, 0x4, filter)
+#define ATL2_RPF_L3_SA(filter) ATL_REG_STRIDE(0x6400, 0x10, filter)
+#define ATL2_RPF_L3_DA(filter) ATL_REG_STRIDE(0x6480, 0x10, filter)
+#define ATL2_RPF_L4_FLT(filter) ATL_REG_STRIDE(0x6520, 0x4, filter)
 #define ATL2_RPF_REC_TAB_EN 0x00006ff0
 #define ATL2_RPF_ACT_RSLVR_REQ_TAG(filter) ATL_REG_STRIDE(0x14000, 0x10, filter)
 #define ATL2_RPF_ACT_RSLVR_TAG_MASK(filter) ATL_REG_STRIDE(0x14004, 0x10, filter)

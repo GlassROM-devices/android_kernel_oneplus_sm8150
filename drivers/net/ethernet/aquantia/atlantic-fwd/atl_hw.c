@@ -954,52 +954,6 @@ void atl_set_loopback(struct atl_nic *nic, int idx, bool on)
 	}
 }
 
-void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
-{
-	struct atl_hw *hw = &nic->hw;
-	struct atl_rxf_ntuple *ntuple = &nic->rxf_ntuple;
-	uint32_t cmd = ntuple->cmd[idx];
-	int i;
-
-	if (!(cmd & ATL_NTC_EN)) {
-		atl_write(hw, ATL_NTUPLE_CTRL(idx), cmd);
-		return;
-	}
-
-	if (cmd & ATL_NTC_V6) {
-		for (i = 0; i < 4; i++) {
-			if (cmd & ATL_NTC_SA)
-				atl_write(hw, ATL_NTUPLE_SADDR(idx + i),
-					swab32(ntuple->src_ip6[idx][i]));
-
-			if (cmd & ATL_NTC_DA)
-				atl_write(hw, ATL_NTUPLE_DADDR(idx + i),
-					swab32(ntuple->dst_ip6[idx][i]));
-		}
-	} else {
-		if (cmd & ATL_NTC_SA)
-			atl_write(hw, ATL_NTUPLE_SADDR(idx),
-				swab32(ntuple->src_ip4[idx]));
-
-		if (cmd & ATL_NTC_DA)
-			atl_write(hw, ATL_NTUPLE_DADDR(idx),
-				swab32(ntuple->dst_ip4[idx]));
-	}
-
-	if (cmd & ATL_NTC_SP)
-		atl_write(hw, ATL_NTUPLE_SPORT(idx),
-			swab16(ntuple->src_port[idx]));
-
-	if (cmd & ATL_NTC_DP)
-		atl_write(hw, ATL_NTUPLE_DPORT(idx),
-			swab16(ntuple->dst_port[idx]));
-
-	if (cmd & ATL_NTC_RXQ)
-		cmd |= 1 << ATL_NTC_ACT_SHIFT;
-
-	atl_write(hw, ATL_NTUPLE_CTRL(idx), cmd);
-}
-
 int atl_hwsem_get(struct atl_hw *hw, int idx)
 {
 	uint32_t val;
