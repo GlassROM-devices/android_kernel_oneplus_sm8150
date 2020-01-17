@@ -2304,6 +2304,29 @@ void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
 static void atl_rxf_update_flex(struct atl_nic *nic, int idx)
 {
 	atl_write(&nic->hw, ATL_RX_FLEX_FLT_CTRL(idx), nic->rxf_flex.cmd[idx]);
+
+	if (nic->hw.brd_id == ATL_AQC113) {
+		uint32_t action;
+
+		atl2_rpf_flex_flr_tag_set(&nic->hw, idx + 1, idx);
+
+		if (!(nic->rxf_flex.cmd[idx] & ATL_FLEX_EN)) {
+			action = ATL2_ACTION_DISABLE;
+		} else if (!(nic->rxf_flex.cmd[idx] & ATL_RXF_ACT_TOHOST)) {
+			action = ATL2_ACTION_DROP;
+		} else if (!(nic->rxf_flex.cmd[idx] & ATL_FLEX_RXQ)) {
+			action = ATL2_ACTION_ASSIGN_TC(0);
+		} else {
+			int queue = (nic->rxf_flex.cmd[idx] >> ATL_FLEX_RXQ_SHIFT) & ATL_RXF_RXQ_MSK;
+
+			action = ATL2_ACTION_ASSIGN_QUEUE(queue);
+		}
+		atl2_act_rslvr_table_set(&nic->hw,
+			ATL2_RPF_FLEX_USER_INDEX + idx,
+			(idx + 1) << ATL2_RPF_TAG_FLEX_OFFSET,
+			ATL2_RPF_TAG_FLEX_MASK,
+			action);
+	}
 }
 
 static const struct atl_rxf_flt_desc atl_rxf_descs[] = {

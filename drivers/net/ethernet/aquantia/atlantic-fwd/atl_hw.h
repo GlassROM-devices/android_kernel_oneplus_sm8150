@@ -44,6 +44,7 @@ struct atl_nic;
 #define ATL2_RPF_L3L4_USER_INDEX        48
 #define ATL2_RPF_ET_PCP_USER_INDEX      64
 #define ATL2_RPF_VLAN_USER_INDEX        80
+#define ATL2_RPF_FLEX_USER_INDEX        96
 #define ATL2_RPF_VLAN_INDEX             122
 #define ATL2_RPF_MAC_INDEX              123
 #define ATL2_RPF_ALLMC_INDEX            124
@@ -71,6 +72,7 @@ struct atl_nic;
 #define ATL2_RPF_TAG_L3_V4_MASK (0x00000007 << ATL2_RPF_TAG_L3_V4_OFFSET)
 #define ATL2_RPF_TAG_L3_V6_MASK (0x00000007 << ATL2_RPF_TAG_L3_V6_OFFSET)
 #define ATL2_RPF_TAG_L4_MASK    (0x00000007 << ATL2_RPF_TAG_L4_OFFSET)
+#define ATL2_RPF_TAG_FLEX_MASK  (0x00000003 << ATL2_RPF_TAG_FLEX_OFFSET)
 #define ATL2_RPF_TAG_PCP_MASK   (0x00000007 << ATL2_RPF_TAG_PCP_OFFSET)
 
 #define ATL2_RPF_TAG_BASE_UC    (1 << ATL2_RPF_TAG_UC_OFFSET)
@@ -301,6 +303,11 @@ static inline void atl2_rpf_l3_v6_da_set(struct atl_hw *hw, u32 filter, u32 val[
 	int i;
 	for (i = 0; i < 4; i++)
 		atl_write(hw, ATL2_RPF_L3_DA(filter) + 4 * i, swab32(val[i]));
+}
+
+static inline void atl2_rpf_flex_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
+{
+	atl_write_bits(hw, ATL_RX_FLEX_FLT_CTRL(filter), 0x19, 2, tag);
 }
 
 int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
