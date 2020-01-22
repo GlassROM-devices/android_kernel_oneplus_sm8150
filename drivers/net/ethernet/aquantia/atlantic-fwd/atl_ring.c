@@ -1627,7 +1627,7 @@ static void atl_set_intr_mod_qvec(struct atl_queue_vec *qvec)
 	min = nic->tx_intr_delay - atl_min_intr_delay;
 	max = min + atl_tx_mod_hyst;
 
-	if (hw->brd_id == ATL_AQC113)
+	if (hw->chip_id == ATL_ANTIGUA)
 		reg = ATL2_TX_INTR_MOD_CTRL(idx);
 	else
 		reg = ATL_TX_INTR_MOD_CTRL(idx);

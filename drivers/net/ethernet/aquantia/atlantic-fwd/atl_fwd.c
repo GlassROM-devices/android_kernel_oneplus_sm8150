@@ -233,7 +233,7 @@ static void atl_fwd_update_im(struct atl_fwd_ring *ring)
 	int idx = ring->idx;
 	uint32_t addr, tx_reg;
 
-	if (hw->brd_id == ATL_AQC113)
+	if (hw->chip_id == ATL_ANTIGUA)
 		tx_reg = ATL2_TX_INTR_MOD_CTRL(idx);
 	else
 		tx_reg = ATL_TX_INTR_MOD_CTRL(idx);

@@ -93,13 +93,10 @@ struct atl_nic;
 	(orig - i);					\
 })
 
-enum atl_board {
+enum atl_chip {
 	ATL_UNKNOWN,
-	ATL_AQC107,
-	ATL_AQC108,
-	ATL_AQC109,
-	ATL_AQC100,
-	ATL_AQC113,
+	ATL_ATLANTIC,
+	ATL_ANTIGUA,
 };
 
 struct atl_thermal {
@@ -131,7 +128,7 @@ struct atl_hw {
 	uint8_t __iomem *regs;
 	struct pci_dev *pdev;
 	unsigned long state;
-	enum atl_board brd_id;
+	enum atl_chip chip_id;
 	struct atl_link_state link_state;
 	unsigned wol_mode;
 	struct atl_mcp mcp;
@@ -312,7 +309,7 @@ static inline void atl2_rpf_flex_flr_tag_set(struct atl_hw *hw, u32 tag, u32 fil
 
 int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 	unsigned size);
-int atl_hwinit(struct atl_hw *hw, enum atl_board brd_id);
+int atl_hwinit(struct atl_hw *hw, enum atl_chip chip_id);
 void atl_refresh_link(struct atl_nic *nic);
 void atl_set_rss_key(struct atl_hw *hw);
 int atl_set_rss_tbl(struct atl_hw *hw);

@@ -15,28 +15,6 @@
 #include "atl_ring.h"
 #include "atl2_fw.h"
 
-struct atl_board_info {
-	unsigned int link_mask;
-};
-
-static struct atl_board_info atl_boards[] = {
-	[ATL_UNKNOWN] = {
-		.link_mask = 0x1f,
-	},
-	[ATL_AQC107] = {
-		.link_mask = 0x1f,
-	},
-	[ATL_AQC108] = {
-		.link_mask = 0xf,
-	},
-	[ATL_AQC109] = {
-		.link_mask = 7,
-	},
-	[ATL_AQC100] = {
-		.link_mask = 0x1f,
-	},
-};
-
 static void atl_unplugged(struct atl_hw *hw)
 {
 	if (!hw->regs)
@@ -109,14 +87,14 @@ static void atl2_hw_init_new_rx_filters(struct atl_hw *hw);
 static void atl_set_promisc(struct atl_hw *hw, bool enabled)
 {
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, enabled);
-	if (hw->brd_id == ATL_AQC113)
+	if (hw->chip_id == ATL_ANTIGUA)
 		atl2_hw_new_rx_filter_promisc(hw, enabled);
 }
 
 void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
 {
 	atl_write_bit(hw, ATL_RX_VLAN_FLT_CTRL1, 1, !!promisc);
-	if (hw->brd_id == ATL_AQC113)
+	if (hw->chip_id == ATL_ANTIGUA)
 		atl2_hw_new_rx_filter_vlan_promisc(hw, !!promisc);
 }
 
@@ -398,7 +376,7 @@ int atl_hw_reset(struct atl_hw *hw)
 {
 	int ret;
 
-	if (hw->brd_id == ATL_AQC113)
+	if (hw->chip_id == ATL_ANTIGUA)
 		ret = atl2_hw_reset(hw);
 	else
 		ret = atl1_hw_reset(hw);
@@ -419,14 +397,11 @@ static int atl_get_mac_addr(struct atl_hw *hw, uint8_t *buf)
 	return ret;
 }
 
-int atl_hwinit(struct atl_hw *hw, enum atl_board brd_id)
+int atl_hwinit(struct atl_hw *hw, enum atl_chip chip_id)
 {
-	struct atl_board_info *brd = &atl_boards[brd_id];
 	int ret;
 
-	hw->brd_id = brd_id;
-	/* Default supported speed set based on device id. */
-	hw->link_state.supported = brd->link_mask;
+	hw->chip_id = chip_id;
 
 	hw->thermal = atl_def_thermal;
 
@@ -491,7 +466,7 @@ static irqreturn_t atl_link_irq(int irq, void *priv)
 
 	set_bit(ATL_ST_UPDATE_LINK, &nic->hw.state);
 	atl_schedule_work(nic);
-	if (nic->hw.brd_id == ATL_AQC113)
+	if (nic->hw.chip_id == ATL_ANTIGUA)
 		atl_write(&nic->hw, ATL2_MCP_HOST_REQ_INT, 0);
 
 	return IRQ_HANDLED;
@@ -611,7 +586,7 @@ int atl_set_rss_tbl(struct atl_hw *hw)
 	uint32_t val = 0, stat;
 	uint32_t tc = 0;
 
-	if (hw->brd_id == ATL_AQC113)
+	if (hw->chip_id == ATL_ANTIGUA)
 		for (i = ATL_RSS_TBL_SIZE; i--;) {
 			atl_write_bits(hw, ATL2_RPF_RSS_REDIR(tc, i),
 				       5 * ((tc) % 4), 5, hw->rss_tbl[i]);
@@ -680,7 +655,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* Enable RPF2, filter logic 3 */
 	atl_write(hw, 0x5040, BIT(16) | (3 << 17));
 
-	if (hw->brd_id == ATL_AQC113) {
+	if (hw->chip_id == ATL_ANTIGUA) {
 		rpb_size = 192;
 		tpb_size = 128;
 	}
@@ -698,7 +673,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* 4-TC | Enable TPB */
 	atl_set_bits(hw, ATL_TX_PBUF_CTRL1, BIT(8) | BIT(0));
 	/* TX Buffer clk gate  off */
-	if (hw->brd_id == ATL_AQC113)
+	if (hw->chip_id == ATL_ANTIGUA)
 		atl_clear_bits(hw, ATL_TX_PBUF_CTRL1, BIT(5));
 
 	/* Alloc RPB */
@@ -748,7 +723,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* Enable untagged packets */
 	atl_write(hw, ATL_RX_VLAN_FLT_CTRL1, 1 << 2 | 1 << 3);
 
-	if (hw->brd_id == ATL_AQC113) {
+	if (hw->chip_id == ATL_ANTIGUA) {
 		/* RSS hash type */
 		atl_set_bits(hw, ATL2_RX_RSS_HASH_TYPE_ADR, BIT(9) - 1);
 
@@ -807,7 +782,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* Map MCP 4 interrupt to cause 0 */
 	atl_write(hw, ATL_INTR_GEN_INTR_MAP4, BIT(7) | (0 << 0));
 
-	if (hw->brd_id == ATL_AQC113) {
+	if (hw->chip_id == ATL_ANTIGUA) {
 		atl_set_bits(hw, ATL_GLOBAL_CTRL2, BIT(3) << 0xA);
 		atl_write(hw, ATL2_MCP_HOST_REQ_INT_MASK(3),
 			  ATL2_FW_HOST_INTERRUPT_LINK_UP |

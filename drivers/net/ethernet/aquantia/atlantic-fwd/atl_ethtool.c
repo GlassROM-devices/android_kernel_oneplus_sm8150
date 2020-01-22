@@ -1971,7 +1971,7 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 	if (cmd & ATL_NTC_V6) {
 		int i;
 
-		if (nic->hw.brd_id != ATL_AQC113) {
+		if (nic->hw.chip_id != ATL_ANTIGUA) {
 			if (idx & 3) {
 				atl_nic_err("IPv6 filters only supported in locations 8 and 12\n");
 				return -EINVAL;
@@ -2061,7 +2061,7 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 
 	ntuple->cmd[idx] = cmd;
 
-	if (nic->hw.brd_id == ATL_AQC113)
+	if (nic->hw.chip_id == ATL_ANTIGUA)
 		atl2_rxf_set_ntuple(nic, ntuple, idx);
 
 	return !present;
@@ -2093,7 +2093,7 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 
 	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), cmd);
 
-	if (nic->hw.brd_id != ATL_AQC113)
+	if (nic->hw.chip_id != ATL_ANTIGUA)
 		return;
 
 	if (!(cmd & ATL_RXF_EN)) {
@@ -2133,7 +2133,7 @@ static void atl_rxf_update_etype(struct atl_nic *nic, int idx)
 
 	atl_write(&nic->hw, ATL_RX_ETYPE_FLT(idx), cmd);
 
-	if (nic->hw.brd_id != ATL_AQC113)
+	if (nic->hw.chip_id != ATL_ANTIGUA)
 		return;
 
 	if (!(cmd & ATL_RXF_EN)) {
@@ -2297,7 +2297,7 @@ void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
 
 	atl_write(hw, ATL_NTUPLE_CTRL(idx), cmd);
 
-	if (nic->hw.brd_id == ATL_AQC113)
+	if (nic->hw.chip_id == ATL_ANTIGUA)
 		atl2_update_ntuple_flt(nic, idx);
 }
 
@@ -2305,7 +2305,7 @@ static void atl_rxf_update_flex(struct atl_nic *nic, int idx)
 {
 	atl_write(&nic->hw, ATL_RX_FLEX_FLT_CTRL(idx), nic->rxf_flex.cmd[idx]);
 
-	if (nic->hw.brd_id == ATL_AQC113) {
+	if (nic->hw.chip_id == ATL_ANTIGUA) {
 		uint32_t action;
 
 		atl2_rpf_flex_flr_tag_set(&nic->hw, idx + 1, idx);
