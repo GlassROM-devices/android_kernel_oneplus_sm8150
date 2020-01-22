@@ -1807,8 +1807,7 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 	if (ntuple->cmd[idx] & ATL_NTC_SA) {
 		if (ntuple->cmd[idx] & ATL_NTC_V6){
 			l3.cmd |= ATL2_NTC_L3_IPV6_SA | ATL2_NTC_L3_IPV6_EN;
-			for (i = 0; i < 4; i++)
-				l3.src_ip6[i] = ntuple->src_ip6[idx][i];
+			memcpy(l3.src_ip6, ntuple->src_ip6[idx], 16);
 		} else {
 			l3.cmd |= ATL2_NTC_L3_IPV4_SA | ATL2_NTC_L3_IPV4_EN;
 			l3.src_ip4 = ntuple->src_ip4[idx];
@@ -1817,8 +1816,7 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 	if (ntuple->cmd[idx] & ATL_NTC_DA) {
 		if (ntuple->cmd[idx] & ATL_NTC_V6){
 			l3.cmd |= ATL2_NTC_L3_IPV6_DA | ATL2_NTC_L3_IPV6_EN;
-			for (i = 0; i < 4; i++)
-				l3.dst_ip6[i] = ntuple->dst_ip6[idx][i];
+			memcpy(l3.dst_ip6, ntuple->dst_ip6[idx], 16);
 		} else {
 			l3.cmd |= ATL2_NTC_L3_IPV4_DA | ATL2_NTC_L3_IPV4_EN;
 			l3.dst_ip4 = ntuple->dst_ip4[idx];
