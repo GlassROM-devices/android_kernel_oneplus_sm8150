@@ -1684,8 +1684,6 @@ static int atl_rxf_set_etype(const struct atl_rxf_flt_desc *desc,
 
 static int atl2_rxf_l3_is_equal(struct atl2_rxf_l3 *f1, struct atl2_rxf_l3 *f2)
 {
-	int i;
-
 	if (f1->cmd != f2->cmd)
 		return false;
 
@@ -1702,14 +1700,12 @@ static int atl2_rxf_l3_is_equal(struct atl2_rxf_l3 *f1, struct atl2_rxf_l3 *f2)
 			return false;
 
 	if (f1->cmd & ATL2_NTC_L3_IPV6_SA)
-		for (i = 0; i < 4; i++)
-			if (f1->src_ip6[i] != f2->src_ip6[i])
+		if (memcmp(f1->src_ip6,f2->src_ip6, 16))
 				return false;
 
 	if (f1->cmd & ATL2_NTC_L3_IPV6_DA)
-		for (i = 0; i < 4; i++)
-			if (f1->dst_ip6[i] != f2->dst_ip6[i])
-				return false;
+		if (memcmp(f1->dst_ip6,f2->dst_ip6, 16))
+			return false;
 
 	return true;
 }
