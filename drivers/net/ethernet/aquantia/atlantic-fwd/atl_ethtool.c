@@ -2196,7 +2196,6 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 			tag |= (l3_idx + 1) << ATL2_RPF_TAG_L3_V4_OFFSET;
 			mask |= ATL2_RPF_TAG_L3_V4_MASK;
 			cmd |= (l3_idx + 1) << 0x4;
-			cmd |= BIT(0x17); /* turn on IPv4 filters */
 
 			if (l3->cmd & ATL2_NTC_L3_IPV4_SA)
 				atl2_rpf_l3_v4_sa_set(hw, l3_idx, l3->src_ip4);
@@ -2217,6 +2216,7 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 		}
 
 		atl_write(hw, ATL2_RPF_L3_FLT(l3_idx), cmd);
+		atl_set_bits(hw, ATL2_RPF_L3_FLT(0), BIT(0x17));
 	}
 
 	if (l4_idx > -1) {
