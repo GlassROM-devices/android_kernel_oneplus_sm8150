@@ -1965,7 +1965,12 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 	if (cmd & ATL_NTC_V6) {
 		int i;
 
-		if (nic->hw.chip_id != ATL_ANTIGUA) {
+		if (nic->hw.chip_id == ATL_ANTIGUA) {
+			if (idx > 5) {
+				atl_nic_err("IPv6 filters allowed in the first 6 locations\n");
+				return -EINVAL;
+			}
+		} else {
 			if (idx & 3) {
 				atl_nic_err("IPv6 filters only supported in locations 8 and 12\n");
 				return -EINVAL;
