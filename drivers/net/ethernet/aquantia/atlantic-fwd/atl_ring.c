@@ -1354,7 +1354,7 @@ int atl_setup_datapath(struct atl_nic *nic)
 
 		netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
 
-		if (unlikely(!(nic->flags & ATL_FL_MULTIPLE_VECTORS))) {
+		if (unlikely(irq_work)) {
 			INIT_WORK(&irq_work[i].work, atl_ring_work);
 			irq_work[i].napi = &qvec->napi;
 			qvec->work = &irq_work[i].work;
