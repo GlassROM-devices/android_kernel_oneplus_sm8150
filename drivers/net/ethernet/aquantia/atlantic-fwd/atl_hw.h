@@ -28,11 +28,11 @@ struct atl_nic;
 #define ATL_HW_CLOCK_TO_US(clk)  (clk * 32 / 10000)
 
 #define ATL2_ACTION(ACTION, RSS, INDEX, VALID, TS_VALID) \
-	(((ACTION & 0x3U) << 8) | \
+	((((ACTION & 0x3U) << 8) | \
 	((RSS & 0x1U) << 7) | \
 	((INDEX & 0x3FU) << 2) | \
 	((TS_VALID & 0x1U) << 1)) | \
-	((VALID & 0x1U) << 0)
+	((VALID & 0x1U) << 0))
 
 #define ATL2_ACTION_DROP ATL2_ACTION(0, 0, 0, 1, 0)
 #define ATL2_ACTION_DISABLE ATL2_ACTION(0, 0, 0, 0, 0)
@@ -263,12 +263,14 @@ static inline void atl_init_rss_table(struct atl_hw *hw, int nvecs)
 
 int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
 			     u32 tag, u32 mask, u32 action);
-static inline void atl2_rpf_vlan_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
+static inline void atl2_rpf_vlan_flr_tag_set(struct atl_hw *hw, u32 tag,
+					     u32 filter)
 {
 	atl_write_bits(hw, ATL_RX_VLAN_FLT(filter), 12, 4, tag);
 }
 
-static inline void atl2_rpf_etht_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
+static inline void atl2_rpf_etht_flr_tag_set(struct atl_hw *hw, u32 tag,
+					     u32 filter)
 {
 	atl_write_bits(hw, ATL_RX_ETYPE_FLT(filter), 0, 3, tag);
 }
@@ -289,21 +291,26 @@ static inline void atl2_rpf_l3_v4_sa_set(struct atl_hw *hw, u32 filter, u32 val)
 	atl_write(hw, ATL2_RPF_L3_SA(addr_set) + 4 * dword, swab32(val));
 }
 
-static inline void atl2_rpf_l3_v6_sa_set(struct atl_hw *hw, u32 filter, u32 val[4])
+static inline void atl2_rpf_l3_v6_sa_set(struct atl_hw *hw, u32 filter,
+					 u32 val[4])
 {
 	int i;
+
 	for (i = 0; i < 4; i++)
 		atl_write(hw, ATL2_RPF_L3_SA(filter) + 4 * i, swab32(val[i]));
 }
 
-static inline void atl2_rpf_l3_v6_da_set(struct atl_hw *hw, u32 filter, u32 val[4])
+static inline void atl2_rpf_l3_v6_da_set(struct atl_hw *hw, u32 filter,
+					 u32 val[4])
 {
 	int i;
+
 	for (i = 0; i < 4; i++)
 		atl_write(hw, ATL2_RPF_L3_DA(filter) + 4 * i, swab32(val[i]));
 }
 
-static inline void atl2_rpf_flex_flr_tag_set(struct atl_hw *hw, u32 tag, u32 filter)
+static inline void atl2_rpf_flex_flr_tag_set(struct atl_hw *hw, u32 tag,
+					     u32 filter)
 {
 	atl_write_bits(hw, ATL_RX_FLEX_FLT_CTRL(filter), 0x19, 2, tag);
 }

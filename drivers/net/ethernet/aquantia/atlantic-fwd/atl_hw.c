@@ -745,7 +745,7 @@ void atl_start_hw_global(struct atl_nic *nic)
 
 	}
 	/* Turn new filters on*/
-	if (hw->new_rpf) { 
+	if (hw->new_rpf) {
 		atl_set_bits(hw, ATL_RX_FLT_CTRL2, BIT(0xB));
 		atl2_hw_init_new_rx_filters(hw);
 	}

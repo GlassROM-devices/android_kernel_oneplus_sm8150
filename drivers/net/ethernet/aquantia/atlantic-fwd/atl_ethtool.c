@@ -1700,11 +1700,11 @@ static int atl2_rxf_l3_is_equal(struct atl2_rxf_l3 *f1, struct atl2_rxf_l3 *f2)
 			return false;
 
 	if (f1->cmd & ATL2_NTC_L3_IPV6_SA)
-		if (memcmp(f1->src_ip6,f2->src_ip6, 16))
-				return false;
+		if (memcmp(f1->src_ip6, f2->src_ip6, 16))
+			return false;
 
 	if (f1->cmd & ATL2_NTC_L3_IPV6_DA)
-		if (memcmp(f1->dst_ip6,f2->dst_ip6, 16))
+		if (memcmp(f1->dst_ip6, f2->dst_ip6, 16))
 			return false;
 
 	return true;
@@ -1805,7 +1805,7 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 	}
 
 	if (ntuple->cmd[idx] & ATL_NTC_SA) {
-		if (ntuple->cmd[idx] & ATL_NTC_V6){
+		if (ntuple->cmd[idx] & ATL_NTC_V6) {
 			l3.cmd |= ATL2_NTC_L3_IPV6_SA | ATL2_NTC_L3_IPV6_EN;
 			memcpy(l3.src_ip6, ntuple->src_ip6[idx], 16);
 		} else {
@@ -1814,7 +1814,7 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 		}
 	}
 	if (ntuple->cmd[idx] & ATL_NTC_DA) {
-		if (ntuple->cmd[idx] & ATL_NTC_V6){
+		if (ntuple->cmd[idx] & ATL_NTC_V6) {
 			l3.cmd |= ATL2_NTC_L3_IPV6_DA | ATL2_NTC_L3_IPV6_EN;
 			memcpy(l3.dst_ip6, ntuple->dst_ip6[idx], 16);
 		} else {
@@ -1834,7 +1834,7 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 	/* find L3 and L4 filters */
 	if (l3.cmd & (ATL2_NTC_L3_IPV4_EN | ATL2_NTC_L3_IPV6_EN)) {
 		for (i = 0; i < ATL_RXF_NTUPLE_MAX; i++) {
-			if (atl2_rxf_l3_is_equal(&ntuple->l3[i], &l3)){
+			if (atl2_rxf_l3_is_equal(&ntuple->l3[i], &l3)) {
 				l3_idx = i;
 				break;
 			}
@@ -1852,7 +1852,7 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 
 	if (ntuple->l3_idx[idx] != -1)
 		if (!(atl2_rxf_l3_is_equal(&ntuple->l3[ntuple->l3_idx[idx]], &l3))) {
-			atl2_rxf_l3_put(&nic->hw, 
+			atl2_rxf_l3_put(&nic->hw,
 					&ntuple->l3[ntuple->l3_idx[idx]],
 					ntuple->l3_idx[idx]);
 		}
@@ -1876,7 +1876,7 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 
 	if (ntuple->l4_idx[idx] != -1)
 		if (!(atl2_rxf_l4_is_equal(&ntuple->l4[ntuple->l4_idx[idx]], &l4))) {
-			atl2_rxf_l4_put(&nic->hw, 
+			atl2_rxf_l4_put(&nic->hw,
 					&ntuple->l4[ntuple->l4_idx[idx]],
 					ntuple->l4_idx[idx]);
 		}
@@ -2101,7 +2101,7 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 			0,
 			0,
 			ATL2_ACTION_DISABLE);
-		return ;
+		return;
 	}
 
 	if (!(cmd & ATL_RXF_ACT_TOHOST)) {
