@@ -18,10 +18,13 @@
 struct link_options_s {
 	uint32_t link_up:1;
 	uint32_t link_renegotiate:1;
-	uint32_t rsvd:2;
+	uint32_t minimal_link_speed:1;
 	uint32_t internal_loopback:1;
 	uint32_t external_loopback:1;
-	uint32_t rsvd2:2;
+	uint32_t rate_10M_hd:1;
+	uint32_t rate_100M_hd:1;
+	uint32_t rate_1G_hd:1;
+
 
 	uint32_t rate_10M:1;
 	uint32_t rate_100M:1;
@@ -64,7 +67,9 @@ struct link_control_s {
 
 struct thermal_shutdown_s {
 	uint32_t enable:1;
-	uint32_t rsvd:7;
+	uint32_t warning_enable:1;
+	uint32_t rsvd:6;
+
 
 	uint32_t cold_temperature:8;
 	uint32_t warning_temperature:8;
@@ -105,7 +110,9 @@ struct sleep_proxy_s {
 		uint32_t ignore_fragmented:1;
 		uint32_t rsvd:2;
 		uint32_t echo_max_len:16;
-		uint32_t ipv4[16];
+		uint32_t ipv4[8];
+		uint32_t reserved[8];
+
 	} ipv4_offload;
 
 	struct {
@@ -135,10 +142,11 @@ struct sleep_proxy_s {
 			uint32_t timeout;
 			uint16_t local_port;
 			uint16_t remote_port;
-			uint8_t remote_mac_addr[8];
-			uint32_t rsvd:32;
+			uint8_t remote_mac_addr[6];
+			uint32_t rsvd:16;
 			uint32_t rsvd2:32;
-			uint32_t rsvd3:16;
+			uint32_t rsvd3:32;
+			uint32_t rsvd4:16;
 			uint16_t win_size;
 			uint32_t seq_num;
 			uint32_t ack_num;
@@ -155,10 +163,11 @@ struct sleep_proxy_s {
 			uint32_t timeout;
 			uint16_t local_port;
 			uint16_t remote_port;
-			uint8_t remote_mac_addr[8];
-			uint32_t rsvd:32;
+			uint8_t remote_mac_addr[6];
+			uint32_t rsvd:16;
 			uint32_t rsvd2:32;
-			uint32_t rsvd3:16;
+			uint32_t rsvd3:32;
+			uint32_t rsvd4:16;
 			uint16_t win_size;
 			uint32_t seq_num;
 			uint32_t ack_num;
@@ -196,13 +205,18 @@ struct pause_quanta_s {
 	uint16_t threshold_10G;
 };
 
-struct memory_mailbox_control_s {
-	uint32_t operation :1;
-	uint32_t start :1;
-	uint32_t target :1;
-	uint32_t rsvd:29;
-	uint32_t address;
-	uint32_t memory_data;
+struct data_buffer_status_s {
+	uint32_t data_offset;
+	uint32_t data_length;
+};
+
+struct device_caps_s {
+	uint32_t finite_flashless: 1;
+	uint32_t cable_diag: 1;
+	uint32_t ncsi: 1;
+	uint32_t avb: 1;
+	uint32_t :28;
+	uint32_t :32;
 };
 
 struct version_s {
@@ -249,7 +263,8 @@ struct wol_status_s {
 struct mac_health_monitor_s {
 	uint32_t mac_ready:1;
 	uint32_t mac_fault:1;
-	uint32_t rsvd:6;
+	uint32_t mac_flashless_finished:1;
+	uint32_t rsvd:5;
 	uint32_t mac_temperature:8;
 	uint32_t mac_heart_beat:16;
 	uint32_t mac_fault_code:16;
@@ -268,10 +283,12 @@ struct phy_health_monitor_s {
 };
 
 struct device_link_caps_s {
-	uint32_t rsvd:4;
+	uint32_t rsvd:3;
 	uint32_t internal_loopback:1;
 	uint32_t external_loopback:1;
-	uint32_t rsvd2:2;
+	uint32_t rate_10M_hd:1;
+	uint32_t rate_100M_hd:1;
+	uint32_t rate_1G_hd:1;
 
 	uint32_t rate_10M:1;
 	uint32_t rate_100M:1;
@@ -279,7 +296,7 @@ struct device_link_caps_s {
 	uint32_t rate_2P5G:1;
 	uint32_t rate_N2P5G:1;
 	uint32_t rate_5G:1;
-	uint32_t rate__N5G:1;
+	uint32_t rate_N5G:1;
 	uint32_t rate_10G:1;
 
 	uint32_t rsvd3:1;
@@ -329,7 +346,10 @@ struct sleep_proxy_caps_s {
 };
 
 struct lkp_link_caps_s {
-	uint32_t rsvd:8;
+	uint32_t rsvd:5;
+	uint32_t rate_10M_hd:1;
+	uint32_t rate_100M_hd:1;
+	uint32_t rate_1G_hd:1;
 
 	uint32_t rate_10M:1;
 	uint32_t rate_100M:1;
@@ -367,12 +387,15 @@ struct core_dump_s {
 
 struct trace_s {
 	uint32_t sync_counter;
-	uint32_t mem_buffer[0xff];
+	uint32_t mem_buffer[0x1ff];
 };
 
 struct cable_diag_control_s {
 	uint32_t toggle :1;
-	uint32_t rsvd:31;
+	uint32_t rsvd:7;
+	uint32_t wait_timeout_sec:8;
+	uint32_t rsvd2:16;
+
 };
 
 struct cable_diag_lane_data_s {
@@ -384,8 +407,9 @@ struct cable_diag_lane_data_s {
 
 struct cable_diag_status_s {
 	struct cable_diag_lane_data_s lane_data[4];
-	uint32_t state :1;
-	uint32_t rsvd:31;
+	uint32_t transact_id:8;
+	uint32_t status:4;
+	uint32_t rsvd:20;
 };
 
 struct phy_fw_load_status_s {
@@ -448,6 +472,17 @@ struct statistics_s {
 	uint32_t main_loop_cycles;
 };
 
+struct  filter_caps_s {
+	uint8_t unicast_filters_count;
+	uint8_t multicast_filters_count;
+	uint8_t ethertype_filters_count;
+	uint8_t vlan_filters_count;
+	uint8_t l3_filters_count;
+	uint8_t l4_filters_count;
+	uint8_t l4_flex_filters_count;
+	uint8_t flexible_filters_count;
+};
+
 struct fw_interface_in {
 	uint32_t mtu;
 	uint32_t rsvd1:32;
@@ -463,7 +498,7 @@ struct fw_interface_in {
 	struct pause_quanta_s pause_quanta[8];
 	struct cable_diag_control_s cable_diag_control;
 	uint32_t rsvd6:32;
-	struct memory_mailbox_control_s mem_box_control;
+	struct data_buffer_status_s data_buffer_status;
 };
 
 struct transaction_counter_s {
@@ -495,8 +530,12 @@ struct fw_interface_out {
 	struct core_dump_s core_dump;
 	uint32_t rsvd11:32;
 	struct statistics_s stats;
-	uint32_t reserveFWGAP;
-	uint32_t reserve[36];
+	uint32_t rsvd12:32;
+	uint32_t rsvd13:32;
+	struct filter_caps_s filter_caps;
+	uint32_t rsvd14:32;
+	struct device_caps_s device_caps;
+	uint32_t reserve[30];
 	struct trace_s trace;
 };
 

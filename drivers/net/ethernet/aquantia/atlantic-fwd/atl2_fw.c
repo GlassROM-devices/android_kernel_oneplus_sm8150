@@ -155,6 +155,9 @@ static int __atl2_fw_wait_init(struct atl_hw *hw)
 			 "pauseQuanta invalid size");
 	BUILD_BUG_ON_MSG(sizeof(struct cable_diag_control_s) != 0x4,
 			 "cableDiagControl invalid size");
+	BUILD_BUG_ON_MSG(sizeof(struct statistics_s) != 0x6C,
+			 "statistics_s invalid size");
+
 
 	BUILD_BUG_ON_MSG(offsetof(struct fw_interface_in, mtu) != 0,
 			 "mtu invalid offset");
@@ -207,6 +210,8 @@ static int __atl2_fw_wait_init(struct atl_hw *hw)
 			 "coreDump invalid offset");
 	BUILD_BUG_ON_MSG(offsetof(struct fw_interface_out, stats) != 0x700,
 			 "stats invalid offset");
+	BUILD_BUG_ON_MSG(offsetof(struct fw_interface_out, filter_caps) != 0x774,
+			 "filter_caps invalid offset");
 	BUILD_BUG_ON_MSG(offsetof(struct fw_interface_out, trace) != 0x800,
 			 "trace invalid offset");
 
