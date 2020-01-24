@@ -129,6 +129,7 @@ struct atl_hw {
 	struct pci_dev *pdev;
 	unsigned long state;
 	enum atl_chip chip_id;
+	bool new_rpf;
 	struct atl_link_state link_state;
 	unsigned wol_mode;
 	struct atl_mcp mcp;

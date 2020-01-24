@@ -87,14 +87,14 @@ static void atl2_hw_init_new_rx_filters(struct atl_hw *hw);
 static void atl_set_promisc(struct atl_hw *hw, bool enabled)
 {
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, enabled);
-	if (hw->chip_id == ATL_ANTIGUA)
+	if (hw->new_rpf)
 		atl2_hw_new_rx_filter_promisc(hw, enabled);
 }
 
 void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
 {
 	atl_write_bit(hw, ATL_RX_VLAN_FLT_CTRL1, 1, !!promisc);
-	if (hw->chip_id == ATL_ANTIGUA)
+	if (hw->new_rpf)
 		atl2_hw_new_rx_filter_vlan_promisc(hw, !!promisc);
 }
 
@@ -397,11 +397,16 @@ static int atl_get_mac_addr(struct atl_hw *hw, uint8_t *buf)
 	return ret;
 }
 
+static unsigned int atl_newrpf = 1;
+atl_module_param(newrpf, uint, 0644);
+
 int atl_hwinit(struct atl_hw *hw, enum atl_chip chip_id)
 {
 	int ret;
 
 	hw->chip_id = chip_id;
+	if (chip_id == ATL_ANTIGUA && atl_newrpf)
+		hw->new_rpf = 1;
 
 	hw->thermal = atl_def_thermal;
 
@@ -467,7 +472,7 @@ static irqreturn_t atl_link_irq(int irq, void *priv)
 	set_bit(ATL_ST_UPDATE_LINK, &nic->hw.state);
 	atl_schedule_work(nic);
 	if (nic->hw.chip_id == ATL_ANTIGUA)
-		atl_write(&nic->hw, ATL2_MCP_HOST_REQ_INT, 0);
+		atl_write(&nic->hw, ATL2_MCP_HOST_REQ_INT_CLR, 0xffff);
 
 	return IRQ_HANDLED;
 }
@@ -586,7 +591,7 @@ int atl_set_rss_tbl(struct atl_hw *hw)
 	uint32_t val = 0, stat;
 	uint32_t tc = 0;
 
-	if (hw->chip_id == ATL_ANTIGUA)
+	if (hw->new_rpf)
 		for (i = ATL_RSS_TBL_SIZE; i--;) {
 			atl_write_bits(hw, ATL2_RPF_RSS_REDIR(tc, i),
 				       5 * ((tc) % 4), 5, hw->rss_tbl[i]);
@@ -633,9 +638,6 @@ unsigned int atl_fwd_tx_buf_reserve =
 
 module_param_named(fwd_tx_buf_reserve, atl_fwd_tx_buf_reserve, uint, 0444);
 module_param_named(fwd_rx_buf_reserve, atl_fwd_rx_buf_reserve, uint, 0444);
-
-static unsigned int atl_newrpf = 1;
-atl_module_param(newrpf, uint, 0644);
 
 /* Must be called either during early init when netdev isn't yet
  * registered, or with RTNL lock held */
@@ -741,9 +743,10 @@ void atl_start_hw_global(struct atl_nic *nic)
 		atl_write(hw, ATL2_TX_Q_TO_TC_MAP(6), 0x03030303);
 		atl_write(hw, ATL2_TX_Q_TO_TC_MAP(7), 0x03030303);
 
-		/* Turn new filters on*/
-		if (atl_newrpf) 
-			atl_set_bits(hw, ATL_RX_FLT_CTRL2, BIT(0xB));
+	}
+	/* Turn new filters on*/
+	if (hw->new_rpf) { 
+		atl_set_bits(hw, ATL_RX_FLT_CTRL2, BIT(0xB));
 		atl2_hw_init_new_rx_filters(hw);
 	}
 
