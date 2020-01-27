@@ -11,10 +11,11 @@
 #include "atl_drviface.h"
 
 struct atl_link_type atl_link_types[] = {
-#define LINK_TYPE(_idx, _name, _speed, _ethtl_idx, _fw1_bit, _fw2_bit)	\
+#define LINK_TYPE(_idx, _name, _speed, _duplex, _ethtl_idx, _fw1_bit, _fw2_bit)	\
 	[_idx] = {							\
 		.name = _name,						\
 		.speed = _speed,					\
+		.duplex = _duplex,					\
 		.ethtool_idx = _ethtl_idx,				\
 		.fw_bits = {						\
 		[0] = _fw1_bit,						\
@@ -22,24 +23,33 @@ struct atl_link_type atl_link_types[] = {
 		},							\
 	},
 
+	LINK_TYPE(atl_link_type_idx_10m_half,
+		"10BaseTX-HD", 10, DUPLEX_HALF,
+		ETHTOOL_LINK_MODE_10baseT_Half_BIT, 0, 0)
 	LINK_TYPE(atl_link_type_idx_10m,
-		"10BaseTX-FD", 10, ETHTOOL_LINK_MODE_10baseT_Full_BIT,
-		0, BIT(1))
+		"10BaseTX-FD", 10, DUPLEX_FULL,
+		ETHTOOL_LINK_MODE_10baseT_Full_BIT, 0, BIT(1))
+	LINK_TYPE(atl_link_type_idx_100m_half,
+		"100BaseTX-HD", 100, DUPLEX_HALF,
+		ETHTOOL_LINK_MODE_100baseT_Half_BIT, 0, 0)
 	LINK_TYPE(atl_link_type_idx_100m,
-		"100BaseTX-FD", 100, ETHTOOL_LINK_MODE_100baseT_Full_BIT,
-		0x20, BIT(5))
+		"100BaseTX-FD", 100, DUPLEX_FULL,
+		ETHTOOL_LINK_MODE_100baseT_Full_BIT, 0x20, BIT(5))
+	LINK_TYPE(atl_link_type_idx_1g_half,
+		"1000BaseT-HD", 1000, DUPLEX_HALF,
+		ETHTOOL_LINK_MODE_1000baseT_Half_BIT, 0, 0)
 	LINK_TYPE(atl_link_type_idx_1g,
-		"1000BaseT-FD", 1000, ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
-		0x10, BIT(8))
+		"1000BaseT-FD", 1000, DUPLEX_FULL,
+		ETHTOOL_LINK_MODE_1000baseT_Full_BIT, 0x10, BIT(8))
 	LINK_TYPE(atl_link_type_idx_2p5g,
-		"2.5GBaseT-FD", 2500, ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-		8, BIT(9))
+		"2.5GBaseT-FD", 2500, DUPLEX_FULL,
+		ETHTOOL_LINK_MODE_2500baseT_Full_BIT, 8, BIT(9))
 	LINK_TYPE(atl_link_type_idx_5g,
-		"5GBaseT-FD", 5000, ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-		2, BIT(10))
+		"5GBaseT-FD", 5000, DUPLEX_FULL,
+		ETHTOOL_LINK_MODE_5000baseT_Full_BIT, 2, BIT(10))
 	LINK_TYPE(atl_link_type_idx_10g,
-		"10GBaseT-FD", 10000, ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
-		1, BIT(11))
+		"10GBaseT-FD", 10000, DUPLEX_FULL,
+		ETHTOOL_LINK_MODE_10000baseT_Full_BIT, 1, BIT(11))
 };
 #define ATL_FW2_LINK_MSK (BIT(5) | BIT(8) | BIT(9) | BIT(10) | BIT(11))
 

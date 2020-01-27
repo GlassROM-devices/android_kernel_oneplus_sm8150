@@ -262,7 +262,7 @@ static int atl2_hw_reset(struct atl_hw *hw)
 
 	if (rbl_status & ATL2_FW_BOOT_FAILED_MASK) {
 		err = -EIO;
-		atl_dev_err("FW Restart failed");
+		atl_dev_err("FW Restart failed, status  = %#x", rbl_status);
 		goto unlock;
 	}
 

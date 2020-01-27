@@ -280,6 +280,9 @@ static void atl2_set_rate(struct atl_hw *hw,
 {
 	unsigned int adv = atl_link_adv(&hw->link_state);
 
+	link_options->rate_10M_hd =  !!(adv & BIT(atl_link_type_idx_10m_half));
+	link_options->rate_100M_hd = !!(adv & BIT(atl_link_type_idx_100m_half));
+	link_options->rate_1G_hd   = !!(adv & BIT(atl_link_type_idx_1g_half));
 	link_options->rate_10M = !!(adv & BIT(atl_link_type_idx_10m));
 	link_options->rate_100M = !!(adv & BIT(atl_link_type_idx_100m));
 	link_options->rate_1G   = !!(adv & BIT(atl_link_type_idx_1g));
@@ -368,6 +371,12 @@ static u32 a2_fw_caps_to_mask(struct device_link_caps_s *link_caps)
 		supported |= BIT(atl_link_type_idx_100m);
 	if (link_caps->rate_10M)
 		supported |= BIT(atl_link_type_idx_10m);
+	if (link_caps->rate_1G_hd)
+		supported |= BIT(atl_link_type_idx_1g_half);
+	if (link_caps->rate_100M_hd)
+		supported |= BIT(atl_link_type_idx_100m_half);
+	if (link_caps->rate_10M_hd)
+		supported |= BIT(atl_link_type_idx_10m_half);
 
 	if (link_caps->eee_10G)
 		supported |= BIT(atl_link_type_idx_10g) << ATL_EEE_BIT_OFFT;
@@ -397,6 +406,12 @@ static u32 a2_fw_lkp_to_mask(struct lkp_link_caps_s *lkp_link_caps)
 		rate |= BIT(atl_link_type_idx_100m);
 	if (lkp_link_caps->rate_10M)
 		rate |= BIT(atl_link_type_idx_10m);
+	if (lkp_link_caps->rate_1G_hd)
+		rate |= BIT(atl_link_type_idx_1g_half);
+	if (lkp_link_caps->rate_100M_hd)
+		rate |= BIT(atl_link_type_idx_100m_half);
+	if (lkp_link_caps->rate_10M_hd)
+		rate |= BIT(atl_link_type_idx_10m_half);
 
 	if (lkp_link_caps->eee_10G)
 		rate |= BIT(atl_link_type_idx_10g) << ATL_EEE_BIT_OFFT;
@@ -430,13 +445,19 @@ static int __atl2_fw_update_link_status(struct atl_hw *hw)
 		lstate->link = &atl_link_types[atl_link_type_idx_2p5g];
 		break;
 	case ATL2_FW_LINK_RATE_1G:
-		lstate->link = &atl_link_types[atl_link_type_idx_1g];
+		lstate->link = link_status.duplex ?
+				&atl_link_types[atl_link_type_idx_1g] :
+				&atl_link_types[atl_link_type_idx_1g_half];
 		break;
 	case ATL2_FW_LINK_RATE_100M:
-		lstate->link = &atl_link_types[atl_link_type_idx_100m];
+		lstate->link = link_status.duplex ?
+				&atl_link_types[atl_link_type_idx_100m] :
+				&atl_link_types[atl_link_type_idx_100m_half];
 		break;
 	case ATL2_FW_LINK_RATE_10M:
-		lstate->link = &atl_link_types[atl_link_type_idx_10m];
+		lstate->link = link_status.duplex ?
+				&atl_link_types[atl_link_type_idx_10m] :
+				&atl_link_types[atl_link_type_idx_10m_half];;
 		break;
 	default:
 		lstate->link = NULL;

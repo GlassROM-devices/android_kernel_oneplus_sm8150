@@ -37,6 +37,7 @@ struct atl_mcp {
 
 struct atl_link_type {
 	unsigned speed;
+	bool duplex;
 	unsigned ethtool_idx;
 	uint32_t fw_bits[2];
 	const char *name;
@@ -49,6 +50,9 @@ enum atl_link_type_index {
 	atl_link_type_idx_2p5g,
 	atl_link_type_idx_5g,
 	atl_link_type_idx_10g,
+	atl_link_type_idx_10m_half,
+	atl_link_type_idx_100m_half,
+	atl_link_type_idx_1g_half,
 };
 
 extern struct atl_link_type atl_link_types[];

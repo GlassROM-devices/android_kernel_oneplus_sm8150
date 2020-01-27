@@ -40,7 +40,6 @@ static void atl_link_to_kernel(unsigned int bits, unsigned long *kernel,
 do {									\
 	struct atl_fc_state *fc = &(lstate)->fc;			\
 	(base)->port = PORT_TP;						\
-	(base)->duplex = DUPLEX_FULL;					\
 	(base)->autoneg = AUTONEG_DISABLE;				\
 	(base)->eth_tp_mdix = ETH_TP_MDI_INVALID;			\
 	(base)->eth_tp_mdix_ctrl = ETH_TP_MDI_INVALID;			\
@@ -117,6 +116,7 @@ static int atl_ethtool_get_settings(struct net_device *ndev,
 	cmd->lp_advertising = cmd_compat.link_modes.lp_advertising;
 
 	ethtool_cmd_speed_set(cmd, lstate->link ? lstate->link->speed : 0);
+	cmd->duplex = (lstate->link) ? lstate->link->duplex : DUPLEX_UNKNOWN;
 
 	return 0;
 }
@@ -139,6 +139,7 @@ static int atl_ethtool_get_ksettings(struct net_device *ndev,
 	atl_ethtool_get_common(&cmd->base, cmd, lstate, false);
 
 	cmd->base.speed = lstate->link ? lstate->link->speed : 0;
+	cmd->base.duplex = (lstate->link) ? lstate->link->duplex : DUPLEX_UNKNOWN;
 
 	return 0;
 }
@@ -168,16 +169,18 @@ static unsigned int atl_kernel_to_link(const unsigned long int *bits,
 	return ret;
 }
 
-static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed)
+static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed,
+			       unsigned int duplex)
 {
 	struct atl_link_state *lstate = &hw->link_state;
 	struct atl_link_type *type;
 	unsigned long tmp;
+	unsigned int dplx = duplex == DUPLEX_HALF ? DUPLEX_HALF : DUPLEX_FULL;
 	int i;
 
 	lstate->advertized &= ~ATL_EEE_MASK;
 	atl_for_each_rate(i, type)
-		if (type->speed == speed) {
+		if (type->speed == speed && type->duplex == dplx) {
 			if (!(lstate->supported & BIT(i)))
 				return -EINVAL;
 
@@ -202,11 +205,11 @@ static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed)
 do {									\
 	struct atl_fc_state *fc = &lstate->fc;				\
 									\
-	if ((base)->port != PORT_TP || (base)->duplex != DUPLEX_FULL)	\
+	if ((base)->port != PORT_TP)					\
 		return -EINVAL;						\
 									\
 	if ((base)->autoneg != AUTONEG_ENABLE)				\
-		return atl_set_fixed_speed(hw, speed);			\
+		return atl_set_fixed_speed(hw, speed, (base)->duplex);	\
 									\
 	atl_add_link_bit(tmp, Autoneg);					\
 	atl_add_link_bit(tmp, TP);					\
