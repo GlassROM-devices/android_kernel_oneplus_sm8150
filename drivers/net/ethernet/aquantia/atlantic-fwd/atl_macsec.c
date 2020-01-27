@@ -379,13 +379,16 @@ int atl_macsec_update_stats(struct atl_hw *hw)
 
 int atl_init_macsec(struct atl_hw *hw)
 {
-	struct macsec_msg_fw_request msg = { 0 };
-	struct macsec_msg_fw_response resp = { 0 };
+	uint32_t ctl_ether_types[1] = { ETH_P_PAE };
+	struct macsec_msg_fw_request msg;
+	struct macsec_msg_fw_response resp;
 	int num_ctl_ether_types = 0;
 	int index = 0, tbl_idx;
 	int ret;
 
 	rtnl_lock();
+	memset(&msg, 0, sizeof(msg));
+	memset(&resp, 0, sizeof(resp));
 
 	if (hw->mcp.ops->send_macsec_req != NULL) {
 		struct macsec_cfg cfg = { 0 };
@@ -404,10 +407,12 @@ int atl_init_macsec(struct atl_hw *hw)
 	}
 
 	/* Init Ethertype bypass filters */
-	uint32_t ctl_ether_types[1] = { ETH_P_PAE };
 	for (index = 0; index < ARRAY_SIZE(ctl_ether_types); index++) {
-		struct aq_mss_ingress_prectlf_record rx_prectlf_rec = { 0 };
-		struct aq_mss_egress_ctlf_record tx_ctlf_rec = { 0 };
+		struct aq_mss_ingress_prectlf_record rx_prectlf_rec;
+		struct aq_mss_egress_ctlf_record tx_ctlf_rec;
+
+		memset(&rx_prectlf_rec, 0, sizeof(rx_prectlf_rec));
+		memset(&tx_ctlf_rec, 0, sizeof(tx_ctlf_rec));
 
 		if (ctl_ether_types[index] == 0)
 			continue;
@@ -465,10 +470,13 @@ static int atl_set_txsc(struct atl_hw *hw, int txsc_idx)
 {
 	struct atl_macsec_txsc *atl_txsc = &hw->macsec_cfg.atl_txsc[txsc_idx];
 	const struct macsec_secy *secy = atl_txsc->sw_secy;
+	struct aq_mss_egress_class_record tx_class_rec;
 	unsigned int sc_idx = atl_txsc->hw_sc_idx;
+	struct aq_mss_egress_sc_record sc_rec;
 	int ret = 0;
 
-	struct aq_mss_egress_class_record tx_class_rec = { 0 };
+	memset(&tx_class_rec, 0, sizeof(tx_class_rec));
+	memset(&sc_rec, 0, sizeof(sc_rec));
 
 	ether_addr_to_mac(tx_class_rec.mac_sa, secy->netdev->dev_addr);
 
@@ -492,8 +500,6 @@ static int atl_set_txsc(struct atl_hw *hw, int txsc_idx)
 	ret = aq_mss_set_egress_class_record(hw, &tx_class_rec, txsc_idx);
 	if (ret)
 		return ret;
-
-	struct aq_mss_egress_sc_record sc_rec = { 0 };
 
 	sc_rec.protect = secy->protect_frames;
 	if (secy->tx_sc.encrypt)
@@ -794,8 +800,11 @@ static int atl_clear_txsa(struct atl_nic *nic, struct atl_macsec_txsc *atl_txsc,
 		clear_bit(sa_num, &atl_txsc->tx_sa_idx_busy);
 
 	if ((clear_type & ATL_CLEAR_HW) && netif_carrier_ok(nic->ndev)) {
-		struct aq_mss_egress_sakey_record key_rec = { 0 };
-		struct aq_mss_egress_sa_record sa_rec = { 0 };
+		struct aq_mss_egress_sakey_record key_rec;
+		struct aq_mss_egress_sa_record sa_rec;
+
+		memset(&key_rec, 0, sizeof(key_rec));
+		memset(&sa_rec, 0, sizeof(sa_rec));
 
 		sa_rec.fresh = 1;
 
@@ -843,12 +852,15 @@ static int atl_set_rxsc(struct atl_hw *hw, const uint32_t rxsc_idx)
 {
 	const struct atl_macsec_rxsc *atl_rxsc =
 		&hw->macsec_cfg.atl_rxsc[rxsc_idx];
-	struct aq_mss_ingress_preclass_record pre_class_record = { 0 };
+	struct aq_mss_ingress_preclass_record pre_class_record;
 	const struct macsec_rx_sc *rx_sc = atl_rxsc->sw_rxsc;
 	const struct macsec_secy *secy = atl_rxsc->sw_secy;
 	const uint32_t hw_sc_idx = atl_rxsc->hw_sc_idx;
-	struct aq_mss_ingress_sc_record sc_record = { 0 };
+	struct aq_mss_ingress_sc_record sc_record;
 	int ret = 0;
+
+	memset(&pre_class_record, 0, sizeof(pre_class_record));
+	memset(&sc_record, 0, sizeof(sc_record));
 
 	atl_dev_dbg("set rx_sc: rxsc_idx=%d, sci %#llx, hw_sc_idx=%d\n",
 		    rxsc_idx, rx_sc->sci, hw_sc_idx);
@@ -978,8 +990,11 @@ static int atl_clear_rxsc(struct atl_nic *nic, const int rxsc_idx,
 	}
 
 	if (clear_type & ATL_CLEAR_HW) {
-		struct aq_mss_ingress_preclass_record pre_class_record = { 0 };
-		struct aq_mss_ingress_sc_record sc_record = { 0 };
+		struct aq_mss_ingress_preclass_record pre_class_record;
+		struct aq_mss_ingress_sc_record sc_record;
+
+		memset(&pre_class_record, 0, sizeof(pre_class_record));
+		memset(&sc_record, 0, sizeof(sc_record));
 
 		ret = aq_mss_set_ingress_preclass_record(hw, &pre_class_record,
 							 2 * rxsc_idx);
@@ -1038,10 +1053,13 @@ static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
 			   const struct macsec_rx_sa *rx_sa,
 			   const unsigned char *key, const unsigned char an)
 {
-	struct aq_mss_ingress_sakey_record sa_key_record = { 0 };
-	struct aq_mss_ingress_sa_record sa_record = { 0 };
+	struct aq_mss_ingress_sakey_record sa_key_record;
+	struct aq_mss_ingress_sa_record sa_record;
 	const int sa_idx = sc_idx | an;
 	int ret = 0;
+
+	memset(&sa_key_record, 0, sizeof(sa_key_record));
+	memset(&sa_record, 0, sizeof(sa_record));
 
 	atl_dev_dbg("set rx_sa %d: active=%d, next_pn=%d\n", an, rx_sa->active,
 		    rx_sa->next_pn);
@@ -1144,8 +1162,11 @@ static int atl_clear_rxsa(struct atl_nic *nic, struct atl_macsec_rxsc *atl_rxsc,
 		clear_bit(sa_num, &atl_rxsc->rx_sa_idx_busy);
 
 	if ((clear_type & ATL_CLEAR_HW) && netif_carrier_ok(nic->ndev)) {
-		struct aq_mss_ingress_sakey_record sa_key_record = { 0 };
-		struct aq_mss_ingress_sa_record sa_record = { 0 };
+		struct aq_mss_ingress_sakey_record sa_key_record;
+		struct aq_mss_ingress_sa_record sa_record;
+
+		memset(&sa_key_record, 0, sizeof(sa_key_record));
+		memset(&sa_record, 0, sizeof(sa_record));
 
 		sa_record.fresh = 1;
 		ret = aq_mss_set_ingress_sa_record(hw, &sa_record, sa_idx);

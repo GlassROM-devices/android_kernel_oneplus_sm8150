@@ -815,11 +815,12 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 				       ARRAY_SIZE(macsec_stat_descs));
 
 		for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
-			if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
-				continue;
 			struct atl_macsec_txsc *atl_txsc =
 				&nic->hw.macsec_cfg.atl_txsc[i];
 			int assoc_num;
+
+			if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
+				continue;
 
 			snprintf(prefix, sizeof(prefix), "txsc%d_",
 				 atl_txsc->hw_sc_idx);
@@ -839,11 +840,12 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 			}
 		}
 		for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
-			if (!(test_bit(i, &nic->hw.macsec_cfg.rxsc_idx_busy)))
-				continue;
 			struct atl_macsec_rxsc *atl_rxsc =
 				&nic->hw.macsec_cfg.atl_rxsc[i];
 			int assoc_num;
+
+			if (!(test_bit(i, &nic->hw.macsec_cfg.rxsc_idx_busy)))
+				continue;
 
 			for (assoc_num = 0; assoc_num < MACSEC_NUM_AN;
 			     assoc_num++) {
@@ -919,15 +921,16 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 	}
 #endif
 #ifdef NETIF_F_HW_MACSEC
-	int assoc_num;
 	atl_write_stats(&nic->hw.macsec_cfg.stats, macsec_stat_descs, data,
 			uint64_t);
 
 	for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
-		if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
-			continue;
 		struct atl_macsec_txsc *atl_txsc =
 			&nic->hw.macsec_cfg.atl_txsc[i];
+		int assoc_num;
+
+		if (!(test_bit(i, &nic->hw.macsec_cfg.txsc_idx_busy)))
+			continue;
 
 		atl_write_stats(&atl_txsc->stats, macsec_tx_sc_stat_descs, data,
 				uint64_t);
@@ -941,11 +944,12 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 		}
 	}
 	for (i = 0; i < ATL_MACSEC_MAX_SC; i++) {
-		if (!(test_bit(i, &nic->hw.macsec_cfg.rxsc_idx_busy)))
-			continue;
 		struct atl_macsec_rxsc *atl_rxsc =
 			&nic->hw.macsec_cfg.atl_rxsc[i];
 		int assoc_num;
+
+		if (!(test_bit(i, &nic->hw.macsec_cfg.rxsc_idx_busy)))
+			continue;
 
 		for (assoc_num = 0; assoc_num < MACSEC_NUM_AN; assoc_num++) {
 			if (!test_bit(assoc_num, &atl_rxsc->rx_sa_idx_busy))
