@@ -172,10 +172,10 @@ static unsigned int atl_kernel_to_link(const unsigned long int *bits,
 static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed,
 			       unsigned int duplex)
 {
+	unsigned int dplx = (duplex == DUPLEX_HALF) ? DUPLEX_HALF : DUPLEX_FULL;
 	struct atl_link_state *lstate = &hw->link_state;
 	struct atl_link_type *type;
 	unsigned long tmp;
-	unsigned int dplx = duplex == DUPLEX_HALF ? DUPLEX_HALF : DUPLEX_FULL;
 	int i;
 
 	lstate->advertized &= ~ATL_EEE_MASK;
