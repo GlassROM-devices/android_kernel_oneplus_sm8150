@@ -1,3 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* Atlantic Network Driver
+ *
+ * Copyright (C) 2020 Marvell International Ltd.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
 #ifndef __MACSEC_API_H__
 #define __MACSEC_API_H__
 
@@ -47,7 +57,7 @@
  */
 int aq_mss_get_egress_ctlf_record(struct atl_hw *hw,
 				  struct aq_mss_egress_ctlf_record *rec,
-				  uint16_t table_index);
+				  u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress CTL Filter table.
@@ -56,7 +66,7 @@ int aq_mss_get_egress_ctlf_record(struct atl_hw *hw,
  */
 int aq_mss_set_egress_ctlf_record(struct atl_hw *hw,
 				  const struct aq_mss_egress_ctlf_record *rec,
-				  uint16_t table_index);
+				  u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Egress
  *   Packet Classifier table, and unpack it into the fields of rec.
@@ -65,7 +75,7 @@ int aq_mss_set_egress_ctlf_record(struct atl_hw *hw,
  */
 int aq_mss_get_egress_class_record(struct atl_hw *hw,
 				   struct aq_mss_egress_class_record *rec,
-				   uint16_t table_index);
+				   u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress Packet Classifier table.
@@ -74,7 +84,7 @@ int aq_mss_get_egress_class_record(struct atl_hw *hw,
  */
 int aq_mss_set_egress_class_record(struct atl_hw *hw,
 				   const struct aq_mss_egress_class_record *rec,
-				   uint16_t table_index);
+				   u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Egress SC
  *   Lookup table, and unpack it into the fields of rec.
@@ -83,7 +93,7 @@ int aq_mss_set_egress_class_record(struct atl_hw *hw,
  */
 int aq_mss_get_egress_sc_record(struct atl_hw *hw,
 				struct aq_mss_egress_sc_record *rec,
-				uint16_t table_index);
+				u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress SC Lookup table.
@@ -92,7 +102,7 @@ int aq_mss_get_egress_sc_record(struct atl_hw *hw,
  */
 int aq_mss_set_egress_sc_record(struct atl_hw *hw,
 				const struct aq_mss_egress_sc_record *rec,
-				uint16_t table_index);
+				u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Egress SA
  *   Lookup table, and unpack it into the fields of rec.
@@ -101,7 +111,7 @@ int aq_mss_set_egress_sc_record(struct atl_hw *hw,
  */
 int aq_mss_get_egress_sa_record(struct atl_hw *hw,
 				struct aq_mss_egress_sa_record *rec,
-				uint16_t table_index);
+				u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress SA Lookup table.
@@ -110,7 +120,7 @@ int aq_mss_get_egress_sa_record(struct atl_hw *hw,
  */
 int aq_mss_set_egress_sa_record(struct atl_hw *hw,
 				const struct aq_mss_egress_sa_record *rec,
-				uint16_t table_index);
+				u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Egress SA
  *   Key Lookup table, and unpack it into the fields of rec.
@@ -119,7 +129,7 @@ int aq_mss_set_egress_sa_record(struct atl_hw *hw,
  */
 int aq_mss_get_egress_sakey_record(struct atl_hw *hw,
 				   struct aq_mss_egress_sakey_record *rec,
-				   uint16_t table_index);
+				   u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Egress SA Key Lookup table.
@@ -128,7 +138,7 @@ int aq_mss_get_egress_sakey_record(struct atl_hw *hw,
  */
 int aq_mss_set_egress_sakey_record(struct atl_hw *hw,
 				   const struct aq_mss_egress_sakey_record *rec,
-				   uint16_t table_index);
+				   u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress
  *   Pre-MACSec CTL Filter table, and unpack it into the fields of rec.
@@ -137,7 +147,7 @@ int aq_mss_set_egress_sakey_record(struct atl_hw *hw,
  */
 int aq_mss_get_ingress_prectlf_record(struct atl_hw *hw,
 				      struct aq_mss_ingress_prectlf_record *rec,
-				      uint16_t table_index);
+				      u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress Pre-MACSec CTL Filter table.
@@ -146,7 +156,7 @@ int aq_mss_get_ingress_prectlf_record(struct atl_hw *hw,
  */
 int aq_mss_set_ingress_prectlf_record(
 	struct atl_hw *hw, const struct aq_mss_ingress_prectlf_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress
  *   Pre-MACSec Packet Classifier table, and unpack it into the fields of rec.
@@ -155,7 +165,7 @@ int aq_mss_set_ingress_prectlf_record(
  */
 int aq_mss_get_ingress_preclass_record(
 	struct atl_hw *hw, struct aq_mss_ingress_preclass_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress Pre-MACSec Packet Classifier table.
@@ -164,7 +174,7 @@ int aq_mss_get_ingress_preclass_record(
  */
 int aq_mss_set_ingress_preclass_record(
 	struct atl_hw *hw, const struct aq_mss_ingress_preclass_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress SC
  *   Lookup table, and unpack it into the fields of rec.
@@ -173,7 +183,7 @@ int aq_mss_set_ingress_preclass_record(
  */
 int aq_mss_get_ingress_sc_record(struct atl_hw *hw,
 				 struct aq_mss_ingress_sc_record *rec,
-				 uint16_t table_index);
+				 u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress SC Lookup table.
@@ -182,7 +192,7 @@ int aq_mss_get_ingress_sc_record(struct atl_hw *hw,
  */
 int aq_mss_set_ingress_sc_record(struct atl_hw *hw,
 				 const struct aq_mss_ingress_sc_record *rec,
-				 uint16_t table_index);
+				 u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress SA
  *   Lookup table, and unpack it into the fields of rec.
@@ -191,7 +201,7 @@ int aq_mss_set_ingress_sc_record(struct atl_hw *hw,
  */
 int aq_mss_get_ingress_sa_record(struct atl_hw *hw,
 				 struct aq_mss_ingress_sa_record *rec,
-				 uint16_t table_index);
+				 u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress SA Lookup table.
@@ -200,7 +210,7 @@ int aq_mss_get_ingress_sa_record(struct atl_hw *hw,
  */
 int aq_mss_set_ingress_sa_record(struct atl_hw *hw,
 				 const struct aq_mss_ingress_sa_record *rec,
-				 uint16_t table_index);
+				 u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress SA
  *   Key Lookup table, and unpack it into the fields of rec.
@@ -209,7 +219,7 @@ int aq_mss_set_ingress_sa_record(struct atl_hw *hw,
  */
 int aq_mss_get_ingress_sakey_record(struct atl_hw *hw,
 				    struct aq_mss_ingress_sakey_record *rec,
-				    uint16_t table_index);
+				    u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress SA Key Lookup table.
@@ -218,7 +228,7 @@ int aq_mss_get_ingress_sakey_record(struct atl_hw *hw,
  */
 int aq_mss_set_ingress_sakey_record(
 	struct atl_hw *hw, const struct aq_mss_ingress_sakey_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress
  *   Post-MACSec Packet Classifier table, and unpack it into the
@@ -228,7 +238,7 @@ int aq_mss_set_ingress_sakey_record(
  */
 int aq_mss_get_ingress_postclass_record(
 	struct atl_hw *hw, struct aq_mss_ingress_postclass_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress Post-MACSec Packet Classifier table.
@@ -237,7 +247,7 @@ int aq_mss_get_ingress_postclass_record(
  */
 int aq_mss_set_ingress_postclass_record(
 	struct atl_hw *hw, const struct aq_mss_ingress_postclass_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Read the raw table data from the specified row of the Ingress
  *   Post-MACSec CTL Filter table, and unpack it into the fields of rec.
@@ -246,7 +256,7 @@ int aq_mss_set_ingress_postclass_record(
  */
 int aq_mss_get_ingress_postctlf_record(
 	struct atl_hw *hw, struct aq_mss_ingress_postctlf_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Pack the fields of rec, and write the packed data into the
  *   specified row of the Ingress Post-MACSec CTL Filter table.
@@ -255,7 +265,7 @@ int aq_mss_get_ingress_postctlf_record(
  */
 int aq_mss_set_ingress_postctlf_record(
 	struct atl_hw *hw, const struct aq_mss_ingress_postctlf_record *rec,
-	uint16_t table_index);
+	u16 table_index);
 
 /*!  Read the counters for the specified SC, and unpack them into the
  *   fields of counters.
@@ -264,7 +274,7 @@ int aq_mss_set_ingress_postctlf_record(
  */
 int aq_mss_get_egress_sc_counters(struct atl_hw *hw,
 				  struct aq_mss_egress_sc_counters *counters,
-				  uint16_t sc_index);
+				  u16 sc_index);
 
 /*!  Read the counters for the specified SA, and unpack them into the
  *   fields of counters.
@@ -273,7 +283,7 @@ int aq_mss_get_egress_sc_counters(struct atl_hw *hw,
  */
 int aq_mss_get_egress_sa_counters(struct atl_hw *hw,
 				  struct aq_mss_egress_sa_counters *counters,
-				  uint16_t sa_index);
+				  u16 sa_index);
 
 /*!  Read the counters for the common egress counters, and unpack them
  *   into the fields of counters.
@@ -292,7 +302,7 @@ int aq_mss_clear_egress_counters(struct atl_hw *hw);
  */
 int aq_mss_get_ingress_sa_counters(struct atl_hw *hw,
 				   struct aq_mss_ingress_sa_counters *counters,
-				   uint16_t sa_index);
+				   u16 sa_index);
 
 /*!  Read the counters for the common ingress counters, and unpack them
  *   into the fields of counters.
@@ -305,13 +315,13 @@ int aq_mss_get_ingress_common_counters(
 int aq_mss_clear_ingress_counters(struct atl_hw *hw);
 
 /*!  Get Egress SA expired. */
-int aq_mss_get_egress_sa_expired(struct atl_hw *hw, uint32_t *expired);
+int aq_mss_get_egress_sa_expired(struct atl_hw *hw, u32 *expired);
 /*!  Get Egress SA threshold expired. */
 int aq_mss_get_egress_sa_threshold_expired(struct atl_hw *hw,
-					   uint32_t *expired);
+					   u32 *expired);
 /*!  Set Egress SA expired. */
-int aq_mss_set_egress_sa_expired(struct atl_hw *hw, uint32_t expired);
+int aq_mss_set_egress_sa_expired(struct atl_hw *hw, u32 expired);
 /*!  Set Egress SA threshold expired. */
-int aq_mss_set_egress_sa_threshold_expired(struct atl_hw *hw, uint32_t expired);
+int aq_mss_set_egress_sa_threshold_expired(struct atl_hw *hw, u32 expired);
 
 #endif /* __MACSEC_API_H__ */

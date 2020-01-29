@@ -14,6 +14,7 @@
 #include "atl_mdio.h"
 #include "atl_ring.h"
 #include "atl_fwdnl.h"
+#include "atl_macsec.h"
 
 static uint32_t atl_ethtool_get_link(struct net_device *ndev)
 {
@@ -636,7 +637,7 @@ static const char atl_priv_flags[][ETH_GSTRING_LEN] = {
 	ATL_PRIV_FLAG(MediaDetect, MEDIA_DETECT),
 };
 
-#ifdef NETIF_F_HW_MACSEC
+#if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
 
 #define ATL_MACSEC_STAT(_name, _field)					\
 {									\
@@ -737,7 +738,7 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 		       + ARRAY_SIZE(rx_stat_descs) *
 				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_RX])
 #endif
-#ifdef NETIF_F_HW_MACSEC
+#if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
 		       + ARRAY_SIZE(macsec_stat_descs)
 		       + ARRAY_SIZE(macsec_tx_sc_stat_descs) *
 				 atl_macsec_tx_sc_cnt(&nic->hw)
@@ -810,7 +811,7 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 					ARRAY_SIZE(rx_stat_descs));
 		}
 #endif
-#ifdef NETIF_F_HW_MACSEC
+#if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
 		atl_copy_stats_strings(&p, "macsec_", macsec_stat_descs,
 				       ARRAY_SIZE(macsec_stat_descs));
 
@@ -886,7 +887,7 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 
 	atl_update_eth_stats(nic);
 	atl_update_global_stats(nic);
-#ifdef NETIF_F_HW_MACSEC
+#if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
 	atl_macsec_update_stats(&nic->hw);
 #endif
 	atl_write_stats(&nic->stats.tx, tx_stat_descs, data, uint64_t);
@@ -920,7 +921,7 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 		}
 	}
 #endif
-#ifdef NETIF_F_HW_MACSEC
+#if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
 	atl_write_stats(&nic->hw.macsec_cfg.stats, macsec_stat_descs, data,
 			uint64_t);
 
