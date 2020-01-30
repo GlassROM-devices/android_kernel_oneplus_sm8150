@@ -215,8 +215,8 @@ struct device_caps_s {
 	uint32_t cable_diag: 1;
 	uint32_t ncsi: 1;
 	uint32_t avb: 1;
-	uint32_t :28;
-	uint32_t :32;
+	uint32_t rsvd: 28;
+	uint32_t rsvd2: 32;
 };
 
 struct version_s {

@@ -139,7 +139,7 @@ static int atl_ethtool_get_ksettings(struct net_device *ndev,
 	atl_ethtool_get_common(&cmd->base, cmd, lstate, false);
 
 	cmd->base.speed = lstate->link ? lstate->link->speed : 0;
-	cmd->base.duplex = (lstate->link) ? lstate->link->duplex : DUPLEX_UNKNOWN;
+	cmd->base.duplex = lstate->link ? lstate->link->duplex : DUPLEX_UNKNOWN;
 
 	return 0;
 }

@@ -89,7 +89,8 @@ static u32 atl2_mif_mcp_finished_read_get(struct atl_hw *hw)
 /* There are two 16bit transaction counters. The one is incremented at start of
  * changing non atomic value, the other one - at the end. So we need to wait for
  * ma moment when they are equal each other at the reading non atomic memory and
- * at the end of read.  */
+ * at the end of read.
+ */
 static int _atl2_shared_buffer_read_safe(struct atl_hw *hw,
 		     uint32_t offset, uint32_t dwords,
 		     void *data)
@@ -457,7 +458,7 @@ static int __atl2_fw_update_link_status(struct atl_hw *hw)
 	case ATL2_FW_LINK_RATE_10M:
 		lstate->link = link_status.duplex ?
 				&atl_link_types[atl_link_type_idx_10m] :
-				&atl_link_types[atl_link_type_idx_10m_half];;
+				&atl_link_types[atl_link_type_idx_10m_half];
 		break;
 	default:
 		lstate->link = NULL;

@@ -233,7 +233,7 @@ static int atl2_hw_reset(struct atl_hw *hw)
 /*
 	atl_set_bits(hw, 0x404, 1);
 */
-	atl_write(hw, ATL2_MIF_BOOT_REG_ADR, rbl_request),
+	atl_write(hw, ATL2_MIF_BOOT_REG_ADR, rbl_request);
 /*
 	if (hw->mcp.ops)
 		hw->mcp.ops->restore_cfg(hw);
@@ -374,7 +374,8 @@ unlock:
 }
 
 /* Must be called either during early init when netdev isn't yet
- * registered, or with RTNL lock held */
+ * registered, or with RTNL lock held
+ */
 int atl_hw_reset(struct atl_hw *hw)
 {
 	int ret;
@@ -1342,7 +1343,8 @@ void atl_thermal_check(struct atl_hw *hw, bool alarm)
 				lstate->thermal_throttled && alarm)
 				/* We're still thermal-throttled, and
 				 * just found out we can lower the
-				 * speed even more, so renegotiate. */
+				 * speed even more, so renegotiate.
+				 */
 				goto relink;
 		}
 	} else
