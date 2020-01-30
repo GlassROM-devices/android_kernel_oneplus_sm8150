@@ -1726,14 +1726,20 @@ static int atl2_rxf_l4_is_equal(struct atl2_rxf_l4 *f1, struct atl2_rxf_l4 *f2)
 	return true;
 }
 
+static void atl2_rpf_l3_cmd_set(struct atl_hw *hw, u32 val, u32 idx)
+{
+	atl_write_mask_bits(hw, ATL2_RPF_L3_FLT(idx), 0xFF7FFFFF, val);
+}
+
 static void atl2_rxf_l3_put(struct atl_hw *hw, struct atl2_rxf_l3 *l3, int idx)
 {
-
 	if (l3->usage)
 		l3->usage--;
 
-	if (!l3->usage)
-		atl_write(hw, ATL2_RPF_L3_FLT(idx), 0);
+	if (!l3->usage) {
+		l3->cmd = 0;
+		atl2_rpf_l3_cmd_set(hw, l3->cmd, idx);
+	}
 }
 
 static void atl2_rxf_l3_get(struct atl2_rxf_l3 *l3, int idx,
@@ -1752,12 +1758,13 @@ static void atl2_rxf_l3_get(struct atl2_rxf_l3 *l3, int idx,
 
 static void atl2_rxf_l4_put(struct atl_hw *hw, struct atl2_rxf_l4 *l4, int idx)
 {
-
 	if (l4->usage)
 		l4->usage--;
 
-	if (!l4->usage)
-		atl_write(hw, ATL2_RPF_L4_FLT(idx), 0);
+	if (!l4->usage){
+		l4->cmd = 0;
+		atl_write(hw, ATL2_RPF_L4_FLT(idx), l4->cmd);
+	}
 }
 
 static void atl2_rxf_l4_get(struct atl2_rxf_l4 *l4, int idx,
@@ -2215,8 +2222,7 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 			return;
 		}
 
-		atl_write(hw, ATL2_RPF_L3_FLT(l3_idx), cmd);
-		atl_set_bits(hw, ATL2_RPF_L3_FLT(0), BIT(0x17));
+		atl2_rpf_l3_cmd_set(hw, cmd, l3_idx);
 	}
 
 	if (l4_idx > -1) {
