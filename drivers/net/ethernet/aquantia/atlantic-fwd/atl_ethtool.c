@@ -1761,7 +1761,7 @@ static void atl2_rxf_l4_put(struct atl_hw *hw, struct atl2_rxf_l4 *l4, int idx)
 	if (l4->usage)
 		l4->usage--;
 
-	if (!l4->usage){
+	if (!l4->usage) {
 		l4->cmd = 0;
 		atl_write(hw, ATL2_RPF_L4_FLT(idx), l4->cmd);
 	}
@@ -1848,7 +1848,9 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 		}
 		if (l3_idx < 0)
 			for (i = 0; i < ATL_RXF_NTUPLE_MAX; i++)
-				if ((ntuple->l3[i].cmd & (ATL2_NTC_L3_IPV4_EN | ATL2_NTC_L3_IPV6_EN)) == 0) {
+				if ((ntuple->l3[i].cmd &
+				     (ATL2_NTC_L3_IPV4_EN |
+				      ATL2_NTC_L3_IPV6_EN)) == 0) {
 					l3_idx = i;
 					break;
 				}
@@ -1858,7 +1860,8 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 	}
 
 	if (ntuple->l3_idx[idx] != -1)
-		if (!(atl2_rxf_l3_is_equal(&ntuple->l3[ntuple->l3_idx[idx]], &l3))) {
+		if (!(atl2_rxf_l3_is_equal(&l3,
+					   &ntuple->l3[ntuple->l3_idx[idx]]))) {
 			atl2_rxf_l3_put(&nic->hw,
 					&ntuple->l3[ntuple->l3_idx[idx]],
 					ntuple->l3_idx[idx]);
@@ -1882,7 +1885,8 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 	}
 
 	if (ntuple->l4_idx[idx] != -1)
-		if (!(atl2_rxf_l4_is_equal(&ntuple->l4[ntuple->l4_idx[idx]], &l4))) {
+		if (!(atl2_rxf_l4_is_equal(&l4,
+					   &ntuple->l4[ntuple->l4_idx[idx]]))) {
 			atl2_rxf_l4_put(&nic->hw,
 					&ntuple->l4[ntuple->l4_idx[idx]],
 					ntuple->l4_idx[idx]);
