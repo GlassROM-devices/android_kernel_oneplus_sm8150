@@ -2270,7 +2270,8 @@ void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
 	if (!(cmd & ATL_NTC_EN)) {
 		atl_write(hw, ATL_NTUPLE_CTRL(idx), cmd);
 
-		atl2_update_ntuple_flt(nic, idx);
+		if (nic->hw.new_rpf)
+			atl2_update_ntuple_flt(nic, idx);
 		return;
 	}
 
