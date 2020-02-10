@@ -425,7 +425,7 @@ static int atl_set_pauseparam(struct net_device *ndev,
 	struct atl_link_state *lstate = &hw->link_state;
 	struct atl_fc_state *fc = &lstate->fc;
 
-	if (atl_fw_major(hw) < 2)
+	if ((hw->chip_id == ATL_ATLANTIC) && (atl_fw_major(hw) < 2))
 		return -EOPNOTSUPP;
 
 	if (pause->autoneg)
