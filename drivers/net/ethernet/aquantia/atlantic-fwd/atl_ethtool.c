@@ -2218,9 +2218,9 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 			mask |= ATL2_RPF_TAG_L3_V6_MASK;
 			cmd |= (l3_idx + 1) << 0x14;
 
-			if (l3->cmd & ATL2_NTC_L3_IPV4_SA)
+			if (l3->cmd & ATL2_NTC_L3_IPV6_SA)
 				atl2_rpf_l3_v6_sa_set(hw, l3_idx, l3->src_ip6);
-			if (l3->cmd & ATL2_NTC_L3_IPV4_DA)
+			if (l3->cmd & ATL2_NTC_L3_IPV6_DA)
 				atl2_rpf_l3_v6_da_set(hw, l3_idx, l3->dst_ip6);
 		} else {
 			WARN(1, "L3 filter invalid");
