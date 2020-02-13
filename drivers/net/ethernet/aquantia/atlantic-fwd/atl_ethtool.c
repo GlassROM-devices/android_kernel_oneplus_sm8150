@@ -1789,8 +1789,8 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 
 	if (ntuple->cmd[idx] & ATL_NTC_PROTO)
 		l3.cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
-			  ATL2_NTC_L3_IPV6_PROTO :
-			  ATL2_NTC_L3_IPV4_PROTO;
+			  ATL2_NTC_L3_IPV6_PROTO | ATL2_NTC_L3_IPV6_EN :
+			  ATL2_NTC_L3_IPV4_PROTO | ATL2_NTC_L3_IPV4_EN;
 
 	switch (ntuple->cmd[idx] & ATL_NTC_L4_MASK) {
 	case ATL_NTC_L4_TCP:
@@ -2240,6 +2240,10 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 			return;
 		}
 		cmd = l4->cmd | (l4_idx + 1) << 0x4;
+		atl_write(hw, ATL_NTUPLE_SPORT(l4_idx),
+			swab16(l4->src_port));
+		atl_write(hw, ATL_NTUPLE_DPORT(l4_idx),
+			swab16(l4->dst_port));
 		atl_write(hw, ATL2_RPF_L4_FLT(l4_idx), cmd);
 	}
 
@@ -2295,13 +2299,18 @@ void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
 				swab32(ntuple->dst_ip4[idx]));
 	}
 
-	if (cmd & ATL_NTC_SP)
-		atl_write(hw, ATL_NTUPLE_SPORT(idx),
-			swab16(ntuple->src_port[idx]));
+	/* ports are used by both new RPF and legacy RPF, but with different
+	 * locations
+	 */
+	if (!nic->hw.new_rpf) {
+		if (cmd & ATL_NTC_SP)
+			atl_write(hw, ATL_NTUPLE_SPORT(idx),
+				swab16(ntuple->src_port[idx]));
 
-	if (cmd & ATL_NTC_DP)
-		atl_write(hw, ATL_NTUPLE_DPORT(idx),
-			swab16(ntuple->dst_port[idx]));
+		if (cmd & ATL_NTC_DP)
+			atl_write(hw, ATL_NTUPLE_DPORT(idx),
+				swab16(ntuple->dst_port[idx]));
+	}
 
 	if (cmd & ATL_NTC_RXQ)
 		cmd |= 1 << ATL_NTC_ACT_SHIFT;

@@ -90,8 +90,8 @@ enum atl2_ntuple_cmd {
 	ATL2_NTC_L3_IPV6_PROTO_SHIFT = 0x18,
 
 	ATL2_NTC_L4_EN = BIT(0), /* Filter enabled */
-	ATL2_NTC_L4_SP = BIT(1),
-	ATL2_NTC_L4_DP = BIT(2),
+	ATL2_NTC_L4_DP = BIT(1),
+	ATL2_NTC_L4_SP = BIT(2),
 };
 
 struct atl2_rxf_l3 {
