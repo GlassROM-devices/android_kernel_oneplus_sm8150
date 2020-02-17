@@ -683,10 +683,10 @@ static int atl2_fw_update_thermal(struct atl_hw *hw)
 	atl_lock_fw(hw);
 
 	atl2_shared_buffer_get(hw, thermal_shutdown, thermal_shutdown);
-	thermal_shutdown.enable = enable;
-	thermal_shutdown.shutdown_temperature = hw->thermal.crit;
-	thermal_shutdown.warning_temperature = hw->thermal.high;
-	thermal_shutdown.cold_temperature = hw->thermal.low;
+	thermal_shutdown.shutdown_enable = enable;
+	thermal_shutdown.shutdown_temp_threshold = hw->thermal.crit;
+	thermal_shutdown.warning_hot_tempThreshold = hw->thermal.high;
+	thermal_shutdown.warning_cold_temp_threshold = hw->thermal.low;
 	atl2_shared_buffer_write(hw, thermal_shutdown, thermal_shutdown);
 	ret = atl2_shared_buffer_finish_ack(hw);
 
