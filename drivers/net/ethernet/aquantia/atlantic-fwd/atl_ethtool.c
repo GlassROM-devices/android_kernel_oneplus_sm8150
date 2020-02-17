@@ -470,31 +470,28 @@ static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_hw *hw = &nic->hw;
 	struct atl_link_state *lstate = &hw->link_state;
-	uint32_t tmp = 0;
+	uint32_t lpi_timer = 0;
+	unsigned long tmp = 0;
 
 	if ((hw->chip_id == ATL_ATLANTIC) && (atl_fw_major(hw) < 2))
 		return -EOPNOTSUPP;
 
-	atl_get_lpi_timer(nic, &tmp);
-	if (eee->tx_lpi_timer != tmp)
+	atl_get_lpi_timer(nic, &lpi_timer);
+	if (eee->tx_lpi_timer != lpi_timer)
 		return -EOPNOTSUPP;
 
 	lstate->eee_enabled = eee->eee_enabled;
 
 	if (lstate->eee_enabled) {
 		atl_link_to_kernel(lstate->supported >> ATL_EEE_BIT_OFFT,
-			(unsigned long *)&tmp, true);
+				   &tmp, true);
 		if (eee->advertised & ~tmp)
 			return -EINVAL;
 
 		/* advertize the requested link or all supported */
 		if (eee->advertised)
-			tmp = atl_kernel_to_link(
-					(unsigned long *)&eee->advertised,
-					true);
-		else
-			tmp = atl_kernel_to_link(
-					(unsigned long *)&tmp, true);
+			tmp = eee->advertised;
+		tmp = atl_kernel_to_link(&tmp, true);
 	}
 
 	lstate->advertized &= ~ATL_EEE_MASK;
