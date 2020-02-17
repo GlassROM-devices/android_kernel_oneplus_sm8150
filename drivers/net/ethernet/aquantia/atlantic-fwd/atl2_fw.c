@@ -221,7 +221,7 @@ static int __atl2_fw_wait_init(struct atl_hw *hw)
 	atl2_shared_buffer_write(hw, link_control, link_control);
 
 	atl2_shared_buffer_get(hw, mtu, mtu);
-	mtu = ATL_MAX_MTU;
+	mtu = ATL_MAX_MTU + ETH_FCS_LEN + ETH_HLEN;
 	atl2_shared_buffer_write(hw, mtu, mtu);
 
 	return atl2_shared_buffer_finish_ack(hw);
