@@ -1048,10 +1048,8 @@ static int atl_set_pad_stripping(struct atl_nic *nic, bool on)
 	int ret;
 
 	ret = hw->mcp.ops->set_pad_stripping(hw, on);
-	if (ret)
-		return ret;
-	/* Restart aneg to make FW apply the new settings */
-	return hw->mcp.ops->restart_aneg(hw);
+
+	return ret;
 }
 
 int atl_set_media_detect(struct atl_nic *nic, bool on)
