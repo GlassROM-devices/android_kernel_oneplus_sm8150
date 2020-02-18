@@ -700,6 +700,23 @@ static int atl2_fw_update_thermal(struct atl_hw *hw)
 	return ret;
 }
 
+static int atl2_fw_set_pad_stripping(struct atl_hw *hw, bool on)
+{
+	struct link_control_s link_control;
+	int err = 0;
+
+	atl_lock_fw(hw);
+
+	atl2_shared_buffer_get(hw, link_control, link_control);
+	link_control.enable_frame_padding_removal_rx = on;
+	atl2_shared_buffer_write(hw, link_control, link_control);
+	err = atl2_shared_buffer_finish_ack(hw);
+
+	atl_unlock_fw(hw);
+
+	return err;
+}
+
 static int atl2_fw_unsupported(struct atl_hw *hw)
 {
 	return -ENOTSUPP;
@@ -727,6 +744,7 @@ static struct atl_fw_ops atl2_fw_ops = {
 		.get_phy_temperature = atl2_fw_get_phy_temperature,
 		.set_mediadetect = (void *)atl2_fw_unsupported,
 		.send_macsec_req = (void *)atl2_fw_unsupported,
+		.set_pad_stripping = atl2_fw_set_pad_stripping,
 		.get_mac_addr = atl2_fw_get_mac_addr,
 		.__get_hbeat = __atl2_fw_get_hbeat,
 		.set_phy_loopback = atl2_fw_set_phy_loopback,
