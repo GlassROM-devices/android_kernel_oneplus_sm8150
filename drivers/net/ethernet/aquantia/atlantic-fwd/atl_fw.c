@@ -383,12 +383,18 @@ static int atl_fw1_unsupported(struct atl_hw *hw)
 	return -EOPNOTSUPP;
 }
 
-static int atl_fw2_restart_aneg(struct atl_hw *hw)
+static int __atl_fw2_restart_aneg(struct atl_hw *hw)
 {
-	atl_lock_fw(hw);
 	/* Autoneg restart is self-clearing, no need to track via
 	 * mcp->req_high */
 	atl_set_bits(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), BIT(31));
+	return 0;
+}
+
+static int atl_fw2_restart_aneg(struct atl_hw *hw)
+{
+	atl_lock_fw(hw);
+	__atl_fw2_restart_aneg(hw);
 	atl_unlock_fw(hw);
 	return 0;
 }
@@ -623,6 +629,9 @@ static int __atl_fw2x_apply_msm_settings(struct atl_hw *hw)
 	uint32_t msg_id = atl_fw2_msm_settings_apply;
 	uint32_t high_status, high_req = 0;
 	int ret = 0;
+
+	if (hw->mcp.fw_rev < 0x0301006e)
+		return __atl_fw2_restart_aneg(hw);
 
 	ret = atl_write_mcp_mem(hw, 0, &msg_id, sizeof(msg_id),
 				MCP_AREA_CONFIG);
