@@ -190,9 +190,9 @@ static int atl_set_fixed_speed(struct atl_hw *hw, unsigned int speed,
 
 	if (lstate->eee_enabled) {
 		atl_link_to_kernel(lstate->supported >> ATL_EEE_BIT_OFFT,
-				   &tmp, true);
+				   &tmp, false);
 		/* advertize the supported links */
-		tmp = atl_kernel_to_link(&tmp, true);
+		tmp = atl_kernel_to_link(&tmp, false);
 		lstate->advertized |= tmp << ATL_EEE_BIT_OFFT;
 	}
 
@@ -484,14 +484,14 @@ static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
 
 	if (lstate->eee_enabled) {
 		atl_link_to_kernel(lstate->supported >> ATL_EEE_BIT_OFFT,
-				   &tmp, true);
+				   &tmp, false);
 		if (eee->advertised & ~tmp)
 			return -EINVAL;
 
 		/* advertize the requested link or all supported */
 		if (eee->advertised)
 			tmp = eee->advertised;
-		tmp = atl_kernel_to_link(&tmp, true);
+		tmp = atl_kernel_to_link(&tmp, false);
 	}
 
 	lstate->advertized &= ~ATL_EEE_MASK;
