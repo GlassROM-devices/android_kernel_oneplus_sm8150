@@ -733,7 +733,7 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 		return ARRAY_SIZE(tx_stat_descs) * (nic->nvecs + 1) +
 		       ARRAY_SIZE(rx_stat_descs) * (nic->nvecs + 1) +
 		       ARRAY_SIZE(eth_stat_descs)
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 		       + ARRAY_SIZE(tx_stat_descs) *
 				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_TX])
 		       + ARRAY_SIZE(rx_stat_descs) *
@@ -798,7 +798,7 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 			atl_copy_stats_string_set(&p, prefix);
 		}
 
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 		for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
 			snprintf(prefix, sizeof(prefix), "fwd_ring_%d_", i);
 
@@ -906,7 +906,7 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 		atl_write_stats(&tmp.rx, rx_stat_descs, data, uint64_t);
 	}
 
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	for (i = 0; i < ATL_NUM_FWD_RINGS; i++) {
 		struct atl_ring_stats tmp;
 
@@ -1389,7 +1389,7 @@ static int atl_rxf_check_ring(struct atl_nic *nic, uint32_t ring)
 	if (ring < nic->nvecs || ring == ATL_RXF_RING_ANY)
 		return 0;
 
-#ifdef CONFIG_ATLFWD_FWD
+#if IS_ENABLED(CONFIG_ATLFWD_FWD)
 	if (test_bit(ring, &nic->fwd.ring_map[ATL_FWDIR_RX]))
 		return 0;
 #endif

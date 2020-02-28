@@ -123,7 +123,7 @@ static int atl_open(struct net_device *ndev)
 
 	pm_runtime_put_sync(&nic->hw.pdev->dev);
 
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	atlfwd_nl_on_open(nic->ndev);
 #endif
 
@@ -200,7 +200,7 @@ static const struct net_device_ops atl_ndev_ops = {
 	.ndo_open = atl_open,
 	.ndo_stop = atl_ndo_close,
 	.ndo_start_xmit = atl_start_xmit,
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	.ndo_select_queue = atlfwd_nl_select_queue,
 #endif
 	.ndo_vlan_rx_add_vid = atl_vlan_rx_add_vid,
@@ -436,7 +436,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Number of queues:
 	 * Extra TX queue is used for redirection to FWD ring.
 	 */
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	const unsigned int txqs = atl_max_queues + 1;
 #else
 	const unsigned int txqs = atl_max_queues;
@@ -485,7 +485,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	INIT_WORK(&nic->work, atl_work);
 	mutex_init(&nic->hw.mcp.lock);
 
-#ifdef CONFIG_ATLFWD_FWD
+#if IS_ENABLED(CONFIG_ATLFWD_FWD)
 	BLOCKING_INIT_NOTIFIER_HEAD(&nic->fwd.nh_clients);
 #endif
 
@@ -597,7 +597,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	atl_intr_enable_non_ring(nic);
 	mod_timer(&nic->work_timer, jiffies + HZ);
 
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	atlfwd_nl_on_probe(nic->ndev);
 #endif
 
@@ -632,7 +632,7 @@ static void atl_remove(struct pci_dev *pdev)
 	if (!nic)
 		return;
 
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	atlfwd_nl_on_remove(nic->ndev);
 #endif
 
@@ -643,7 +643,7 @@ static void atl_remove(struct pci_dev *pdev)
 	atl_intr_disable_all(&nic->hw);
 	unregister_netdev(nic->ndev);
 
-#ifdef CONFIG_ATLFWD_FWD
+#if IS_ENABLED(CONFIG_ATLFWD_FWD)
 	atl_fwd_release_rings(nic);
 #endif
 
@@ -894,7 +894,7 @@ static int __init atl_module_init(void)
 	if (ret)
 		goto err_pci_reg;
 
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	ret = atlfwd_nl_init();
 	if (ret)
 		goto err_fwd_netlink;
@@ -902,7 +902,7 @@ static int __init atl_module_init(void)
 
 	return 0;
 
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 err_fwd_netlink:
 #endif
 	pci_unregister_driver(&atl_pci_ops);
@@ -914,7 +914,7 @@ module_init(atl_module_init);
 
 static void __exit atl_module_exit(void)
 {
-#ifdef CONFIG_ATLFWD_FWD_NETLINK
+#if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	atlfwd_nl_exit();
 #endif
 
