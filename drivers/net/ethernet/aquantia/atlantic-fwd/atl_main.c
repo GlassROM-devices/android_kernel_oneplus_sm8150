@@ -345,14 +345,14 @@ int atl_fw_configure(struct atl_hw *hw)
 
 	ret = hw->mcp.ops->set_mediadetect(hw,
 			!!(nic->priv_flags & ATL_PF_BIT(MEDIA_DETECT)));
-	if (ret && ret != -ENOTSUPP)
+	if (ret && ret != -EOPNOTSUPP)
 		return ret;
 	ret = hw->mcp.ops->set_pad_stripping(hw,
 			!!(nic->priv_flags & ATL_PF_BIT(STRIP_PAD)));
-	if (ret && ret != -ENOTSUPP)
+	if (ret && ret != -EOPNOTSUPP)
 		return ret;
 	ret = hw->mcp.ops->update_thermal(hw);
-	if (ret == -ENOTSUPP)
+	if (ret == -EOPNOTSUPP)
 		ret = 0;
 
 	return ret;
