@@ -614,7 +614,7 @@ static int atl2_fw_set_phy_loopback(struct atl_nic *nic, u32 mode)
 	switch (mode) {
 	case ATL_PF_LPB_INT_PHY:
 		if (!device_link_caps.internal_loopback) {
-			ret = -ENOTSUPP;
+			ret = -EOPNOTSUPP;
 			goto unlock;
 		}
 
@@ -622,7 +622,7 @@ static int atl2_fw_set_phy_loopback(struct atl_nic *nic, u32 mode)
 		break;
 	case ATL_PF_LPB_EXT_PHY:
 		if (!device_link_caps.external_loopback) {
-			ret = -ENOTSUPP;
+			ret = -EOPNOTSUPP;
 			goto unlock;
 		}
 		link_options.external_loopback = on;
@@ -719,7 +719,7 @@ static int atl2_fw_set_pad_stripping(struct atl_hw *hw, bool on)
 
 static int atl2_fw_unsupported(struct atl_hw *hw)
 {
-	return -ENOTSUPP;
+	return -EOPNOTSUPP;
 }
 
 int atl2_get_fw_version(struct atl_hw *hw, u32 *fw_version)
