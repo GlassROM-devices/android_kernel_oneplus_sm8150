@@ -459,9 +459,11 @@ static int atl_get_eee(struct net_device *ndev, struct ethtool_eee *eee)
 	eee->eee_enabled = eee->tx_lpi_enabled = lstate->eee_enabled;
 	eee->eee_active = lstate->eee;
 
-	if (lstate->link)
-		ret = atl_get_lpi_timer(nic, &eee->tx_lpi_timer);
+	ret = atl_get_lpi_timer(nic, &nic->hw.lpi_timer);
+	if (ret == -ENODATA)
+		ret = 0;
 
+	eee->tx_lpi_timer = nic->hw.lpi_timer;
 	return ret;
 }
 
@@ -470,14 +472,12 @@ static int atl_set_eee(struct net_device *ndev, struct ethtool_eee *eee)
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_hw *hw = &nic->hw;
 	struct atl_link_state *lstate = &hw->link_state;
-	uint32_t lpi_timer = 0;
 	unsigned long tmp = 0;
 
 	if ((hw->chip_id == ATL_ATLANTIC) && (atl_fw_major(hw) < 2))
 		return -EOPNOTSUPP;
 
-	atl_get_lpi_timer(nic, &lpi_timer);
-	if (eee->tx_lpi_timer != lpi_timer)
+	if (eee->tx_lpi_timer != nic->hw.lpi_timer)
 		return -EOPNOTSUPP;
 
 	lstate->eee_enabled = eee->eee_enabled;

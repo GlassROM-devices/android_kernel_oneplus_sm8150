@@ -131,6 +131,7 @@ struct atl_hw {
 	enum atl_chip chip_id;
 	bool new_rpf;
 	struct atl_link_state link_state;
+	uint32_t lpi_timer;
 	unsigned wol_mode;
 	struct atl_mcp mcp;
 	uint32_t non_ring_intr_mask;

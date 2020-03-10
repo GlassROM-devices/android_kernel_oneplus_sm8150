@@ -88,6 +88,7 @@ enum mcp_scratchpad {
 
 /* MPI @ 0x4000 */
 #define ATL_MPI_CTRL1 0x4000
+#define ATL_MPI_MSM_CTRL 0x4018
 #define ATL_MPI_MSM_ADDR 0x4400
 #define ATL_MPI_MSM_WR 0x4404
 #define ATL_MPI_MSM_RD 0x4408
