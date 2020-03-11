@@ -955,7 +955,7 @@ static int atl_msm_wait(struct atl_hw *hw)
 {
 	uint32_t val;
 
-	busy_wait(10, udelay(1), val, atl_read(hw, ATL_MPI_MSM_ADDR),
+	busy_wait(10, udelay(10), val, atl_read(hw, ATL_MPI_MSM_ADDR),
 		val & BIT(12));
 	if (val & BIT(12)) {
 		/* If MSM CLKL off, return ENODATA */
