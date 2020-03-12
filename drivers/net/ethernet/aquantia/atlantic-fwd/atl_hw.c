@@ -959,8 +959,9 @@ static int atl_msm_wait(struct atl_hw *hw)
 		val & BIT(12));
 	if (val & BIT(12)) {
 		/* If MSM CLKL off, return ENODATA */
-		if (!(atl_read(hw, ATL_MPI_MSM_CTRL) & BIT(0xB)))
+		if ((atl_read(hw, ATL_MPI_MSM_CTRL) & BIT(0xB)) == 0)
 			return -ENODATA;
+
 		return -ETIME;
 	}
 
@@ -989,7 +990,7 @@ int atl_msm_read(struct atl_hw *hw, uint32_t addr, uint32_t *val)
 	int ret;
 
 	/* If MSM CLKL off, fail here */
-	if (!(atl_read(hw, ATL_MPI_MSM_CTRL) & BIT(0xB)))
+	if ((atl_read(hw, ATL_MPI_MSM_CTRL) & BIT(0xB)) == 0)
 		return -ENODATA;
 
 	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
