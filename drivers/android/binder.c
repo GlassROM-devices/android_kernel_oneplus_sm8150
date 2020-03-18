@@ -3353,9 +3353,6 @@ static void binder_transaction(struct binder_proc *proc,
 		ALIGN(secctx_sz, sizeof(u64));
 	off_min = 0;
 
-	binder_alloc_pass_binder_buffer(&target_proc->alloc,
-					t->buffer, tr->data_size);
-
 	for (buffer_offset = off_start_offset; buffer_offset < off_end_offset;
 	     buffer_offset += sizeof(binder_size_t)) {
 
