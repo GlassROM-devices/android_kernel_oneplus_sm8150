@@ -549,7 +549,8 @@ static int atl_fw2_dump_cfg(struct atl_hw *hw)
 {
 	/* save link configuration */
 	hw->fw_cfg_dump[0] = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_LOW));
-	hw->fw_cfg_dump[1] = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH)) & 0xF18;
+	hw->fw_cfg_dump[1] = atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH)) &
+			     0x400F18;
 
 	return 0;
 }
