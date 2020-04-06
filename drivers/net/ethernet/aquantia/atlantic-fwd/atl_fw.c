@@ -597,7 +597,7 @@ static int atl_fw2_update_statistics(struct atl_hw *hw)
 	req = hw->mcp.req_high;
 	atl_write(hw, ATL_MCP_SCRATCH(FW2_LINK_REQ_HIGH), req);
 
-	busy_wait(1000, udelay(10), res,
+	busy_wait(10000, udelay(10), res,
 		atl_read(hw, ATL_MCP_SCRATCH(FW2_LINK_RES_HIGH)),
 		((res ^ req) & atl_fw2_statistics) != 0);
 	if (((res ^ req) & atl_fw2_statistics) != 0) {
