@@ -1,4 +1,4 @@
-# SPDX-License-Identifier GPL-2.0-only.
+# SPDX-License-Identifier: GPL-2.0-only
 # Atlantic Network Driver
 #
 # Copyright(c) 2014-2017 aQuantia Corporation.
