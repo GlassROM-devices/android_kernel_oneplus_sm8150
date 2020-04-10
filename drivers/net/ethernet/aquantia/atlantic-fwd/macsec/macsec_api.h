@@ -325,4 +325,10 @@ int aq_mss_set_egress_sa_expired(struct atl_hw *hw, u32 expired);
 /*!  Set Egress SA threshold expired. */
 int aq_mss_set_egress_sa_threshold_expired(struct atl_hw *hw, u32 expired);
 
+/*!  Set Drop IGPRC miss packets */
+int aq_mss_set_drop_igprc_miss_packets(struct atl_hw *hw, u32 drop);
+
+/*!  Set Packet Edit Control register */
+int aq_mss_set_packet_edit_control(struct atl_hw *hw, u32 conttrol);
+
 #endif /* __MACSEC_API_H__ */
