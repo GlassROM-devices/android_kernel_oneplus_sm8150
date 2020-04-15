@@ -2920,7 +2920,7 @@ int aq_mss_set_egress_sa_threshold_expired(struct atl_hw *hw, u32 expired)
 }
 
 
-static int set_drop_igprc_miss_packets(struct atl_hw *hw, u32 drop)
+static int set_drop_igprc_miss_packets(struct atl_hw *hw, bool drop)
 {
 	struct mss_ingress_ctl_register ctl_reg;
 	int ret;
@@ -2938,7 +2938,7 @@ static int set_drop_igprc_miss_packets(struct atl_hw *hw, u32 drop)
 	if (unlikely(ret))
 		return ret;
 
-	ctl_reg.bits_0.drop_igprc_miss = !!drop;
+	ctl_reg.bits_0.drop_igprc_miss = (drop) ? (1) : (0);
 	ret = __atl_mdio_write(hw, 0, MDIO_MMD_VEND1,
 			       MSS_INGRESS_CTL_REGISTER_ADDR,
 			       ctl_reg.word_0);
@@ -2953,24 +2953,24 @@ static int set_drop_igprc_miss_packets(struct atl_hw *hw, u32 drop)
 	return 0;
 }
 
-int aq_mss_set_drop_igprc_miss_packets(struct atl_hw *hw, u32 drop)
+int aq_mss_set_drop_igprc_miss_packets(struct atl_hw *hw, bool drop)
 {
 	return AQ_API_CALL_SAFE(set_drop_igprc_miss_packets, hw, drop);
 }
 
-static int set_packet_edit_control(struct atl_hw *hw, u32 conttrol)
+static int set_packet_edit_control(struct atl_hw *hw, u32 control)
 {
 	int ret;
 
 	ret = __atl_mdio_write(hw, 0, MDIO_MMD_VEND1,
 			       SEC_INGRESS_PACKET_EDIT_CTL_REGISTER_ADDR,
-			       conttrol);
+			       control);
 
 	return ret;
 }
 
-int aq_mss_set_packet_edit_control(struct atl_hw *hw, u32 conttrol)
+int aq_mss_set_packet_edit_control(struct atl_hw *hw, u32 control)
 {
-	return AQ_API_CALL_SAFE(set_packet_edit_control, hw, conttrol);
+	return AQ_API_CALL_SAFE(set_packet_edit_control, hw, control);
 }
 
