@@ -342,6 +342,9 @@ static void msm_restart_prepare(const char *cmd)
 
 	if (force_warm_reboot)
 		pr_info("Forcing a warm reset of the system\n");
+		
+	/* always force hard resets, to make sure an edl exploit can't easily read memory */
+	need_warm_reset = false;
 
 	/* Hard reset the PMIC unless memory contents must be maintained. */
 	if (force_warm_reboot || need_warm_reset)
