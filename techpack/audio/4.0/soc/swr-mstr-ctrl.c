@@ -22,7 +22,6 @@
 #include <soc/swr-common.h>
 #include <linux/regmap.h>
 #include <dsp/msm-audio-event-notify.h>
-#include <dsp/hw-vote-rsc.h>
 #include "swrm_registers.h"
 #include "swr-mstr-ctrl.h"
 
@@ -379,7 +378,7 @@ static int swrm_request_hw_vote(struct swr_mstr_ctrl *swrm,
 				}
 				if (++swrm->hw_core_clk_en == 1) {
 					ret =
-					   hw_vote_rsc_enable(
+					   clk_prepare_enable(
 						swrm->lpass_core_hw_vote);
 					if (ret < 0) {
 						dev_err(swrm->dev,
@@ -393,7 +392,7 @@ static int swrm_request_hw_vote(struct swr_mstr_ctrl *swrm,
 				if (swrm->hw_core_clk_en < 0)
 					swrm->hw_core_clk_en = 0;
 				else if (swrm->hw_core_clk_en == 0)
-					hw_vote_rsc_disable(
+					clk_disable_unprepare(
 						swrm->lpass_core_hw_vote);
 			}
 		}
@@ -411,7 +410,7 @@ static int swrm_request_hw_vote(struct swr_mstr_ctrl *swrm,
 				}
 				if (++swrm->aud_core_clk_en == 1) {
 					ret =
-					   hw_vote_rsc_enable(
+					   clk_prepare_enable(
 						swrm->lpass_core_audio);
 					if (ret < 0) {
 						dev_err(swrm->dev,
@@ -425,7 +424,7 @@ static int swrm_request_hw_vote(struct swr_mstr_ctrl *swrm,
 				if (swrm->aud_core_clk_en < 0)
 					swrm->aud_core_clk_en = 0;
 				else if (swrm->aud_core_clk_en == 0)
-					hw_vote_rsc_disable(
+					clk_disable_unprepare(
 						swrm->lpass_core_audio);
 			}
 		}
@@ -3320,8 +3319,6 @@ int swrm_wcd_notify(struct platform_device *pdev, u32 id, void *data)
 			swrm_device_down(&pdev->dev);
 		mutex_lock(&swrm->devlock);
 		swrm->dev_up = false;
-		swrm->hw_core_clk_en = 0;
-		swrm->aud_core_clk_en = 0;
 		mutex_unlock(&swrm->devlock);
 		mutex_lock(&swrm->reslock);
 		swrm->state = SWR_MSTR_SSR;
