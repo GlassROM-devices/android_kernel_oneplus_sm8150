@@ -96,6 +96,9 @@
 #include <linux/flex_array.h>
 #include <linux/posix-timers.h>
 #include <linux/cpufreq_times.h>
+#ifdef CONFIG_ADJ_CHAIN
+#include <linux/oem/adj_chain.h>
+#endif
 #ifdef CONFIG_HARDWALL
 #include <asm/hardwall.h>
 #endif
@@ -1009,6 +1012,9 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 	struct mm_struct *mm = NULL;
 	struct task_struct *task;
 	int err = 0;
+#ifdef CONFIG_ADJ_CHAIN
+	int need_update_oom_score_adj = 0;
+#endif
 
 	task = get_proc_task(file_inode(file));
 	if (!task)
@@ -1053,7 +1059,15 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 		}
 	}
 
+#ifdef CONFIG_MEMPLUS
+	/* CONFIG_MEMPLUS add start by bin.zhong@ATSI */
+	memplus_state_check(legacy, oom_adj, task, 0, 0);
+	/* add end */
+#endif
 	task->signal->oom_score_adj = oom_adj;
+#ifdef CONFIG_ADJ_CHAIN
+	adj_chain_update_oom_score_adj(task);
+#endif
 	if (!legacy && has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_adj;
 	trace_oom_score_adj_update(task);
@@ -1071,12 +1085,22 @@ static int __set_oom_adj(struct file *file, int oom_adj, bool legacy)
 				continue;
 
 			task_lock(p);
+#ifdef CONFIG_ADJ_CHAIN
+			need_update_oom_score_adj = 0;
+#endif
 			if (!p->vfork_done && process_shares_mm(p, mm)) {
 				p->signal->oom_score_adj = oom_adj;
+#ifdef CONFIG_ADJ_CHAIN
+				need_update_oom_score_adj = 1;
+#endif
 				if (!legacy && has_capability_noaudit(current, CAP_SYS_RESOURCE))
 					p->signal->oom_score_adj_min = (short)oom_adj;
 			}
 			task_unlock(p);
+#ifdef CONFIG_ADJ_CHAIN
+			if (need_update_oom_score_adj)
+				adj_chain_update_oom_score_adj(p);
+#endif
 		}
 		rcu_read_unlock();
 		mmdrop(mm);
@@ -3250,6 +3274,70 @@ static int proc_pid_patch_state(struct seq_file *m, struct pid_namespace *ns,
 }
 #endif /* CONFIG_LIVEPATCH */
 
+#ifdef CONFIG_MEMPLUS
+static ssize_t
+memplus_type_write(struct file *file, const char __user *buf,
+	size_t count, loff_t *offset)
+{
+	struct inode *inode = file_inode(file);
+	struct task_struct *p;
+	char buffer[PROC_NUMBUF];
+	int type_id, err;
+
+	memset(buffer, 0, sizeof(buffer));
+	if (count > sizeof(buffer) - 1)
+		count = sizeof(buffer) - 1;
+	if (copy_from_user(buffer, buf, count)) {
+		err = -EFAULT;
+		goto out;
+	}
+
+	err = kstrtoint(strstrip(buffer), 0, &type_id);
+	if (err)
+		goto out;
+
+	p = get_proc_task(inode);
+	if (!p)
+		return -ESRCH;
+
+	memplus_state_check(false, 0, p, type_id, 1);
+
+	put_task_struct(p);
+
+out:
+	return err < 0 ? err : count;
+}
+
+static int memplus_type_show(struct seq_file *m, void *v)
+{
+	struct inode *inode = m->private;
+	struct task_struct *p;
+
+	p = get_proc_task(inode);
+	if (!p)
+		return -ESRCH;
+
+	seq_printf(m, "%d\n", p->signal->memplus_type);
+
+	put_task_struct(p);
+
+	return 0;
+}
+
+static int memplus_type_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, memplus_type_show, inode);
+}
+
+static const struct file_operations proc_pid_memplus_type_operations = {
+	.open           = memplus_type_open,
+	.read           = seq_read,
+	.write          = memplus_type_write,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+#endif
+
 /*
  * Thread groups
  */
@@ -3373,6 +3461,14 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_CPU_FREQ_TIMES
 	ONE("time_in_state", 0444, proc_time_in_state_show),
 #endif
+#ifdef CONFIG_MEMPLUS
+	REG("memplus_type", 0666,
+		proc_pid_memplus_type_operations),
+#endif
+#ifdef CONFIG_SMART_BOOST
+	REG("page_hot_count", 0666, proc_page_hot_count_operations),
+#endif
+
 };
 
 static int proc_tgid_base_readdir(struct file *file, struct dir_context *ctx)
