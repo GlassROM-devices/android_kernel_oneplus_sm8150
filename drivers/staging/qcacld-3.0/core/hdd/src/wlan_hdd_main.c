@@ -1289,6 +1289,7 @@ static void hdd_update_wiphy_vhtcap(struct hdd_context *hdd_ctx)
 	struct ieee80211_supported_band *band_5g =
 		hdd_ctx->wiphy->bands[NL80211_BAND_5GHZ];
 	uint32_t val;
+	uint32_t value1;
 
 	if (!band_5g) {
 		hdd_debug("5GHz band disabled, skipping capability population");
@@ -1304,6 +1305,13 @@ static void hdd_update_wiphy_vhtcap(struct hdd_context *hdd_ctx)
 
 	hdd_debug("Updated wiphy vhtcap:0x%x, CSNAntSupp:%d, NumSoundDim:%d",
 		  band_5g->vht_cap.cap, hdd_ctx->config->txBFCsnValue, val);
+
+	sme_cfg_get_int(hdd_ctx->mac_handle, WNI_CFG_VHT_RX_MCS_MAP, &value1);
+	band_5g->vht_cap.vht_mcs.rx_mcs_map = value1;
+
+	sme_cfg_get_int(hdd_ctx->mac_handle, WNI_CFG_VHT_TX_MCS_MAP, &value1);
+	band_5g->vht_cap.vht_mcs.tx_mcs_map = value1;
+
 }
 
 /**
@@ -1393,30 +1401,9 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 
 	enable_tx_stbc = pconfig->enableTxSTBC;
 
-	if (pconfig->enable2x2 && (cfg->num_rf_chains == 2)) {
+	if (pconfig->enable2x2 && (cfg->num_rf_chains == 2))
 		pconfig->enable2x2 = 1;
-	} else {
-		pconfig->enable2x2 = 0;
-		enable_tx_stbc = 0;
 
-		/* 1x1 */
-		/* Update Rx Highest Long GI data Rate */
-		if (sme_cfg_set_int(mac_handle,
-				    WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE,
-				    VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1)
-				== QDF_STATUS_E_FAILURE) {
-			hdd_err("Could not pass on WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE to CCM");
-		}
-
-		/* Update Tx Highest Long GI data Rate */
-		if (sme_cfg_set_int
-			    (mac_handle,
-			     WNI_CFG_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE,
-			     VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1) ==
-			    QDF_STATUS_E_FAILURE) {
-			hdd_err("VHT_TX_HIGHEST_SUPP_RATE_1_1 to CCM fail");
-		}
-	}
 	if (!(cfg->ht_tx_stbc && pconfig->enable2x2))
 		enable_tx_stbc = 0;
 	phtCapInfo->txSTBC = enable_tx_stbc;
@@ -1463,6 +1450,8 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	uint32_t hw_rx_ldpc_enabled;
 	struct wma_caps_per_phy caps_per_phy;
 	mac_handle_t mac_handle;
+	uint32_t tx_highest_data_rate;
+	uint32_t rx_highest_data_rate;
 
 	if (!band_5g) {
 		hdd_debug("5GHz band disabled, skipping capability population");
@@ -1470,6 +1459,46 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
+	if (pconfig->enable2x2) {
+		if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
+			/* Update 2x2 Highest Short GI data rate */
+			tx_highest_data_rate =
+				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80;
+			rx_highest_data_rate =
+				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80;
+		} else {
+			/* Update 2x2 Rx Highest Long GI data Rate */
+			tx_highest_data_rate =
+					VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
+			rx_highest_data_rate =
+					VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
+		}
+	} else if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
+		/* Update 1x1 Highest Short GI data rate */
+		tx_highest_data_rate =
+				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80;
+		rx_highest_data_rate =
+				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80;
+	} else {
+		 /* Update 1x1 Highest Long GI data rate */
+		tx_highest_data_rate = VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+		rx_highest_data_rate = VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+	}
+
+	status = sme_cfg_set_int(mac_handle,
+				 WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE,
+				 rx_highest_data_rate);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("Failed to set rx_supp_data_rate");
+
+	status = sme_cfg_set_int(mac_handle,
+				 WNI_CFG_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE,
+				 tx_highest_data_rate);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("Failed to set tx_supp_data_rate");
+
 
 	/* Get the current MPDU length */
 	status =
@@ -1809,6 +1838,8 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	if (cfg->vht_txop_ps & WMI_VHT_CAP_TXOP_PS)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_VHT_TXOP_PS;
 
+	band_5g->vht_cap.vht_mcs.rx_highest = cpu_to_le16(rx_highest_data_rate);
+	band_5g->vht_cap.vht_mcs.tx_highest = cpu_to_le16(tx_highest_data_rate);
 }
 
 /**
@@ -2967,6 +2998,23 @@ static void hdd_register_policy_manager_callback(
 #endif
 
 #ifdef WLAN_FEATURE_NAN_CONVERGENCE
+static void hdd_indicate_active_ndp_cnt(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint8_t cnt)
+{
+	struct hdd_adapter *adapter = NULL;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
+	if (adapter && hdd_ctx && (hdd_ctx->config->sta_disable_roam &
+	    LFR3_STA_ROAM_DISABLE_BY_NAN)) {
+		hdd_debug("vdev_id:%d ndp active sessions %d", vdev_id, cnt);
+		if (!cnt)
+			wlan_hdd_enable_roaming(adapter);
+		else
+			wlan_hdd_disable_roaming(adapter);
+	}
+}
+
 static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct nan_callbacks cb_obj = {0};
@@ -2981,6 +3029,7 @@ static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.new_peer_ind = hdd_ndp_new_peer_handler;
 	cb_obj.get_peer_idx = hdd_ndp_get_peer_idx;
 	cb_obj.peer_departed_ind = hdd_ndp_peer_departed_handler;
+	cb_obj.wlan_hdd_indicate_active_ndp_cnt = hdd_indicate_active_ndp_cnt;
 
 	os_if_nan_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
@@ -6097,7 +6146,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			wlansap_reset_sap_config_add_ie(sap_config,
 							eUPDATE_IE_ALL);
 		ucfg_ipa_flush(hdd_ctx->pdev);
-		if (!(flag & HDD_IN_CAC_WORK_TH_CONTEXT))
+		if ((!(flag & HDD_IN_CAC_WORK_TH_CONTEXT)) &&
+		    (hdd_ctx->sap_pre_cac_work.fn))
 			cds_flush_work(&hdd_ctx->sap_pre_cac_work);
 		/* fallthrough */
 
@@ -6271,7 +6321,8 @@ QDF_STATUS hdd_stop_all_adapters(struct hdd_context *hdd_ctx)
 
 	hdd_enter();
 
-	cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+	if (hdd_ctx->sap_pre_cac_work.fn)
+		cds_flush_work(&hdd_ctx->sap_pre_cac_work);
 
 	hdd_for_each_adapter(hdd_ctx, adapter)
 		hdd_stop_adapter(hdd_ctx, adapter);
@@ -6322,7 +6373,9 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 
 	hdd_enter();
 
-	cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+	/* do not flush work if it is not created */
+	if (hdd_ctx->sap_pre_cac_work.fn)
+		cds_flush_work(&hdd_ctx->sap_pre_cac_work);
 
 	hdd_for_each_adapter(hdd_ctx, adapter) {
 		hdd_info("[SSR] reset adapter with device mode %s(%d)",
@@ -16101,7 +16154,6 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
  * wlan_hdd_add_monitor_check() - check for monitor intf and add if needed
  * @hdd_ctx: pointer to hdd context
  * @adapter: output pointer to hold created monitor adapter
- * @type: type of the interface
  * @name: name of the interface
  * @rtnl_held: True if RTNL lock is held
  * @name_assign_type: the name of assign type of the netdev
@@ -16112,8 +16164,8 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 int
 wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 			   struct hdd_adapter **adapter,
-			   enum nl80211_iftype type, const char *name,
-			   bool rtnl_held, unsigned char name_assign_type)
+			   const char *name, bool rtnl_held,
+			   unsigned char name_assign_type)
 {
 	struct hdd_adapter *sta_adapter;
 	struct hdd_adapter *mon_adapter;
@@ -16121,17 +16173,15 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 	uint8_t num_open_session = 0;
 	QDF_STATUS status;
 
-	if (!ucfg_pkt_capture_get_mode(hdd_ctx->psoc))
-		return 0;
+	/* if no interface is up do not add monitor mode */
+	if (hdd_is_any_interface_open(hdd_ctx))
+		return -EINVAL;
 
 	/*
 	 * If add interface request is for monitor mode, then it can run in
 	 * parallel with only one station interface.
 	 * If there is no existing station interface return error
 	 */
-	if (type != NL80211_IFTYPE_MONITOR)
-		return 0;
-
 	status = policy_mgr_mode_specific_num_open_sessions(hdd_ctx->psoc,
 							    QDF_MONITOR_MODE,
 							    &num_open_session);
