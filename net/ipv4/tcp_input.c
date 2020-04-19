@@ -96,7 +96,6 @@ int sysctl_tcp_moderate_rcvbuf __read_mostly = 1;
 int sysctl_tcp_early_retrans __read_mostly = 3;
 int sysctl_tcp_invalid_ratelimit __read_mostly = HZ/2;
 int sysctl_tcp_default_init_rwnd __read_mostly = TCP_INIT_CWND * 2;
-int sysctl_tcp_simult_connect __read_mostly = IS_ENABLED(CONFIG_TCP_SIMULT_CONNECT_DEFAULT_ON);
 
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
@@ -5859,7 +5858,7 @@ discard:
 	    tcp_paws_reject(&tp->rx_opt, 0))
 		goto discard_and_undo;
 
-	if (th->syn && sysctl_tcp_simult_connect) {
+	if (th->syn) {
 		/* We see SYN without ACK. It is attempt of
 		 * simultaneous connect with crossed SYNs.
 		 * Particularly, it can be connect to self.
