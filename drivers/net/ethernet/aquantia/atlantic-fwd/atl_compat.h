@@ -20,6 +20,10 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 
+#ifndef IS_REACHABLE
+#define IS_REACHABLE defined
+#endif
+
 /* If the kernel is not RHEL / CentOS, then the 2 identifiers below will be
  * undefined. Define them this way to simplify the checks below.
  */

@@ -18,7 +18,8 @@ atlantic-fwd-objs := atl_fw.o \
 		     atl_ethtool.o \
 		     atl_trace.o \
 		     atl_compat.o \
-		     atl_hwmon.o
+		     atl_hwmon.o \
+		     atl_ptp.o
 
 atlantic-fwd-$(CONFIG_ATLFWD_FWD) += atl_fwd.o
 atlantic-fwd-$(CONFIG_ATLFWD_FWD_NETLINK) += atl_fwdnl.o \

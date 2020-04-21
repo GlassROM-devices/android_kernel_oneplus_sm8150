@@ -16,6 +16,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/pm_runtime.h>
 #include "atl_macsec.h"
+#include "atl_ptp.h"
 
 const char atl_driver_name[] = "atlantic-fwd";
 
@@ -598,9 +599,12 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_hwmon_init;
 
+	ret = atl_ptp_init(nic);
+	if (ret)
+		goto err_ptp_init;
+
 	if (hw->mcp.caps_low & atl_fw2_wake_on_link_force)
 		pm_runtime_put_noidle(&pdev->dev);
-
 
 	atl_intr_enable_non_ring(nic);
 	mod_timer(&nic->work_timer, jiffies + HZ);
@@ -611,6 +615,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	return 0;
 
+err_ptp_init:
 err_hwmon_init:
 	atl_stop(nic, true);
 	unregister_netdev(nic->ndev);
@@ -644,6 +649,9 @@ static void atl_remove(struct pci_dev *pdev)
 #if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 	atlfwd_nl_on_remove(nic->ndev);
 #endif
+
+	atl_ptp_unregister(nic);
+	atl_ptp_free(nic);
 
 	atl_stop(nic, true);
 	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &nic->hw.state);

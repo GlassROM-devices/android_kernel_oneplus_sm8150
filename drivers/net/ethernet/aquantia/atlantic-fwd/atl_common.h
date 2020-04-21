@@ -34,6 +34,8 @@ struct atl_nic;
 
 #include "atl_fwd.h"
 
+struct atl_ptp;
+
 enum {
 	ATL_RXF_VLAN_BASE = 0,
 	ATL_RXF_VLAN_MAX = ATL_VLAN_FLT_NUM,
@@ -253,6 +255,9 @@ struct atl_nic {
 	struct atl_rxf_vlan rxf_vlan;
 	struct atl_rxf_etype rxf_etype;
 	struct atl_rxf_flex rxf_flex;
+
+	/* PTP support */
+	struct atl_ptp *ptp;
 };
 
 /* Flags only modified with RTNL lock held */
