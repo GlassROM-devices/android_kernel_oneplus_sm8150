@@ -1139,10 +1139,13 @@ static int atl_set_coalesce(struct net_device *ndev,
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 
-	if (ec->use_adaptive_rx_coalesce || ec->use_adaptive_tx_coalesce ||
-		ec->rx_max_coalesced_frames || ec->tx_max_coalesced_frames ||
+	if (ec->rx_max_coalesced_frames ||
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 7, 0)
+		ec->use_adaptive_rx_coalesce || ec->use_adaptive_tx_coalesce ||
 		ec->rx_max_coalesced_frames_irq || ec->rx_coalesce_usecs_irq ||
-		ec->tx_max_coalesced_frames_irq || ec->tx_coalesce_usecs_irq)
+		ec->tx_max_coalesced_frames_irq || ec->tx_coalesce_usecs_irq ||
+#endif
+		ec->tx_max_coalesced_frames)
 		return -EOPNOTSUPP;
 
 	if (ec->rx_coalesce_usecs < atl_min_intr_delay ||
@@ -2798,6 +2801,10 @@ static void atl_ethtool_complete(struct net_device *ndev)
 }
 
 const struct ethtool_ops atl_ethtool_ops = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
+				     ETHTOOL_COALESCE_MAX_FRAMES,
+#endif
 	.get_link = atl_ethtool_get_link,
 #ifndef ATL_HAVE_ETHTOOL_KSETTINGS
 	.get_settings = atl_ethtool_get_settings,
