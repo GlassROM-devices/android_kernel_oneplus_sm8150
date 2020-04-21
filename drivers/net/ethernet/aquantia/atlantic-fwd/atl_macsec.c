@@ -628,6 +628,11 @@ static int atl_mdo_add_secy(struct macsec_context *ctx)
 	u32 txsc_idx;
 	int ret = 0;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+	if (secy->xpn)
+		return -EOPNOTSUPP;
+#endif
+
 	sc_sa = sc_sa_from_num_an(MACSEC_NUM_AN);
 	if (sc_sa == atl_macsec_sa_sc_not_used)
 		return -EINVAL;
@@ -745,17 +750,22 @@ static int atl_update_txsa(struct atl_hw *hw, unsigned int sc_idx,
 			   const unsigned char *key, unsigned char an)
 {
 	struct aq_mss_egress_sakey_record key_rec;
+	const unsigned int sa_idx = sc_idx | an;
 	struct aq_mss_egress_sa_record sa_rec;
-	unsigned int sa_idx = sc_idx | an;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 7, 0)
+	const u32 next_pn = tx_sa->next_pn;
+#else
+	const u32 next_pn = tx_sa->next_pn_halves.lower;
+#endif
 	int ret = 0;
 
 	atl_dev_dbg("set tx_sa %d: active=%d, next_pn=%d\n", an, tx_sa->active,
-		    tx_sa->next_pn);
+		    next_pn);
 
 	memset(&sa_rec, 0, sizeof(sa_rec));
 	sa_rec.valid = tx_sa->active;
 	sa_rec.fresh = 1;
-	sa_rec.next_pn = tx_sa->next_pn;
+	sa_rec.next_pn = next_pn;
 
 	ret = aq_mss_set_egress_sa_record(hw, &sa_rec, sa_idx);
 	if (ret) {
@@ -1123,16 +1133,21 @@ static int atl_update_rxsa(struct atl_hw *hw, const unsigned int sc_idx,
 {
 	struct aq_mss_ingress_sakey_record sa_key_record;
 	struct aq_mss_ingress_sa_record sa_record;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 7, 0)
+	const u32 next_pn = rx_sa->next_pn;
+#else
+	const u32 next_pn = rx_sa->next_pn_halves.lower;
+#endif
 	const int sa_idx = sc_idx | an;
 	int ret = 0;
 
 	atl_dev_dbg("set rx_sa %d: active=%d, next_pn=%d\n", an, rx_sa->active,
-		    rx_sa->next_pn);
+		    next_pn);
 
 	memset(&sa_record, 0, sizeof(sa_record));
 	sa_record.valid = rx_sa->active;
 	sa_record.fresh = 1;
-	sa_record.next_pn = rx_sa->next_pn;
+	sa_record.next_pn = next_pn;
 
 	ret = aq_mss_set_ingress_sa_record(hw, &sa_record, sa_idx);
 	if (ret) {
