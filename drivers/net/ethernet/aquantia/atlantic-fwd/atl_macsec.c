@@ -381,7 +381,7 @@ int atl_macsec_update_stats(struct atl_hw *hw)
 int atl_init_macsec(struct atl_hw *hw)
 {
 	struct aq_mss_ingress_prectlf_record rx_prectlf_rec;
-	u32 ctl_ether_types[1] = { ETH_P_PAE };
+	u32 ctl_ether_types[2] = { ETH_P_PAE, ETH_P_PAUSE};
 	struct macsec_msg_fw_response resp;
 	struct macsec_msg_fw_request msg;
 	int num_ctl_ether_types = 0;
@@ -972,6 +972,9 @@ static int atl_set_rxsc(struct atl_hw *hw, const u32 rxsc_idx)
 	if (secy->replay_protect) {
 		sc_record.replay_protect = 1;
 		sc_record.anti_replay_window = secy->replay_window;
+	} else {
+		/* HW workaround to not drop Delayed frames */
+		sc_record.anti_replay_window = ~0;
 	}
 	sc_record.valid = 1;
 	sc_record.fresh = 1;
