@@ -628,8 +628,9 @@ err_dma:
 
 static void atl_remove(struct pci_dev *pdev)
 {
-	int disable_needed;
 	struct atl_nic *nic = pci_get_drvdata(pdev);
+	int disable_needed;
+	bool wol_force;
 
 	if (!nic)
 		return;
@@ -640,6 +641,7 @@ static void atl_remove(struct pci_dev *pdev)
 
 	atl_stop(nic, true);
 	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &nic->hw.state);
+	wol_force = !!(nic->hw.mcp.caps_low & atl_fw2_wake_on_link_force);
 	del_timer_sync(&nic->work_timer);
 	cancel_work_sync(&nic->work);
 	atl_intr_disable_all(&nic->hw);
@@ -654,7 +656,7 @@ static void atl_remove(struct pci_dev *pdev)
 	free_netdev(nic->ndev);
 	pci_release_regions(pdev);
 
-	if (nic->hw.mcp.caps_low & atl_fw2_wake_on_link_force)
+	if (wol_force)
 		pm_runtime_get_sync(&pdev->dev);
 
 	if (disable_needed)
