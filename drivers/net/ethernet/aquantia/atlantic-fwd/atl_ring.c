@@ -1948,8 +1948,8 @@ void atl_get_stats64(struct net_device *ndev,
 
 	atl_update_global_stats(nic);
 
-	nstats->rx_bytes = stats->rx.bytes;
-	nstats->rx_packets = stats->rx.packets;
+	nstats->rx_bytes = stats->rx.bytes + stats->rx_fwd.bytes;
+	nstats->rx_packets = stats->rx.packets + stats->rx_fwd.packets;
 	nstats->tx_bytes = stats->tx.bytes;
 	nstats->tx_packets = stats->tx.packets;
 	nstats->rx_crc_errors = stats->rx.csum_err;

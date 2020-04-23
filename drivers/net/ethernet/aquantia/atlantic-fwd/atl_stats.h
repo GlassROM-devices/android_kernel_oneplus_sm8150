@@ -31,6 +31,11 @@ struct atl_rx_ring_stats {
 	uint64_t multicast;
 };
 
+struct atl_rx_fwd_ring_stats {
+	uint64_t packets;
+	uint64_t bytes;
+};
+
 struct atl_tx_ring_stats {
 	uint64_t packets;
 	uint64_t bytes;
@@ -62,6 +67,7 @@ struct atl_ether_stats {
 struct atl_global_stats {
 	struct atl_rx_ring_stats rx;
 	struct atl_tx_ring_stats tx;
+	struct atl_rx_fwd_ring_stats rx_fwd;
 
 	/* MSM counters can't be reset without full HW reset, so
 	 * store them in relative form:

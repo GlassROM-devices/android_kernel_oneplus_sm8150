@@ -577,6 +577,13 @@ struct atl_stat_desc {
 		sizeof(uint64_t),				\
 }
 
+#define ATL_RX_FWD_STAT(_name, _field)				\
+{								\
+	.stat_name = #_name,					\
+	.idx = offsetof(struct atl_rx_fwd_ring_stats, _field) /	\
+		sizeof(uint64_t),				\
+}
+
 #define ATL_ETH_STAT(_name, _field)				\
 {								\
 	.stat_name = #_name,					\
@@ -607,6 +614,11 @@ static const struct atl_stat_desc rx_stat_descs[] = {
 	ATL_RX_STAT(rx_non_eop_descs, non_eop_descs),
 	ATL_RX_STAT(rx_mac_err, mac_err),
 	ATL_RX_STAT(rx_checksum_err, csum_err),
+};
+
+static const struct atl_stat_desc rx_fwd_stat_descs[] = {
+	ATL_RX_FWD_STAT(rx_fwd_packets, packets),
+	ATL_RX_FWD_STAT(rx_fwd_bytes, bytes),
 };
 
 static const struct atl_stat_desc eth_stat_descs[] = {
@@ -735,6 +747,9 @@ static int atl_get_sset_count(struct net_device *ndev, int sset)
 		return ARRAY_SIZE(tx_stat_descs) * (nic->nvecs + 1) +
 		       ARRAY_SIZE(rx_stat_descs) * (nic->nvecs + 1) +
 		       ARRAY_SIZE(eth_stat_descs)
+#if IS_ENABLED(CONFIG_ATLFWD_FWD)
+		       + ARRAY_SIZE(rx_fwd_stat_descs)
+#endif
 #if IS_ENABLED(CONFIG_ATLFWD_FWD_NETLINK)
 		       + ARRAY_SIZE(tx_stat_descs) *
 				 hweight_long(nic->fwd.ring_map[ATL_FWDIR_TX])
@@ -792,6 +807,10 @@ static void atl_get_strings(struct net_device *ndev, uint32_t sset,
 	case ETH_SS_STATS:
 		atl_copy_stats_string_set(&p, "");
 
+#if IS_ENABLED(CONFIG_ATLFWD_FWD)
+		atl_copy_stats_strings(&p, "", rx_fwd_stat_descs,
+				       ARRAY_SIZE(rx_fwd_stat_descs));
+#endif
 		atl_copy_stats_strings(&p, "", eth_stat_descs,
 				       ARRAY_SIZE(eth_stat_descs));
 
@@ -895,6 +914,9 @@ static void atl_get_ethtool_stats(struct net_device *ndev,
 #endif
 	atl_write_stats(&nic->stats.tx, tx_stat_descs, data, uint64_t);
 	atl_write_stats(&nic->stats.rx, rx_stat_descs, data, uint64_t);
+#if IS_ENABLED(CONFIG_ATLFWD_FWD)
+	atl_write_stats(&nic->stats.rx_fwd, rx_fwd_stat_descs, data, uint64_t);
+#endif
 
 	atl_write_stats(&nic->stats.eth, eth_stat_descs, data, uint64_t);
 
@@ -1037,6 +1059,7 @@ void atl_reset_stats(struct atl_nic *nic)
 		memset(&qvec->rx.stats, 0, sizeof(qvec->rx.stats));
 		memset(&qvec->tx.stats, 0, sizeof(qvec->tx.stats));
 	}
+	memset(&nic->stats.rx_fwd, 0, sizeof(nic->stats.rx_fwd));
 
 	spin_unlock(&nic->stats_lock);
 }

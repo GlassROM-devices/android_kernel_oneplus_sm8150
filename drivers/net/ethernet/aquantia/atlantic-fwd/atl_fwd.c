@@ -788,6 +788,11 @@ EXPORT_SYMBOL(atl_fwd_disable_event);
 
 int atl_fwd_receive_skb(struct net_device *ndev, struct sk_buff *skb)
 {
+	struct atl_nic *nic = netdev_priv(ndev);
+
+	nic->stats.rx_fwd.packets++;
+	nic->stats.rx_fwd.bytes += skb->len;
+
 	skb->protocol = eth_type_trans(skb, ndev);
 	return netif_rx(skb);
 }
@@ -795,8 +800,13 @@ EXPORT_SYMBOL(atl_fwd_receive_skb);
 
 int atl_fwd_napi_receive_skb(struct net_device *ndev, struct sk_buff *skb)
 {
-       skb->protocol = eth_type_trans(skb, ndev);
-       return netif_receive_skb(skb);
+	struct atl_nic *nic = netdev_priv(ndev);
+
+	nic->stats.rx_fwd.packets++;
+	nic->stats.rx_fwd.bytes += skb->len;
+
+	skb->protocol = eth_type_trans(skb, ndev);
+	return netif_receive_skb(skb);
 }
 EXPORT_SYMBOL(atl_fwd_napi_receive_skb);
 
