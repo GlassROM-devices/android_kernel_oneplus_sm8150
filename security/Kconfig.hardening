@@ -36,9 +36,19 @@ choice
 
 endchoice
 
+config GLASSROM_RELEASE_STACK_INIT_HARDENING
+	bool "Enable zero stack initialization"
+	depends on INIT_STACK_ALL
+	default y
+	help
+	  For a glassrom release build, do not use the bug finding behaviour
+	  of initializing everything on the stack with 0xAAAA...
+	  Rather use a 0000... pattern that is more suited for hardening than
+	  Finding bugs in a release build
+
 config INIT_ON_ALLOC_DEFAULT_ON
 	bool "Enable heap memory zeroing on allocation by default"
-	default yes
+	default y
 	help
 	  This has the effect of setting "init_on_alloc=1" on the kernel
 	  command line. This can be disabled with "init_on_alloc=0".
@@ -51,7 +61,7 @@ config INIT_ON_ALLOC_DEFAULT_ON
 
 config INIT_ON_FREE_DEFAULT_ON
 	bool "Enable heap memory zeroing on free by default"
-	default yes
+	default y
 	help
 	  This has the effect of setting "init_on_free=1" on the kernel
 	  command line. This can be disabled with "init_on_free=0".

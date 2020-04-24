@@ -813,7 +813,11 @@ endif
 
 # Initialize all stack variables with a pattern, if desired.
 ifdef CONFIG_INIT_STACK_ALL
+ifdef CONFIG_GLASSROM_RELEASE_STACK_INIT_HARDENING
+KBUILD_CFLAGS	+= -ftrivial-auto-var-init=zero -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+else
 KBUILD_CFLAGS	+= -ftrivial-auto-var-init=pattern
+endif
 endif
 
 KBUILD_CFLAGS   += $(call cc-option, -fno-var-tracking-assignments)
