@@ -175,6 +175,8 @@ unlock:
 }
 
 
+#define ATL2_FW_READ_DONE         BIT(0x10)
+#define ATL2_FW_READ_REQ          BIT(0x11)
 #define ATL2_BOOT_STARTED         BIT(0x18)
 #define ATL2_CRASH_INIT           BIT(0x1B)
 #define ATL2_BOOT_CODE_FAILED     BIT(0x1C)
@@ -184,12 +186,14 @@ unlock:
 				  ATL2_BOOT_CODE_FAILED | \
 				  ATL2_FW_INIT_FAILED)
 #define ATL2_FW_BOOT_COMPLETE_MASK (ATL2_FW_BOOT_FAILED_MASK | \
+				    ATL2_FW_READ_REQ | \
 				    ATL2_FW_INIT_COMP_SUCCESS)
 
 #define ATL2_FW_BOOT_REQ_REBOOT        BIT(0x0)
 #define ATL2_FW_BOOT_REQ_HOST_BOOT     BIT(0x8)
 #define ATL2_FW_BOOT_REQ_MAC_FAST_BOOT BIT(0xA)
 #define ATL2_FW_BOOT_REQ_PHY_FAST_BOOT BIT(0xB)
+#define ATL2_FW_BOOT_REQ_HOST_ITI      BIT(0xC)
 
 static bool atl2_mcp_boot_complete(struct atl_hw *hw)
 {
@@ -220,24 +224,21 @@ static int atl2_hw_reset(struct atl_hw *hw)
 		  ((rbl_status & ATL2_BOOT_STARTED) == 0) ||
 		  (rbl_status == 0xffffffff));
 	if (!(rbl_status & ATL2_BOOT_STARTED))
-		atl_dev_dbg("Boot code probably hanged, reboot anyway");
+		atl_dev_dbg("Boot code probably hung, reboot anyway");
 
 
 	atl_write(hw, ATL2_MCP_HOST_REQ_INT_CLR, 0x01);
 	rbl_request = ATL2_FW_BOOT_REQ_REBOOT;
+	if (hw->mcp.ops) {
+		rbl_request |= ATL2_FW_BOOT_REQ_MAC_FAST_BOOT;
+		rbl_request |= ATL2_FW_BOOT_REQ_HOST_ITI;
+	}
 #ifdef AQ_CFG_FAST_START
 	rbl_request |= ATL2_FW_BOOT_REQ_MAC_FAST_BOOT;
 #endif
 
-/*
-	atl_set_bits(hw, 0x404, 1);
-*/
 	atl_write(hw, ATL2_MIF_BOOT_REG_ADR, rbl_request);
-/*
-	if (hw->mcp.ops)
-		hw->mcp.ops->restore_cfg(hw);
-	atl_clear_bits(hw, 0x404, 1);
-*/
+
 	/* Wait for RBL boot */
 	busy_wait(200, mdelay(1), rbl_status,
 		  atl_read(hw, ATL2_MIF_BOOT_REG_ADR),
@@ -245,16 +246,17 @@ static int atl2_hw_reset(struct atl_hw *hw)
 		  (rbl_status == 0xffffffff));
 	if (!(rbl_status & ATL2_BOOT_STARTED)) {
 		err = -ETIME;
-		atl_dev_err("Boot code hanged");
+		atl_dev_err("Boot code hung, rbl_status %#x", rbl_status);
 		goto unlock;
 	}
 
-	busy_wait(100, mdelay(1), rbl_complete,
-		  atl2_mcp_boot_complete(hw),
+next_turn:
+	busy_wait(1000, mdelay(1), rbl_complete, atl2_mcp_boot_complete(hw),
 		  !rbl_complete);
 	if (!rbl_complete) {
 		err = -ETIME;
-		atl_dev_err("FW Restart timed out");
+		atl_dev_err("FW Restart timed out, status %#x",
+			    atl_read(hw, ATL2_MIF_BOOT_REG_ADR));
 		goto unlock;
 	}
 
@@ -267,6 +269,24 @@ static int atl2_hw_reset(struct atl_hw *hw)
 	}
 
 	if (atl_read(hw, ATL2_MCP_HOST_REQ_INT) & 0x1) {
+		uint32_t req_adr = atl_read(hw, ATL2_MIF_BOOT_READ_REQ_ADR);
+		uint32_t req_len = atl_read(hw, ATL2_MIF_BOOT_READ_REQ_LEN);
+
+		atl_write(hw, ATL2_MCP_HOST_REQ_INT_CLR, 0x01);
+
+		if (((req_adr & BIT(31)) != 0) ||
+		    (req_len >= ATL2_FW_HOSTLOAD_REQ_LEN_MAX)) {
+			err = -EIO;
+			atl_dev_err("FW read request invalid");
+			goto unlock;
+		}
+		if (req_adr >= ATL2_ITI_ADDRESS_START)
+			if (hw->mcp.ops) {
+				err = hw->mcp.ops->restore_cfg(hw);
+				if (!err)
+					goto next_turn;
+			}
+
 		err = -EIO;
 		atl_dev_err("No FW detected. Dynamic FW load not implemented");
 		goto unlock;
@@ -531,7 +551,7 @@ int atl_alloc_link_intr(struct atl_nic *nic)
 
 	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
 		ret = request_irq(pci_irq_vector(pdev, 0), atl_link_irq, 0,
-		nic->ndev->name, nic);
+				  nic->ndev->name, nic);
 		if (ret)
 			atl_nic_err("request MSI link vector failed: %d\n",
 				-ret);

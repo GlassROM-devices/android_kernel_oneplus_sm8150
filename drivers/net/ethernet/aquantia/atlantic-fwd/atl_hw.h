@@ -82,6 +82,8 @@ struct atl_nic;
 #define ATL2_RPF_TAG_BASE_UNTAG (1 << ATL2_RPF_TAG_UNTAG_OFFSET)
 #define ATL2_RPF_TAG_BASE_VLAN  (1 << ATL2_RPF_TAG_VLAN_OFFSET)
 
+#define ATL2_FW_HOSTLOAD_REQ_LEN_MAX 0x1000
+
 #define busy_wait(tries, wait, lvalue, fetch, cond)	\
 ({							\
 	uint32_t _dummy = 0;				\
@@ -143,8 +145,6 @@ struct atl_hw {
 #define ATL_RSS_TBL_SIZE (1 << 6)
 	uint8_t rss_tbl[ATL_RSS_TBL_SIZE];
 	struct atl_thermal thermal;
-#define ATL_FW_CFG_DUMP_SIZE 2
-	uint32_t fw_cfg_dump[ATL_FW_CFG_DUMP_SIZE];
 #if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
 	struct atl_macsec_cfg macsec_cfg;
 #endif

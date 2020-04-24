@@ -35,6 +35,7 @@ struct atl_mcp {
 	unsigned long next_wdog;
 	bool wdog_disabled;
 	uint16_t phy_hbeat;
+	uint32_t *fw_cfg_dump;
 };
 
 struct atl_link_type {
