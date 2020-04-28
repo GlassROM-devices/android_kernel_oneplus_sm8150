@@ -2157,7 +2157,7 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 
 	if (!(cmd & ATL_RXF_EN)) {
 		atl2_act_rslvr_table_set(hw,
-			ATL2_RPF_VLAN_USER_INDEX + idx,
+			hw->art_base_index + ATL2_RPF_VLAN_USER_INDEX + idx,
 			0,
 			0,
 			ATL2_ACTION_DISABLE);
@@ -2177,7 +2177,7 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 
 	atl2_rpf_vlan_flr_tag_set(hw, idx + 2, idx);
 	atl2_act_rslvr_table_set(hw,
-		ATL2_RPF_VLAN_USER_INDEX + idx,
+		hw->art_base_index + ATL2_RPF_VLAN_USER_INDEX + idx,
 		(idx + 2) << ATL2_RPF_TAG_VLAN_OFFSET,
 		ATL2_RPF_TAG_VLAN_MASK,
 		action);
@@ -2242,7 +2242,7 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 		ntuple->l4_idx[idx] = -1;
 		ntuple->l3_idx[idx] = -1;
 		atl2_act_rslvr_table_set(hw,
-			ATL2_RPF_L3L4_USER_INDEX + idx,
+			hw->art_base_index + ATL2_RPF_L3L4_USER_INDEX + idx,
 			0,
 			0,
 			ATL2_ACTION_DISABLE);
@@ -2306,10 +2306,10 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 	}
 
 	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_L3L4_USER_INDEX + idx,
-				 tag,
-				 mask,
-				 action);
+			hw->art_base_index + ATL2_RPF_L3L4_USER_INDEX + idx,
+			tag,
+			mask,
+			action);
 }
 
 void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
@@ -2390,7 +2390,7 @@ static void atl_rxf_update_flex(struct atl_nic *nic, int idx)
 			action = ATL2_ACTION_ASSIGN_QUEUE(queue);
 		}
 		atl2_act_rslvr_table_set(&nic->hw,
-			ATL2_RPF_FLEX_USER_INDEX + idx,
+			hw->art_base_index + ATL2_RPF_FLEX_USER_INDEX + idx,
 			(idx + 1) << ATL2_RPF_TAG_FLEX_OFFSET,
 			ATL2_RPF_TAG_FLEX_MASK,
 			action);
