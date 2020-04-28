@@ -289,6 +289,30 @@ static int __atl2_fw_wait_init(struct atl_hw *hw)
 	mtu = ATL_MAX_MTU + ETH_FCS_LEN + ETH_HLEN;
 	atl2_shared_buffer_write(hw, mtu, mtu);
 
+	atl2_shared_buffer_get(hw, request_policy, request_policy);
+	request_policy.bcast.accept = 1;
+	request_policy.bcast.queue_or_tc = 1;
+	request_policy.bcast.rx_queue_tc_index = 0;
+	request_policy.mcast.accept = 1;
+	request_policy.mcast.queue_or_tc = 1;
+	request_policy.mcast.rx_queue_tc_index = 0;
+	request_policy.promisc.queue_or_tc = 1;
+	request_policy.promisc.rx_queue_tc_index = 0;
+	atl2_shared_buffer_write(hw, request_policy, request_policy);
+
+	return atl2_shared_buffer_finish_ack(hw);
+}
+
+int atl2_fw_set_filter_policy(struct atl_hw *hw, bool promisc, bool allmulti)
+{
+	struct request_policy_s request_policy;
+
+	atl2_shared_buffer_get(hw, request_policy, request_policy);
+
+	request_policy.promisc.all = promisc;
+	request_policy.mcast.promisc = allmulti;
+
+	atl2_shared_buffer_write(hw, request_policy, request_policy);
 	return atl2_shared_buffer_finish_ack(hw);
 }
 

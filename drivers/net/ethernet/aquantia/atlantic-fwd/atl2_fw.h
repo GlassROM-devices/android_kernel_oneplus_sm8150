@@ -684,6 +684,7 @@ enum ATL2_WAKE_REASON {
 
 int atl2_fw_init(struct atl_hw *hw);
 int atl2_get_fw_version(struct atl_hw *hw, u32 *fw_version);
+int atl2_fw_set_filter_policy(struct atl_hw *hw, bool promisc, bool allmulti);
 
 
 #endif

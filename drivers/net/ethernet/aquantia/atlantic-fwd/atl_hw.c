@@ -864,8 +864,8 @@ void atl_set_rx_mode(struct net_device *ndev)
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_hw *hw = &nic->hw;
 	bool is_multicast_enabled = !!(ndev->flags & IFF_MULTICAST);
-	int all_multi_needed = !!(ndev->flags & IFF_ALLMULTI);
-	int promisc_needed = !!(ndev->flags & IFF_PROMISC);
+	bool all_multi_needed = !!(ndev->flags & IFF_ALLMULTI);
+	bool promisc_needed = !!(ndev->flags & IFF_PROMISC);
 	int uc_count = netdev_uc_count(ndev);
 	int mc_count = 0;
 	int i = 1; /* UC filter 0 reserved for MAC address */
@@ -878,10 +878,9 @@ void atl_set_rx_mode(struct net_device *ndev)
 		mc_count = netdev_mc_count(ndev);
 
 	if (uc_count > ATL_UC_FLT_NUM - 1)
-		promisc_needed |= 1;
+		promisc_needed = true;
 	else if (uc_count + mc_count > ATL_UC_FLT_NUM - 1)
-		all_multi_needed |= 1;
-
+		all_multi_needed = true;
 
 	/* Enable promisc VLAN mode if IFF_PROMISC explicitly
 	 * requested or too many VIDs registered
@@ -891,6 +890,10 @@ void atl_set_rx_mode(struct net_device *ndev)
 		!nic->rxf_vlan.vlans_active);
 
 	atl_set_promisc(hw, promisc_needed);
+	if (hw->new_rpf)
+		atl2_fw_set_filter_policy(hw, promisc_needed,
+				  is_multicast_enabled && all_multi_needed);
+
 	if (promisc_needed)
 		return;
 
