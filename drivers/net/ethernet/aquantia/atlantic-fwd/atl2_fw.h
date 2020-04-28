@@ -516,7 +516,7 @@ struct request_policy_s {
 
 	struct {
 		uint8_t accept:1;
-		uint8_t mcast:1;
+		uint8_t promisc:1;
 		uint8_t rx_queue_tc_index:5;
 		uint8_t queue_or_tc:1;
 	} mcast;

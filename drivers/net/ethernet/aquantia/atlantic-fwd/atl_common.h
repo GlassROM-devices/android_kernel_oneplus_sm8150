@@ -41,6 +41,7 @@ enum {
 	ATL_RXF_VLAN_MAX = ATL_VLAN_FLT_NUM,
 	ATL_RXF_ETYPE_BASE = ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX,
 	ATL_RXF_ETYPE_MAX = ATL_ETYPE_FLT_NUM,
+	ATL2_RPF_ETYPE_TAGS = 7,
 	/* + 1 is for backward compatibility */
 	ATL_RXF_NTUPLE_BASE = ATL_RXF_ETYPE_BASE + ATL_RXF_ETYPE_MAX + 1,
 	ATL_RXF_NTUPLE_MAX = ATL_NTUPLE_FLT_NUM,
@@ -140,6 +141,12 @@ struct atl_rxf_ntuple {
 	s8 l4_idx[ATL_RXF_NTUPLE_MAX];
 	uint32_t cmd[ATL_RXF_NTUPLE_MAX];
 	int count;
+	int l3_v4_base_index;
+	int l3_v4_available;
+	int l3_v6_base_index;
+	int l3_v6_available;
+	int l4_base_index;
+	int l4_available;
 };
 
 enum atl_vlan_cmd {
@@ -159,6 +166,8 @@ struct atl_rxf_vlan {
 	unsigned long map[ATL_VID_MAP_LEN];
 	int vlans_active;
 	int promisc_count;
+	int base_index;
+	int available;
 };
 
 enum atl_etype_cmd {
@@ -170,9 +179,24 @@ enum atl_etype_cmd {
 	ATL_ETYPE_VAL_MASK = BIT(16) - 1,
 };
 
+struct atl2_tag_policy {
+	u16 action;
+	u16 usage;
+};
+
 struct atl_rxf_etype {
 	uint32_t cmd[ATL_RXF_ETYPE_MAX];
 	int count;
+	struct atl2_tag_policy tags_policy[ATL_RXF_ETYPE_MAX];
+	int tag[ATL_RXF_ETYPE_MAX];
+	int base_index;
+	int available;
+	int tag_top;
+};
+
+struct atl_rxf_mac {
+	int base_index;
+	int available;
 };
 
 enum atl_flex_cmd {
@@ -186,6 +210,8 @@ enum atl_flex_cmd {
 struct atl_rxf_flex {
 	uint32_t cmd[ATL_RXF_FLEX_MAX];
 	int count;
+	int base_index;
+	int available;
 };
 
 struct atl_queue_vec;
@@ -258,6 +284,7 @@ struct atl_nic {
 	struct atl_rxf_ntuple rxf_ntuple;
 	struct atl_rxf_vlan rxf_vlan;
 	struct atl_rxf_etype rxf_etype;
+	struct atl_rxf_mac rxf_mac;
 	struct atl_rxf_flex rxf_flex;
 
 	/* PTP support */

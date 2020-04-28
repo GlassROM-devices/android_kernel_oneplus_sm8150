@@ -150,6 +150,8 @@ struct atl_hw {
 	struct atl_macsec_cfg macsec_cfg;
 #endif
 	s64 ptp_clk_offset;
+	int art_base_index;
+	int art_available;
 };
 
 struct atl_hw_ring {

@@ -153,10 +153,56 @@ static inline int atl2_shared_buffer_finish_ack(struct atl_hw *hw)
 	return err;
 }
 
+static int atl2_fw_get_filter_caps(struct atl_hw *hw)
+{
+	struct atl_nic *nic = container_of(hw, struct atl_nic, hw);
+	struct filter_caps_s filter_caps;
+	u32 tag_top;
+	int err;
+
+	err = atl2_shared_buffer_read_safe(hw, filter_caps, &filter_caps);
+	if (err)
+		return err;
+
+	hw->art_base_index = filter_caps.rslv_tbl_base_index * 8;
+	hw->art_available = filter_caps.rslv_tbl_count * 8;
+	if (hw->art_available == 0)
+		hw->art_available = 128;
+	nic->rxf_flex.available = 1;
+	nic->rxf_flex.base_index = filter_caps.flexible_filter_mask >> 1;	
+	nic->rxf_mac.base_index = filter_caps.l2_filters_base_index;
+	nic->rxf_mac.available = filter_caps.l2_filter_count;
+	nic->rxf_etype.base_index = filter_caps.ethertype_filter_base_index;
+	nic->rxf_etype.available = filter_caps.ethertype_filter_count;
+	nic->rxf_etype.tag_top =
+		(nic->rxf_etype.available >= ATL2_RPF_ETYPE_TAGS) ?
+		 (ATL2_RPF_ETYPE_TAGS) : (ATL2_RPF_ETYPE_TAGS >> 1);
+	nic->rxf_vlan.base_index = filter_caps.vlan_filter_base_index;
+	/* 0 - no tag, 1 - reserved for vlan-filter-offload filters */
+	tag_top = (filter_caps.vlan_filter_count == ATL_VLAN_FLT_NUM) ?
+		  (ATL_VLAN_FLT_NUM - 2) :
+		  (ATL_VLAN_FLT_NUM / 2 - 2);
+	nic->rxf_vlan.available = min_t(u32, filter_caps.vlan_filter_count - 2,
+					tag_top);
+	nic->rxf_ntuple.l3_v4_base_index = filter_caps.l3_ip4_filter_base_index;
+	nic->rxf_ntuple.l3_v4_available = min_t(u32,
+						filter_caps.l3_ip4_filter_count,
+						ATL_NTUPLE_FLT_NUM - 1);
+	nic->rxf_ntuple.l3_v6_base_index = filter_caps.l3_ip6_filter_base_index;
+	nic->rxf_ntuple.l3_v6_available = filter_caps.l3_ip6_filter_count;
+	nic->rxf_ntuple.l4_base_index = filter_caps.l4_filter_base_index;
+	nic->rxf_ntuple.l4_available = min_t(u32, filter_caps.l4_filter_count,
+						ATL_NTUPLE_FLT_NUM - 1);
+
+	return 0;
+}
+
 static int __atl2_fw_wait_init(struct atl_hw *hw)
 {
+	struct request_policy_s request_policy;
 	struct link_control_s link_control;
 	uint32_t mtu;
+	int err;
 
 	BUILD_BUG_ON_MSG(sizeof(struct link_options_s) != 0x4,
 			 "linkOptions invalid size");
@@ -230,6 +276,10 @@ static int __atl2_fw_wait_init(struct atl_hw *hw)
 			 "management_status invalid offset");
 	BUILD_BUG_ON_MSG(offsetof(struct fw_interface_out, trace) != 0x800,
 			 "trace invalid offset");
+
+	err = atl2_fw_get_filter_caps(hw);
+	if (err)
+		return err;
 
 	atl2_shared_buffer_get(hw, link_control, link_control);
 	link_control.mode = ATL2_HOST_MODE_ACTIVE;
