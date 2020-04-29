@@ -1564,13 +1564,13 @@ static uint32_t atl_rxf_find_vid(struct atl_nic *nic, uint16_t vid,
 	bool try_repl)
 {
 	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
-	int idx, free = ATL_RXF_VLAN_MAX, repl = ATL_RXF_VLAN_MAX;
+	int idx, free = vlan->available, repl = vlan->available;
 
-	for (idx = 0; idx < ATL_RXF_VLAN_MAX; idx++) {
+	for (idx = 0; idx < vlan->available; idx++) {
 		uint32_t cmd = vlan->cmd[idx];
 
 		if (!(cmd & ATL_RXF_EN)) {
-			if (free == ATL_RXF_VLAN_MAX) {
+			if (free == vlan->available) {
 				free = idx;
 				if (vid == 0xffff)
 					break;
@@ -1581,7 +1581,7 @@ static uint32_t atl_rxf_find_vid(struct atl_nic *nic, uint16_t vid,
 		if ((cmd & ATL_VLAN_VID_MASK) == vid)
 			return idx | ATL_VIDX_FOUND;
 
-		if (try_repl && repl == ATL_RXF_VLAN_MAX &&
+		if (try_repl && repl == vlan->available &&
 			(cmd & ATL_RXF_ACT_TOHOST) &&
 			!(cmd & ATL_VLAN_RXQ)) {
 
@@ -1592,10 +1592,10 @@ static uint32_t atl_rxf_find_vid(struct atl_nic *nic, uint16_t vid,
 		}
 	}
 
-	if (free != ATL_RXF_VLAN_MAX)
+	if (free != vlan->available)
 		return free | ATL_VIDX_FREE;
 
-	if (try_repl && repl != ATL_RXF_VLAN_MAX)
+	if (try_repl && repl != vlan->available)
 		return repl | ATL_VIDX_REPL;
 
 	return ATL_VIDX_NONE;
@@ -1612,7 +1612,7 @@ static int atl_rxf_dup_vid(struct atl_rxf_vlan *vlan, int idx, uint16_t vid)
 {
 	int i;
 
-	for (i = 0; i < ATL_RXF_VLAN_MAX; i++) {
+	for (i = 0; i < vlan->available; i++) {
 		if (i == idx)
 			continue;
 
@@ -1637,6 +1637,9 @@ static int atl_rxf_set_vlan(const struct atl_rxf_flt_desc *desc,
 		int dup;
 
 		idx = atl_rxf_idx(desc, fsp);
+		if (idx >= vlan->available)
+			return -ENOSPC;
+
 		dup = atl_rxf_dup_vid(vlan, idx, vid);
 		if (dup >= 0) {
 			atl_nic_err("Can't add duplicate VLAN filter @%d (existing @%d)\n",
@@ -2200,11 +2203,12 @@ static int atl_rxf_set_flex(const struct atl_rxf_flt_desc *desc,
 
 static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 {
-	uint32_t cmd = nic->rxf_vlan.cmd[idx];
+	struct atl_rxf_vlan *vlan = &nic->rxf_vlan;
+	uint32_t cmd = vlan->cmd[idx];
 	struct atl_hw *hw = &nic->hw;
 	u16 action;
 
-	atl_write(&nic->hw, ATL_RX_VLAN_FLT(idx), cmd);
+	atl_write(&nic->hw, ATL_RX_VLAN_FLT(vlan->base_index + idx), cmd);
 
 	if (!nic->hw.new_rpf)
 		return;
@@ -2221,7 +2225,7 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 	if (!(cmd & ATL_RXF_ACT_TOHOST)) {
 		action = ATL2_ACTION_DROP;
 	} else if (!(cmd & ATL_VLAN_RXQ)) {
-		atl2_rpf_vlan_flr_tag_set(hw, 1, idx);
+		atl2_rpf_vlan_flr_tag_set(hw, 1, vlan->base_index + idx);
 		return;
 	} else {
 		int queue = (cmd >> ATL_VLAN_RXQ_SHIFT) & ATL_RXF_RXQ_MSK;
@@ -2229,13 +2233,12 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 		action = ATL2_ACTION_ASSIGN_QUEUE(queue);
 	}
 
-	atl2_rpf_vlan_flr_tag_set(hw, idx + 2, idx);
+	atl2_rpf_vlan_flr_tag_set(hw, idx + 2, vlan->base_index + idx);
 	atl2_act_rslvr_table_set(hw,
 		hw->art_base_index + ATL2_RPF_VLAN_USER_INDEX + idx,
 		(idx + 2) << ATL2_RPF_TAG_VLAN_OFFSET,
 		ATL2_RPF_TAG_VLAN_MASK,
 		action);
-
 }
 
 static void atl_rxf_update_etype(struct atl_nic *nic, int idx)
@@ -2611,7 +2614,7 @@ static bool atl_vlan_pull_from_promisc(struct atl_nic *nic, uint32_t idx)
 		return false;
 
 	memcpy(map, vlan->map, ATL_VID_MAP_LEN * sizeof(*map));
-	for (i = 0; i < ATL_RXF_VLAN_MAX; i++) {
+	for (i = 0; i < vlan->available; i++) {
 		uint32_t cmd = vlan->cmd[i];
 
 		if (cmd & ATL_RXF_EN)
