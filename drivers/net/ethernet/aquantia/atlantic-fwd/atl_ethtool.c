@@ -1693,6 +1693,37 @@ static int atl_rxf_set_vlan(const struct atl_rxf_flt_desc *desc,
 	return !present;
 }
 
+/** Find tag with the same action or new free tag
+ *  top - top inclusive tag value
+ *  action - action for ActionResolverTable
+ */
+static inline int atl2_filter_tag_get(struct atl2_tag_policy *tags,
+				      int top, u16 action)
+{
+	int i;
+
+	for (i = 1; i <= top; i++)
+		if ((tags[i].usage > 0) && (tags[i].action == action)) {
+			tags[i].usage++;
+			return i;
+		}
+
+	for (i = 1; i <= top; i++)
+		if (tags[i].usage == 0) {
+			tags[i].usage = 1;
+			tags[i].action = action;
+			return i;
+		}
+
+	return -1;
+}
+
+static inline void atl2_filter_tag_put(struct atl2_tag_policy *tags, int tag)
+{
+	if (tags[tag].usage > 0)
+		tags[tag].usage--;
+}
+
 static int atl_rxf_set_etype(const struct atl_rxf_flt_desc *desc,
 	struct atl_nic *nic, struct ethtool_rx_flow_spec *fsp)
 {
@@ -1717,11 +1748,34 @@ static int atl_rxf_set_etype(const struct atl_rxf_flt_desc *desc,
 	if (fsp->m_u.ether_spec.h_proto != 0xffff)
 		return -EINVAL;
 
+	if (idx >= etype->available)
+		return -ENOSPC;
+
 	cmd |= ntohs(fsp->h_u.ether_spec.h_proto);
 
 	ret = atl_rxf_set_ring(desc, nic, fsp, &cmd);
 	if (ret)
 		return ret;
+
+	if (nic->hw.new_rpf) {
+		uint16_t action;
+
+		if (!(cmd & ATL_RXF_ACT_TOHOST)) {
+			action = ATL2_ACTION_DROP;
+		} else if (!(cmd & ATL_ETYPE_RXQ)) {
+			action = ATL2_ACTION_ASSIGN_TC(0);
+		} else {
+			int queue = (cmd >> ATL_ETYPE_RXQ_SHIFT) & ATL_RXF_RXQ_MSK;
+
+			action = ATL2_ACTION_ASSIGN_QUEUE(queue);
+		}
+
+		etype->tag[idx] = atl2_filter_tag_get(etype->tags_policy,
+						      etype->tag_top,
+						      action);
+		if (etype->tag[idx] < 0)
+			return -ENOSPC;
+	}
 
 	etype->cmd[idx] = cmd;
 
@@ -2186,38 +2240,35 @@ static void atl_rxf_update_vlan(struct atl_nic *nic, int idx)
 
 static void atl_rxf_update_etype(struct atl_nic *nic, int idx)
 {
-	uint32_t cmd = nic->rxf_etype.cmd[idx];
+	struct atl_rxf_etype *etype = &nic->rxf_etype;
+	uint32_t cmd = etype->cmd[idx];
 	struct atl_hw *hw = &nic->hw;
-	u16 action;
+	u16 action, index;
 
-	atl_write(&nic->hw, ATL_RX_ETYPE_FLT(idx), cmd);
+	atl_write(&nic->hw, ATL_RX_ETYPE_FLT(etype->base_index + idx), cmd);
 
 	if (!nic->hw.new_rpf)
 		return;
 
 	if (!(cmd & ATL_RXF_EN)) {
+		atl2_filter_tag_put(etype->tags_policy,
+				    etype->tag[idx]);
+		index = hw->art_base_index +
+			ATL2_RPF_ET_PCP_USER_INDEX + idx;
 		atl2_act_rslvr_table_set(hw,
-			ATL2_RPF_ET_PCP_USER_INDEX + idx,
+			index,
 			0,
 			0,
 			ATL2_ACTION_DISABLE);
 		return;
 	}
 
-	if (!(cmd & ATL_RXF_ACT_TOHOST)) {
-		action = ATL2_ACTION_DROP;
-	} else if (!(cmd & ATL_ETYPE_RXQ)) {
-		action = ATL2_ACTION_ASSIGN_TC(0);
-	} else {
-		int queue = (cmd >> ATL_ETYPE_RXQ_SHIFT) & ATL_RXF_RXQ_MSK;
-
-		action = ATL2_ACTION_ASSIGN_QUEUE(queue);
-	}
-
-	atl2_rpf_etht_flr_tag_set(hw, idx + 1, idx);
+	atl2_rpf_etht_flr_tag_set(hw, etype->tag[idx], etype->base_index + idx);
+	action = etype->tags_policy[etype->tag[idx]].action;
+	index = hw->art_base_index + ATL2_RPF_ET_PCP_USER_INDEX + idx;
 	atl2_act_rslvr_table_set(hw,
-		ATL2_RPF_ET_PCP_USER_INDEX + idx,
-		(idx + 1) << ATL2_RPF_TAG_ET_OFFSET,
+		index,
+		etype->tag[idx] << ATL2_RPF_TAG_ET_OFFSET,
 		ATL2_RPF_TAG_ET_MASK,
 		action);
 }
@@ -2390,7 +2441,7 @@ static void atl_rxf_update_flex(struct atl_nic *nic, int idx)
 			action = ATL2_ACTION_ASSIGN_QUEUE(queue);
 		}
 		atl2_act_rslvr_table_set(&nic->hw,
-			hw->art_base_index + ATL2_RPF_FLEX_USER_INDEX + idx,
+			nic->hw.art_base_index + ATL2_RPF_FLEX_USER_INDEX + idx,
 			(idx + 1) << ATL2_RPF_TAG_FLEX_OFFSET,
 			ATL2_RPF_TAG_FLEX_MASK,
 			action);
