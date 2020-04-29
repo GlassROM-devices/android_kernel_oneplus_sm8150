@@ -765,9 +765,9 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* RPF */
 	/* Default RPF2 parser options */
 	atl_write(hw, ATL_RX_FLT_CTRL2, 0x0);
-	atl_set_uc_flt(hw, 0, hw->mac_addr);
+	atl_set_uc_flt(hw, nic->rxf_mac.base_index, hw->mac_addr);
 	/* BC action host */
-	atl_write_bits(hw, ATL_RX_FLT_CTRL1, 12, 3, 1);
+	atl_write_bits(hw, ATL_RX_FLT_CTRL1, 12, 1, 1);
 	/* Enable BC */
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 0, 1);
 	/* BC thresh */
@@ -866,9 +866,9 @@ void atl_set_rx_mode(struct net_device *ndev)
 	bool is_multicast_enabled = !!(ndev->flags & IFF_MULTICAST);
 	bool all_multi_needed = !!(ndev->flags & IFF_ALLMULTI);
 	bool promisc_needed = !!(ndev->flags & IFF_PROMISC);
+	int i = nic->rxf_mac.base_index + 1; /* 1 reserved for MAC address */
 	int uc_count = netdev_uc_count(ndev);
 	int mc_count = 0;
-	int i = 1; /* UC filter 0 reserved for MAC address */
 	struct netdev_hw_addr *hwaddr;
 
 	if (!pm_runtime_active(&nic->hw.pdev->dev))
@@ -877,9 +877,9 @@ void atl_set_rx_mode(struct net_device *ndev)
 	if (is_multicast_enabled)
 		mc_count = netdev_mc_count(ndev);
 
-	if (uc_count > ATL_UC_FLT_NUM - 1)
+	if (uc_count > nic->rxf_mac.available - 1)
 		promisc_needed = true;
-	else if (uc_count + mc_count > ATL_UC_FLT_NUM - 1)
+	else if (uc_count + mc_count > nic->rxf_mac.available - 1)
 		all_multi_needed = true;
 
 	/* Enable promisc VLAN mode if IFF_PROMISC explicitly
@@ -1469,11 +1469,13 @@ int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
  */
 static void atl2_hw_init_new_rx_filters(struct atl_hw *hw)
 {
+	struct atl_nic *nic = container_of(hw, struct atl_nic, hw);
 	uint32_t art_last_sec, art_first_sec, art_mask;
 	int index;
 
-	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(0), 22, 6, ATL2_RPF_TAG_BASE_BC);
-	atl_write_bits(hw, ATL2_RX_FLT_L2_BC_TAG, 0, 6, ATL2_RPF_TAG_BASE_UC);
+	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(nic->rxf_mac.base_index),
+		       22, 6, ATL2_RPF_TAG_BASE_UC);
+	atl_write_bits(hw, ATL2_RX_FLT_L2_BC_TAG, 0, 6, ATL2_RPF_TAG_BASE_BC);
 	atl_set_bits(hw, ATL2_RPF_L3_FLT(0), BIT(0x17));
 	
 	art_last_sec = hw->art_base_index / 8 + hw->art_available / 8;
