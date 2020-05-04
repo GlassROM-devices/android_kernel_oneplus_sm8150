@@ -888,7 +888,7 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 				loff_t off, size_t count)
 {
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	return 1;
+	return -EINVAL;
 #else
 	struct pci_dev *dev = to_pci_dev(kobj_to_dev(kobj));
 	unsigned int size = count;
@@ -1186,7 +1186,7 @@ static int pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 			     struct vm_area_struct *vma, int write_combine)
 {
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	return 1;
+	return -EINVAL;
 #else
 	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
 	int bar = (unsigned long)attr->private;
@@ -1275,7 +1275,7 @@ static ssize_t pci_write_resource_io(struct file *filp, struct kobject *kobj,
 				     loff_t off, size_t count)
 {
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	return 1;
+	return -EINVAL;
 #else
 	return pci_resource_io(filp, kobj, attr, buf, off, count, true);
 #endif

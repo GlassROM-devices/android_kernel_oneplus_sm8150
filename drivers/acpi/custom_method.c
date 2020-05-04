@@ -29,7 +29,7 @@ static ssize_t cm_write(struct file *file, const char __user * user_buf,
 	struct acpi_table_header table;
 	acpi_status status;
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	return 1;
+	return -EINVAL;
 #else
 
 	if (!(*ppos)) {

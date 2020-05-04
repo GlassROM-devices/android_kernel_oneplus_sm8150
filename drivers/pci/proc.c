@@ -112,7 +112,7 @@ static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 				  size_t nbytes, loff_t *ppos)
 {
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	return 1;
+	return -EINVAL;
 #else
 	struct inode *ino = file_inode(file);
 	struct pci_dev *dev = PDE_DATA(ino);
@@ -195,7 +195,7 @@ static long proc_bus_pci_ioctl(struct file *file, unsigned int cmd,
 			       unsigned long arg)
 {
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	return 1;
+	return -EINVAL;
 #else
 	struct pci_dev *dev = PDE_DATA(file_inode(file));
 #ifdef HAVE_PCI_MMAP
@@ -242,7 +242,7 @@ static long proc_bus_pci_ioctl(struct file *file, unsigned int cmd,
 static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
 {
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	return 1;
+	return -EINVAL;
 #else
 	struct pci_dev *dev = PDE_DATA(file_inode(file));
 	struct pci_filp_private *fpriv = file->private_data;

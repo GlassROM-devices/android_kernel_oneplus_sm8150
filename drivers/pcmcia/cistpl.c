@@ -1579,7 +1579,7 @@ static ssize_t pccard_store_cis(struct file *filp, struct kobject *kobj,
 	int error;
 
 #ifdef CONFIG_GLASSROM_LOCKDOWN
-	error = 1;
+	error = -EINVAL;
 	return error;
 #else
 
