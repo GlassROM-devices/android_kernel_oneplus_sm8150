@@ -28,7 +28,11 @@
 #define YAMA_SCOPE_CAPABILITY	2
 #define YAMA_SCOPE_NO_ATTACH	3
 
+#ifdef CONFIG_GLASSROM_LOCKDOWN
 static int ptrace_scope = YAMA_SCOPE_NO_ATTACH;
+#else
+static int ptrace_scope = YAMA_SCOPE_RELATIONAL;
+#endif
 
 /* describe a ptrace relationship for potential exception */
 struct ptrace_relation {
