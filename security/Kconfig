@@ -13,6 +13,8 @@ endif
 config GLASSROM_LOCKDOWN
 	bool "Lockdown kernel"
 	default n
+	select MODULE_SIG if MODULES
+	select MODULE_SIG_FORCE if MODULES
 	help
 	  This option enables GlassROM's minimal backport of kernel lockdown
 	  and is equivalent to lockdown_confidentaility
