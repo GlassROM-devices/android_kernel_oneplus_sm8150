@@ -1575,8 +1575,13 @@ static ssize_t pccard_store_cis(struct file *filp, struct kobject *kobj,
 				struct bin_attribute *bin_attr,
 				char *buf, loff_t off, size_t count)
 {
-	struct pcmcia_socket *s;
+	struct __maybe_unused pcmcia_socket *s;
 	int error;
+
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	error = 1;
+	return error;
+#else
 
 	s = to_socket(container_of(kobj, struct device, kobj));
 
@@ -1596,6 +1601,7 @@ static ssize_t pccard_store_cis(struct file *filp, struct kobject *kobj,
 	pcmcia_parse_uevents(s, PCMCIA_UEVENT_REQUERY);
 
 	return count;
+#endif
 }
 
 
