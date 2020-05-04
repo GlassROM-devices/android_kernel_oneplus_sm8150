@@ -71,7 +71,11 @@ static const struct platform_hibernation_ops *hibernation_ops;
 
 bool hibernation_available(void)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return false;
+#else
 	return (nohibernate == 0);
+#endif
 }
 
 /**

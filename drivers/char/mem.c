@@ -801,7 +801,11 @@ static loff_t memory_lseek(struct file *file, loff_t offset, int orig)
 
 static int open_port(struct inode *inode, struct file *filp)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return -EPERM;
+#else
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
+#endif
 }
 
 #define zero_lseek	null_lseek

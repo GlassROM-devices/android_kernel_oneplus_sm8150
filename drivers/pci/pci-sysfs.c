@@ -887,6 +887,9 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 				struct bin_attribute *bin_attr, char *buf,
 				loff_t off, size_t count)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 	struct pci_dev *dev = to_pci_dev(kobj_to_dev(kobj));
 	unsigned int size = count;
 	loff_t init_off = off;
@@ -942,6 +945,7 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 	pci_config_pm_runtime_put(dev);
 
 	return count;
+#endif
 }
 
 static ssize_t read_vpd_attr(struct file *filp, struct kobject *kobj,
@@ -1181,6 +1185,9 @@ int pci_mmap_fits(struct pci_dev *pdev, int resno, struct vm_area_struct *vma,
 static int pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 			     struct vm_area_struct *vma, int write_combine)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
 	int bar = (unsigned long)attr->private;
 	enum pci_mmap_state mmap_type;
@@ -1200,6 +1207,7 @@ static int pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 	mmap_type = res->flags & IORESOURCE_MEM ? pci_mmap_mem : pci_mmap_io;
 
 	return pci_mmap_resource_range(pdev, bar, vma, mmap_type, write_combine);
+#endif
 }
 
 static int pci_mmap_resource_uc(struct file *filp, struct kobject *kobj,
@@ -1266,7 +1274,11 @@ static ssize_t pci_write_resource_io(struct file *filp, struct kobject *kobj,
 				     struct bin_attribute *attr, char *buf,
 				     loff_t off, size_t count)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 	return pci_resource_io(filp, kobj, attr, buf, off, count, true);
+#endif
 }
 
 /**

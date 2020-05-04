@@ -10,6 +10,16 @@ if ARCH_QCOM
 source security/pfe/Kconfig
 endif
 
+config GLASSROM_LOCKDOWN
+	bool "Lockdown kernel"
+	default n
+	select MODULE_SIG if MODULES
+	select MODULE_SIG_FORCE if MODULES
+	help
+	  This option enables GlassROM's minimal backport of kernel lockdown
+	  and is equivalent to lockdown_confidentaility
+	  if unsure, say N
+
 config SECURITY_DMESG_RESTRICT
 	bool "Restrict unprivileged access to the kernel syslog"
 	default y

@@ -469,6 +469,9 @@ disable_trace_kprobe(struct trace_kprobe *tk, struct trace_event_file *file)
 /* Internal register function - just handle k*probes and flags */
 static int __register_trace_kprobe(struct trace_kprobe *tk)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return -EINVAL;
+#else
 	int i, ret;
 
 	if (trace_probe_is_registered(&tk->tp))
@@ -504,6 +507,7 @@ static int __register_trace_kprobe(struct trace_kprobe *tk)
 	}
 
 	return ret;
+#endif
 }
 
 /* Internal unregister function - just handle k*probes and flags */

@@ -557,6 +557,9 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 
 static int open_kcore(struct inode *inode, struct file *filp)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return -EPERM;
+#else
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
@@ -572,6 +575,7 @@ static int open_kcore(struct inode *inode, struct file *filp)
 		inode_unlock(inode);
 	}
 	return 0;
+#endif
 }
 
 static int release_kcore(struct inode *inode, struct file *file)
