@@ -195,6 +195,9 @@ out:
 SYSCALL_DEFINE4(kexec_load, unsigned long, entry, unsigned long, nr_segments,
 		struct kexec_segment __user *, segments, unsigned long, flags)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return -EPERM;
+#else
 	int result;
 
 	/* We only trust the superuser with rebooting the system. */
@@ -235,6 +238,7 @@ SYSCALL_DEFINE4(kexec_load, unsigned long, entry, unsigned long, nr_segments,
 	mutex_unlock(&kexec_mutex);
 
 	return result;
+#endif
 }
 
 #ifdef CONFIG_COMPAT
