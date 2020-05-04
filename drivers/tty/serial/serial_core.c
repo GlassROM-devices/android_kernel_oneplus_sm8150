@@ -825,6 +825,9 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 			 struct uart_state *state,
 			 struct serial_struct *new_info)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return -EPERM;
+#else
 	struct uart_port *uport = uart_port_check(state);
 	unsigned long new_port;
 	unsigned int change_irq, change_port, closing_wait;
@@ -1018,6 +1021,7 @@ static int uart_set_info(struct tty_struct *tty, struct tty_port *port,
 	}
  exit:
 	return retval;
+#endif
 }
 
 static int uart_set_info_user(struct tty_struct *tty, struct uart_state *state,
