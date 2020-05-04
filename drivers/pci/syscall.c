@@ -87,6 +87,9 @@ error:
 SYSCALL_DEFINE5(pciconfig_write, unsigned long, bus, unsigned long, dfn,
 		unsigned long, off, unsigned long, len, void __user *, buf)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 	struct pci_dev *dev;
 	u8 byte;
 	u16 word;
@@ -134,4 +137,5 @@ SYSCALL_DEFINE5(pciconfig_write, unsigned long, bus, unsigned long, dfn,
 	}
 	pci_dev_put(dev);
 	return err;
+#endif
 }

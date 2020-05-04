@@ -111,6 +111,9 @@ static ssize_t proc_bus_pci_read(struct file *file, char __user *buf,
 static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 				  size_t nbytes, loff_t *ppos)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 	struct inode *ino = file_inode(file);
 	struct pci_dev *dev = PDE_DATA(ino);
 	int pos = *ppos;
@@ -180,6 +183,7 @@ static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 	*ppos = pos;
 	i_size_write(ino, dev->cfg_size);
 	return nbytes;
+#endif
 }
 
 struct pci_filp_private {
@@ -190,6 +194,9 @@ struct pci_filp_private {
 static long proc_bus_pci_ioctl(struct file *file, unsigned int cmd,
 			       unsigned long arg)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 	struct pci_dev *dev = PDE_DATA(file_inode(file));
 #ifdef HAVE_PCI_MMAP
 	struct pci_filp_private *fpriv = file->private_data;
@@ -228,11 +235,15 @@ static long proc_bus_pci_ioctl(struct file *file, unsigned int cmd,
 	}
 
 	return ret;
+#endif
 }
 
 #ifdef HAVE_PCI_MMAP
 static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
 {
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 	struct pci_dev *dev = PDE_DATA(file_inode(file));
 	struct pci_filp_private *fpriv = file->private_data;
 	int i, ret, write_combine = 0, res_bit = IORESOURCE_MEM;
@@ -269,6 +280,7 @@ static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
 		return ret;
 
 	return 0;
+#endif
 }
 
 static int proc_bus_pci_open(struct inode *inode, struct file *file)
