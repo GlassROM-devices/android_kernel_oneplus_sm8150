@@ -28,6 +28,9 @@ static ssize_t cm_write(struct file *file, const char __user * user_buf,
 
 	struct acpi_table_header table;
 	acpi_status status;
+#ifdef CONFIG_GLASSROM_LOCKDOWN
+	return 1;
+#else
 
 	if (!(*ppos)) {
 		/* parse the table header to get the table length */
@@ -73,6 +76,7 @@ static ssize_t cm_write(struct file *file, const char __user * user_buf,
 
 	kfree(buf);
 	return count;
+#endif
 }
 
 static const struct file_operations cm_fops = {
