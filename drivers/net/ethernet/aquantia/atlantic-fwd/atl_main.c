@@ -67,6 +67,7 @@ static int atl_start(struct atl_nic *nic)
 	int ret = 0;
 
 	atl_start_hw_global(nic);
+	atl_set_rx_mode(nic->ndev);
 
 	if (atl_keep_link || netif_running(nic->ndev))
 		atl_start_link(nic);
