@@ -134,9 +134,11 @@ struct atl_rxf_ntuple {
 	__be16 dst_port[ATL_RXF_NTUPLE_MAX];
 	__be16 src_port[ATL_RXF_NTUPLE_MAX];
 
-	struct atl2_rxf_l3 l3[ATL_RXF_NTUPLE_MAX];
+	struct atl2_rxf_l3 l3v4[ATL_RXF_NTUPLE_MAX];
+	struct atl2_rxf_l3 l3v6[ATL_RXF_NTUPLE_MAX];
 	struct atl2_rxf_l4 l4[ATL_RXF_NTUPLE_MAX];
 	s8 l3_idx[ATL_RXF_NTUPLE_MAX];
+	bool is_ipv6[ATL_RXF_NTUPLE_MAX];
 	s8 l4_idx[ATL_RXF_NTUPLE_MAX];
 	uint32_t cmd[ATL_RXF_NTUPLE_MAX];
 	int count;

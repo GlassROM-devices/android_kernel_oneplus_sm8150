@@ -1829,9 +1829,13 @@ static int atl2_rxf_l4_is_equal(struct atl2_rxf_l4 *f1, struct atl2_rxf_l4 *f2)
 	return true;
 }
 
-static void atl2_rpf_l3_cmd_set(struct atl_hw *hw, u32 val, u32 idx)
+static void atl2_rxf_write_l3_cmd(struct atl_hw *hw, int l3_idx, bool is_ipv6,
+				  uint32_t cmd)
 {
-	atl_write_mask_bits(hw, ATL2_RPF_L3_FLT(idx), 0xFF7FFFFF, val);
+	uint32_t mask = is_ipv6 ? 0xFF7F0000 : 0x0000FFFF;
+	uint32_t value = (atl_read(hw, ATL2_RPF_L3_FLT(l3_idx)) & ~mask) | cmd;
+	 
+	atl_write(hw, ATL2_RPF_L3_FLT(l3_idx), value);
 }
 
 static void atl2_rxf_l3_put(struct atl_hw *hw, struct atl2_rxf_l3 *l3, int idx)
@@ -1840,8 +1844,8 @@ static void atl2_rxf_l3_put(struct atl_hw *hw, struct atl2_rxf_l3 *l3, int idx)
 		l3->usage--;
 
 	if (!l3->usage) {
+		atl2_rxf_write_l3_cmd(hw, idx, l3->cmd & ATL2_NTC_L3_IPV6_EN, 0);
 		l3->cmd = 0;
-		atl2_rpf_l3_cmd_set(hw, l3->cmd, idx);
 	}
 }
 
@@ -1879,39 +1883,30 @@ static void atl2_rxf_l4_get(struct atl2_rxf_l4 *l4, int idx,
 	l4->dst_port = _l4->dst_port;
 }
 
-static void atl2_rxf_set_ntuple(struct atl_nic *nic,
-				struct atl_rxf_ntuple *ntuple,
-				int idx)
+static void atl2_rxf_configure_l3l4(struct atl_rxf_ntuple *ntuple, int idx,
+				    struct atl2_rxf_l3 *l3,
+				    struct atl2_rxf_l4 *l4)
 {
-	struct atl2_rxf_l3 l3;
-	struct atl2_rxf_l4 l4;
-	s8 l3_idx = -1;
-	s8 l4_idx = -1;
-	int i;
-
-	memset(&l3, 0, sizeof(l3));
-	memset(&l4, 0, sizeof(l4));
-
 	if (ntuple->cmd[idx] & ATL_NTC_PROTO)
-		l3.cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
+		l3->cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
 			  ATL2_NTC_L3_IPV6_PROTO | ATL2_NTC_L3_IPV6_EN :
 			  ATL2_NTC_L3_IPV4_PROTO | ATL2_NTC_L3_IPV4_EN;
 
 	switch (ntuple->cmd[idx] & ATL_NTC_L4_MASK) {
 	case ATL_NTC_L4_TCP:
-		l3.cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
+		l3->cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
 			IPPROTO_TCP << ATL2_NTC_L3_IPV6_PROTO_SHIFT :
 			IPPROTO_TCP << ATL2_NTC_L3_IPV4_PROTO_SHIFT;
 		break;
 
 	case ATL_NTC_L4_UDP:
-		l3.cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
+		l3->cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
 			IPPROTO_UDP << ATL2_NTC_L3_IPV6_PROTO_SHIFT :
 			IPPROTO_UDP << ATL2_NTC_L3_IPV4_PROTO_SHIFT;
 		break;
 
 	case ATL_NTC_L4_SCTP:
-		l3.cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
+		l3->cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
 			IPPROTO_SCTP << ATL2_NTC_L3_IPV6_PROTO_SHIFT :
 			IPPROTO_SCTP << ATL2_NTC_L3_IPV4_PROTO_SHIFT;
 		break;
@@ -1919,76 +1914,142 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 
 	if (ntuple->cmd[idx] & ATL_NTC_SA) {
 		if (ntuple->cmd[idx] & ATL_NTC_V6) {
-			l3.cmd |= ATL2_NTC_L3_IPV6_SA | ATL2_NTC_L3_IPV6_EN;
-			memcpy(l3.src_ip6, ntuple->src_ip6[idx], 16);
+			l3->cmd |= ATL2_NTC_L3_IPV6_SA | ATL2_NTC_L3_IPV6_EN;
+			memcpy(l3->src_ip6, ntuple->src_ip6[idx], 16);
 		} else {
-			l3.cmd |= ATL2_NTC_L3_IPV4_SA | ATL2_NTC_L3_IPV4_EN;
-			l3.src_ip4 = ntuple->src_ip4[idx];
+			l3->cmd |= ATL2_NTC_L3_IPV4_SA | ATL2_NTC_L3_IPV4_EN;
+			l3->src_ip4 = ntuple->src_ip4[idx];
 		}
 	}
 	if (ntuple->cmd[idx] & ATL_NTC_DA) {
 		if (ntuple->cmd[idx] & ATL_NTC_V6) {
-			l3.cmd |= ATL2_NTC_L3_IPV6_DA | ATL2_NTC_L3_IPV6_EN;
-			memcpy(l3.dst_ip6, ntuple->dst_ip6[idx], 16);
+			l3->cmd |= ATL2_NTC_L3_IPV6_DA | ATL2_NTC_L3_IPV6_EN;
+			memcpy(l3->dst_ip6, ntuple->dst_ip6[idx], 16);
 		} else {
-			l3.cmd |= ATL2_NTC_L3_IPV4_DA | ATL2_NTC_L3_IPV4_EN;
-			l3.dst_ip4 = ntuple->dst_ip4[idx];
+			l3->cmd |= ATL2_NTC_L3_IPV4_DA | ATL2_NTC_L3_IPV4_EN;
+			l3->dst_ip4 = ntuple->dst_ip4[idx];
 		}
 	}
 	if (ntuple->cmd[idx] & ATL_NTC_SP) {
-		l4.cmd |= ATL2_NTC_L4_SP | ATL2_NTC_L4_EN;
-		l4.src_port = ntuple->src_port[idx];
+		l4->cmd |= ATL2_NTC_L4_SP | ATL2_NTC_L4_EN;
+		l4->src_port = ntuple->src_port[idx];
 	}
 	if (ntuple->cmd[idx] & ATL_NTC_DP) {
-		l4.cmd |= ATL2_NTC_L4_DP | ATL2_NTC_L4_EN;
-		l4.dst_port = ntuple->dst_port[idx];
+		l4->cmd |= ATL2_NTC_L4_DP | ATL2_NTC_L4_EN;
+		l4->dst_port = ntuple->dst_port[idx];
 	}
+}
 
-	/* find L3 and L4 filters */
-	if (l3.cmd & (ATL2_NTC_L3_IPV4_EN | ATL2_NTC_L3_IPV6_EN)) {
-		for (i = 0; i < ATL_RXF_NTUPLE_MAX; i++) {
-			if (atl2_rxf_l3_is_equal(&ntuple->l3[i], &l3)) {
+static int atl2_rxf_fl3l4_find_l3(struct atl_rxf_ntuple *ntuple,
+				  struct atl2_rxf_l3 *l3)
+{
+	struct atl2_rxf_l3 *nl3 = (l3->cmd & ATL2_NTC_L3_IPV4_EN) ?
+					ntuple->l3v4 : ntuple->l3v6;
+	int first = (l3->cmd & ATL2_NTC_L3_IPV4_EN) ?
+			ntuple->l3_v4_base_index :
+			ntuple->l3_v6_base_index;
+	int last = first + (l3->cmd & ATL2_NTC_L3_IPV4_EN) ?
+				ntuple->l3_v4_available:
+				ntuple->l3_v6_available;
+	int l3_idx = -1;
+	int i;
+
+	for (i = first; i < last; i++) {
+		if (atl2_rxf_l3_is_equal(&nl3[i], l3)) {
+			l3_idx = i;
+			break;
+		}
+	}
+	if (l3_idx < 0)
+		for (i = first; i < last; i++)
+			if ((nl3[i].cmd & (ATL2_NTC_L3_IPV4_EN |
+						ATL2_NTC_L3_IPV6_EN)) == 0) {
 				l3_idx = i;
 				break;
 			}
+	if (l3_idx < 0)
+		return -ENOSPC;
+
+	return l3_idx;
+}
+
+static int atl2_rxf_fl3l4_find_l4(struct atl_rxf_ntuple *ntuple,
+				  struct atl2_rxf_l4 *l4)
+{
+	int l4_idx = -1;
+	int i;
+
+	for (i = ntuple->l4_base_index; i < ntuple->l4_available; i++) {
+		if (atl2_rxf_l4_is_equal(&ntuple->l4[i], l4))
+			l4_idx = i;
+	}
+	if (l4_idx >= 0)
+		return l4_idx;
+
+	for (i = ntuple->l4_base_index; i < ntuple->l4_available; i++) {
+		if ((ntuple->l4[i].cmd & ATL2_NTC_L4_EN) == 0) {
+			l4_idx = i;
+			break;
 		}
+	}
+	if (l4_idx < 0)
+		return -ENOSPC;
+	return l4_idx;
+}
+
+static int atl2_rxf_set_ntuple(struct atl_nic *nic,
+				struct atl_rxf_ntuple *ntuple,
+				int idx)
+{
+	struct atl2_rxf_l3 l3 = {0};
+	struct atl2_rxf_l4 l4 = {0};
+	struct atl2_rxf_l3 *l3_filters;
+	s8 l3_idx = -1;
+	s8 l4_idx = -1;
+
+	atl2_rxf_configure_l3l4(ntuple, idx, &l3, &l4);
+
+	/* find L3 and L4 filters */
+	if (l3.cmd & (ATL2_NTC_L3_IPV4_EN | ATL2_NTC_L3_IPV6_EN)) {
+		l3_idx = atl2_rxf_fl3l4_find_l3(ntuple, &l3);
 		if (l3_idx < 0)
-			for (i = 0; i < ATL_RXF_NTUPLE_MAX; i++)
-				if ((ntuple->l3[i].cmd &
-				     (ATL2_NTC_L3_IPV4_EN |
-				      ATL2_NTC_L3_IPV6_EN)) == 0) {
-					l3_idx = i;
-					break;
-				}
-		WARN(l3_idx < 0, "L3 filter table inconsistent");
-		if (ntuple->l3_idx[idx] != l3_idx)
-			atl2_rxf_l3_get(&ntuple->l3[l3_idx], l3_idx, &l3);
+			return l3_idx;
 	}
 
-	if (ntuple->l3_idx[idx] != -1)
-		if (!(atl2_rxf_l3_is_equal(&l3,
-					   &ntuple->l3[ntuple->l3_idx[idx]]))) {
-			atl2_rxf_l3_put(&nic->hw,
-					&ntuple->l3[ntuple->l3_idx[idx]],
-					ntuple->l3_idx[idx]);
-		}
-	ntuple->l3_idx[idx] = l3_idx;
-
 	if (l4.cmd & ATL2_NTC_L4_EN) {
-		for (i = 0; i < ATL_RXF_NTUPLE_MAX; i++) {
-			if (atl2_rxf_l4_is_equal(&ntuple->l4[i], &l4))
-				l4_idx = i;
-		}
+		l4_idx = atl2_rxf_fl3l4_find_l4(ntuple, &l4);
 		if (l4_idx < 0)
-			for (i = 0; i < ATL_RXF_NTUPLE_MAX; i++)
-				if ((ntuple->l4[i].cmd & ATL2_NTC_L4_EN) == 0) {
-					l4_idx = i;
-					break;
-				}
-		WARN(l4_idx < 0, "L4 filter table inconsistent");
+			return l4_idx;
+
 		if (ntuple->l4_idx[idx] != l4_idx)
 			atl2_rxf_l4_get(&ntuple->l4[l4_idx], l4_idx, &l4);
 	}
+
+	if (l3.cmd & (ATL2_NTC_L3_IPV4_EN | ATL2_NTC_L3_IPV6_EN)) {
+		if (l3.cmd & ATL2_NTC_L3_IPV4_EN)
+			l3_filters = ntuple->l3v4;
+		else
+			l3_filters = ntuple->l3v6;
+
+		if (ntuple->l3_idx[idx] != l3_idx)
+			atl2_rxf_l3_get(&l3_filters[l3_idx], l3_idx, &l3);
+	}
+
+	/* release old filter */
+	if (ntuple->l3_idx[idx] != -1) {
+		if (ntuple->is_ipv6[idx])
+			l3_filters = ntuple->l3v6;
+		else
+			l3_filters = ntuple->l3v4;
+
+		if (!(atl2_rxf_l3_is_equal(&l3,
+					   &l3_filters[ntuple->l3_idx[idx]]))) {
+			atl2_rxf_l3_put(&nic->hw,
+					&l3_filters[ntuple->l3_idx[idx]],
+					ntuple->l3_idx[idx]);
+		}
+	}
+	ntuple->l3_idx[idx] = l3_idx;
 
 	if (ntuple->l4_idx[idx] != -1)
 		if (!(atl2_rxf_l4_is_equal(&l4,
@@ -1998,6 +2059,10 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 					ntuple->l4_idx[idx]);
 		}
 	ntuple->l4_idx[idx] = l4_idx;
+	
+	ntuple->is_ipv6[idx] = (l3.cmd & ATL2_NTC_L3_IPV4_EN) ? false : true;
+
+	return 0;
 }
 
 static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
@@ -2177,8 +2242,11 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 
 	ntuple->cmd[idx] = cmd;
 
-	if (nic->hw.new_rpf)
-		atl2_rxf_set_ntuple(nic, ntuple, idx);
+	if (nic->hw.new_rpf) {
+		ret = atl2_rxf_set_ntuple(nic, ntuple, idx);
+		if (ret < 0)
+			return ret;
+	}
 
 	return !present;
 }
@@ -2280,15 +2348,18 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 {
 	struct atl_hw *hw = &nic->hw;
 	struct atl_rxf_ntuple *ntuple = &nic->rxf_ntuple;
+	uint32_t tag = 0, mask = 0, action, cmd;
+	struct atl2_rxf_l3 *l3_filters;
 	struct atl2_rxf_l3 *l3 = NULL;
 	struct atl2_rxf_l4 *l4 = NULL;
 	s8 l3_idx = ntuple->l3_idx[idx];
 	s8 l4_idx = ntuple->l4_idx[idx];
-	uint32_t tag = 0, mask = 0, action, cmd;
+	bool is_ipv6 = ntuple->is_ipv6[idx];
 
+	l3_filters = ntuple->is_ipv6[idx] ? ntuple->l3v6 : ntuple->l3v4;
 	if (!(ntuple->cmd[idx] & ATL_NTC_EN)) {
 		if (l3_idx > -1)
-			atl2_rxf_l3_put(hw, &ntuple->l3[l3_idx], l3_idx);
+			atl2_rxf_l3_put(hw, &l3_filters[l3_idx], l3_idx);
 
 		if (l4_idx > -1)
 			atl2_rxf_l4_put(hw, &ntuple->l4[l4_idx], l4_idx);
@@ -2304,7 +2375,7 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 		return;
 	}
 	if (l3_idx > -1) {
-		l3 = &ntuple->l3[l3_idx];
+		l3 = &l3_filters[l3_idx];
 		cmd = l3->cmd;
 		if (l3->cmd & ATL2_NTC_L3_IPV4_EN) {
 			tag |= (l3_idx + 1) << ATL2_RPF_TAG_L3_V4_OFFSET;
@@ -2329,7 +2400,7 @@ static void atl2_update_ntuple_flt(struct atl_nic *nic, int idx)
 			return;
 		}
 
-		atl2_rpf_l3_cmd_set(hw, cmd, l3_idx);
+		atl2_rxf_write_l3_cmd(hw, l3_idx, is_ipv6,  cmd);
 	}
 
 	if (l4_idx > -1) {
@@ -2373,11 +2444,12 @@ void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
 	uint32_t cmd = ntuple->cmd[idx];
 	int i;
 
+	if (nic->hw.new_rpf)
+		return atl2_update_ntuple_flt(nic, idx);
+
 	if (!(cmd & ATL_NTC_EN)) {
 		atl_write(hw, ATL_NTUPLE_CTRL(idx), cmd);
 
-		if (nic->hw.new_rpf)
-			atl2_update_ntuple_flt(nic, idx);
 		return;
 	}
 
@@ -2418,9 +2490,6 @@ void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
 		cmd |= 1 << ATL_NTC_ACT_SHIFT;
 
 	atl_write(hw, ATL_NTUPLE_CTRL(idx), cmd);
-
-	if (nic->hw.new_rpf)
-		atl2_update_ntuple_flt(nic, idx);
 }
 
 static void atl_rxf_update_flex(struct atl_nic *nic, int idx)
