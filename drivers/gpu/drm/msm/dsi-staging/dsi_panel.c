@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1739,10 +1739,11 @@ static int dsi_panel_parse_qsync_caps(struct dsi_panel *panel,
 static int dsi_panel_parse_dyn_clk_caps(struct dsi_panel *panel)
 {
 	int rc = 0;
-	bool supported = false;
+	bool supported = false, skip_phy_timing_update = false;
 	struct dsi_dyn_clk_caps *dyn_clk_caps = &panel->dyn_clk_caps;
 	struct dsi_parser_utils *utils = &panel->utils;
 	const char *name = panel->name;
+	const char *type = NULL;
 
 	supported = utils->read_bool(utils->data, "qcom,dsi-dyn-clk-enable");
 
@@ -1773,8 +1774,34 @@ static int dsi_panel_parse_dyn_clk_caps(struct dsi_panel *panel)
 		return -EINVAL;
 	}
 
+	skip_phy_timing_update = utils->read_bool(utils->data,
+				"qcom,dsi-dyn-clk-skip-timing-update");
+	if (!skip_phy_timing_update)
+		dyn_clk_caps->skip_phy_timing_update = false;
+	else
+		dyn_clk_caps->skip_phy_timing_update = true;
+
 	dyn_clk_caps->dyn_clk_support = true;
 
+	type = utils->get_property(utils->data,
+				   "qcom,dsi-dyn-clk-type", NULL);
+	if (!type) {
+		dyn_clk_caps->type = DSI_DYN_CLK_TYPE_LEGACY;
+		dyn_clk_caps->maintain_const_fps = false;
+		return 0;
+	}
+
+	if (!strcmp(type, "constant-fps-adjust-hfp")) {
+		dyn_clk_caps->type = DSI_DYN_CLK_TYPE_CONST_FPS_ADJUST_HFP;
+		dyn_clk_caps->maintain_const_fps = true;
+	} else if (!strcmp(type, "constant-fps-adjust-vfp")) {
+		dyn_clk_caps->type = DSI_DYN_CLK_TYPE_CONST_FPS_ADJUST_VFP;
+		dyn_clk_caps->maintain_const_fps = true;
+	} else {
+		dyn_clk_caps->type = DSI_DYN_CLK_TYPE_LEGACY;
+		dyn_clk_caps->maintain_const_fps = false;
+	}
+	pr_debug("Dynamic clock type is %d\n", dyn_clk_caps->type);
 	return 0;
 }
 
@@ -4230,8 +4257,11 @@ int dsi_panel_get_mode_count(struct dsi_panel *panel)
 {
 	const u32 SINGLE_MODE_SUPPORT = 1;
 	struct dsi_parser_utils *utils;
-	struct device_node *timings_np;
+	struct device_node *timings_np, *child_np;
+	int num_dfps_rates, num_bit_clks;
+	int num_video_modes = 0, num_cmd_modes = 0;
 	int count, rc = 0;
+	void *utils_data = NULL;
 
 	if (!panel) {
 		pr_err("invalid params\n");
@@ -4258,12 +4288,37 @@ int dsi_panel_get_mode_count(struct dsi_panel *panel)
 		goto error;
 	}
 
-	/* No multiresolution support is available for video mode panels */
+	/* No multiresolution support is available for video mode panels.
+	 * Multi-mode is supported for video mode during POMS is enabled.
+	 */
 	if (panel->panel_mode != DSI_OP_CMD_MODE &&
-		!panel->host_config.ext_bridge_num)
+		!panel->host_config.ext_bridge_num &&
+		!panel->panel_mode_switch_enabled)
 		count = SINGLE_MODE_SUPPORT;
 
 	panel->num_timing_nodes = count;
+	dsi_for_each_child_node(timings_np, child_np) {
+		utils_data = child_np;
+		if (utils->read_bool(utils->data, "qcom,mdss-dsi-video-mode"))
+			num_video_modes++;
+		else if (utils->read_bool(utils->data,
+					"qcom,mdss-dsi-cmd-mode"))
+			num_cmd_modes++;
+		else if (panel->panel_mode == DSI_OP_VIDEO_MODE)
+			num_video_modes++;
+		else if (panel->panel_mode == DSI_OP_CMD_MODE)
+			num_cmd_modes++;
+	}
+
+	num_dfps_rates = !panel->dfps_caps.dfps_support ? 1 :
+					panel->dfps_caps.dfps_list_len;
+
+	num_bit_clks = !panel->dyn_clk_caps.dyn_clk_support ? 1 :
+					panel->dyn_clk_caps.bit_clk_list_len;
+
+	/* Inflate num_of_modes by fps and bit clks in dfps */
+	panel->num_display_modes = (num_cmd_modes * num_bit_clks) +
+			(num_video_modes * num_bit_clks * num_dfps_rates);
 
 error:
 	return rc;

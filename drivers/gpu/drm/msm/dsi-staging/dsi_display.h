@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019, The Linux Foundation.All rights reserved.
+ * Copyright (c) 2015-2020, The Linux Foundation.All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -114,7 +114,8 @@ struct dsi_display_boot_param {
  * struct dsi_display_clk_info - dsi display clock source information
  * @src_clks:          Source clocks for DSI display.
  * @mux_clks:          Mux clocks used for DFPS.
- * @shadow_clks:       Used for DFPS.
+ * @shadow_clks:       Used for D-phy clock switch
+ * @shadow_cphy_clks:  Used for C-phy clock switch
  * @xo_clks:           XO clocks for DSI display
  */
 struct dsi_display_clk_info {
@@ -122,6 +123,7 @@ struct dsi_display_clk_info {
 	struct dsi_clk_link_set mux_clks;
 	struct dsi_clk_link_set cphy_clks;
 	struct dsi_clk_link_set shadow_clks;
+	struct dsi_clk_link_set shadow_cphy_clks;
 	struct dsi_clk_link_set xo_clks;
 };
 
@@ -370,7 +372,7 @@ int dsi_display_get_mode_count(struct dsi_display *display, u32 *count);
  * dsi_display_get_modes() - get modes supported by display
  * @display:            Handle to display.
  * @modes;              Output param, list of DSI modes. Number of modes matches
- *                      count returned by dsi_display_get_mode_count
+ *                      count got from display->panel->num_display_modes;
  *
  * Return: error code.
  */

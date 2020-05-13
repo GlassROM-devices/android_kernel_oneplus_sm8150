@@ -1062,7 +1062,7 @@ static int sde_encoder_virt_atomic_check(
 		if (ret) {
 			SDE_ERROR_ENC(sde_enc,
 					"mode unsupported, phys idx %d\n", i);
-			break;
+			return ret;
 		}
 	}
 
@@ -3268,6 +3268,7 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 
 	/* register input handler if not already registered */
 	if (sde_enc->input_handler && !sde_enc->input_handler_registered &&
+		sde_encoder_check_curr_mode(drm_enc, MSM_DISPLAY_CMD_MODE) &&
 			!msm_is_mode_seamless_dms(cur_mode) &&
 			!msm_is_mode_seamless_dyn_clk(cur_mode)) {
 		ret = _sde_encoder_input_handler_register(
