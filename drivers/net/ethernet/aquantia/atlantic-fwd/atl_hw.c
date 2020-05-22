@@ -474,7 +474,14 @@ void atl_refresh_link(struct atl_nic *nic)
 			netif_carrier_on(nic->ndev);
 			pm_runtime_get_sync(&nic->hw.pdev->dev);
 #if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
-			atl_init_macsec(hw);
+			{
+				int ret;
+
+				ret = atl_init_macsec(hw);
+
+				if (ret)
+					atl_dev_err("atl_init_macsec failed with %d", ret);
+			}
 #endif
 		}
 	} else {
