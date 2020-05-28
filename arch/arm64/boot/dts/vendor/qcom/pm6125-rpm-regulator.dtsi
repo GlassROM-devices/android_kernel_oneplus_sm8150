@@ -1,3 +1,15 @@
+/* Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 &rpm_bus {
 	/* VDD_APC supply */
 	rpm-regulator-smpa1 {
@@ -61,22 +73,6 @@
 		regulator-s6 {
 			compatible = "qcom,rpm-smd-regulator";
 			regulator-name = "pm6125_s6";
-			qcom,set = <3>;
-			status = "disabled";
-		};
-	};
-
-	rpm-regulator-smpa7 {
-		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "smpa";
-		qcom,resource-id = <7>;
-		qcom,regulator-type = <1>;
-		qcom,hpm-min-load = <100000>;
-		status = "disabled";
-
-		regulator-s7 {
-			compatible = "qcom,rpm-smd-regulator";
-			regulator-name = "pm6125_s7";
 			qcom,set = <3>;
 			status = "disabled";
 		};

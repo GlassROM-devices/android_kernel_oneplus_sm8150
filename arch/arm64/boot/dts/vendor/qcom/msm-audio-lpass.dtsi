@@ -1,3 +1,16 @@
+/*
+ * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
 &soc {
 	pcm0: qcom,msm-pcm {
 		compatible = "qcom,msm-pcm-dsp";
@@ -66,14 +79,14 @@
 		qcom,msm-dai-q6-dev-id = <8>;
 	};
 
-	dai_dp: qcom,msm-dai-q6-dp {
+	dai_hdmi_ms: qcom,msm-dai-q6-hdmi_ms {
 		compatible = "qcom,msm-dai-q6-hdmi";
-		qcom,msm-dai-q6-dev-id = <0>;
+		qcom,msm-dai-q6-dev-id = <24578>;
 	};
 
-	dai_dp1: qcom,msm-dai-q6-dp1 {
+	dai_dp: qcom,msm-dai-q6-dp {
 		compatible = "qcom,msm-dai-q6-hdmi";
-		qcom,msm-dai-q6-dev-id = <1>;
+		qcom,msm-dai-q6-dev-id = <24608>;
 	};
 
 	loopback: qcom,msm-pcm-loopback {
@@ -128,10 +141,26 @@
 
 		dai_mi2s5: qcom,msm-dai-q6-mi2s-senary {
 			compatible = "qcom,msm-dai-q6-mi2s";
-			qcom,msm-dai-q6-mi2s-dev-id = <5>;
+			qcom,msm-dai-q6-mi2s-dev-id = <6>;
 			qcom,msm-mi2s-rx-lines = <0>;
 			qcom,msm-mi2s-tx-lines = <3>;
 		};
+	};
+
+	dai_meta_mi2s0: qcom,msm-dai-q6-meta-mi2s-prim {
+		compatible = "qcom,msm-dai-q6-meta-mi2s";
+		qcom,msm-dai-q6-meta-mi2s-dev-id = <4864>;
+		qcom,msm-mi2s-num-members = <4>;
+		qcom,msm-mi2s-member-id = <0>, <1>, <2>, <3>;
+		qcom,msm-mi2s-rx-lines = <0xff>, <0xf>, <0x3>, <0x3>;
+	};
+
+	dai_meta_mi2s1: qcom,msm-dai-q6-meta-mi2s-sec {
+		compatible = "qcom,msm-dai-q6-meta-mi2s";
+		qcom,msm-dai-q6-meta-mi2s-dev-id = <4866>;
+		qcom,msm-mi2s-num-members = <4>;
+		qcom,msm-mi2s-member-id = <0>, <1>, <2>, <3>;
+		qcom,msm-mi2s-rx-lines = <0xff>, <0xf>, <0x3>, <0x3>;
 	};
 
 	msm_dai_cdc_dma: qcom,msm-dai-cdc-dma {
@@ -245,6 +274,7 @@
 			compatible = "qcom,msm-dai-cdc-dma-dev";
 			qcom,msm-dai-cdc-dma-dev-id = <45115>;
 		};
+
 	};
 
 	lsm: qcom,msm-lsm-client {
@@ -253,10 +283,75 @@
 
 	qcom,msm-dai-q6 {
 		compatible = "qcom,msm-dai-q6";
+		sb_0_rx: qcom,msm-dai-q6-sb-0-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16384>;
+		};
+
+		sb_0_tx: qcom,msm-dai-q6-sb-0-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16385>;
+		};
+
+		sb_1_rx: qcom,msm-dai-q6-sb-1-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16386>;
+		};
+
+		sb_1_tx: qcom,msm-dai-q6-sb-1-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16387>;
+		};
+
+		sb_2_rx: qcom,msm-dai-q6-sb-2-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16388>;
+		};
+
+		sb_2_tx: qcom,msm-dai-q6-sb-2-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16389>;
+		};
+
+
+		sb_3_rx: qcom,msm-dai-q6-sb-3-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16390>;
+		};
+
+		sb_3_tx: qcom,msm-dai-q6-sb-3-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16391>;
+		};
+
+		sb_4_rx: qcom,msm-dai-q6-sb-4-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16392>;
+		};
+
+		sb_4_tx: qcom,msm-dai-q6-sb-4-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16393>;
+		};
+
+		sb_5_tx: qcom,msm-dai-q6-sb-5-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16395>;
+		};
+
+		sb_5_rx: qcom,msm-dai-q6-sb-5-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16394>;
+		};
+
+		sb_6_rx: qcom,msm-dai-q6-sb-6-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16396>;
+		};
+
 		sb_7_rx: qcom,msm-dai-q6-sb-7-rx {
 			compatible = "qcom,msm-dai-q6-dev";
 			qcom,msm-dai-q6-dev-id = <16398>;
-			qcom,msm-dai-q6-slim-dev-id = <0>;
 		};
 
 		sb_7_tx: qcom,msm-dai-q6-sb-7-tx {
@@ -265,10 +360,25 @@
 			qcom,msm-dai-q6-slim-dev-id = <0>;
 		};
 
+		sb_8_rx: qcom,msm-dai-q6-sb-8-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16400>;
+		};
+
 		sb_8_tx: qcom,msm-dai-q6-sb-8-tx {
 			compatible = "qcom,msm-dai-q6-dev";
 			qcom,msm-dai-q6-dev-id = <16401>;
 			qcom,msm-dai-q6-slim-dev-id = <0>;
+		};
+
+		sb_9_rx: qcom,msm-dai-q6-sb-9-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16402>;
+		};
+
+		sb_9_tx: qcom,msm-dai-q6-sb-9-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <16403>;
 		};
 
 		bt_sco_rx: qcom,msm-dai-q6-bt-sco-rx {
@@ -331,6 +441,16 @@
 			qcom,msm-dai-q6-dev-id = <32770>;
 		};
 
+		proxy_rx: qcom,msm-dai-q6-proxy-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <8194>;
+		};
+
+		proxy_tx: qcom,msm-dai-q6-proxy-tx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <8195>;
+		};
+
 		usb_audio_rx: qcom,msm-dai-q6-usb-audio-rx {
 			compatible = "qcom,msm-dai-q6-dev";
 			qcom,msm-dai-q6-dev-id = <28672>;
@@ -354,8 +474,7 @@
 			compatible = "qcom,msm-audio-ion";
 			qcom,smmu-version = <2>;
 			qcom,smmu-enabled;
-			iommus = <&apps_smmu 0x1801 0x0>;
-			qcom,iommu-dma-addr-pool = <0x10000000 0x10000000>;
+			iommus = <&apps_smmu 0x1b21 0x0>;
 		};
 	};
 
@@ -448,7 +567,7 @@
 		qcom,dba-bridge-chip = "adv7533";
 	};
 
-	adsp_loader: qcom,msm-adsp-loader {
+	qcom,msm-adsp-loader {
 		status = "ok";
 		compatible = "qcom,adsp-loader";
 		qcom,adsp-state = <0>;
@@ -705,5 +824,9 @@
 	afe_loopback_tx: qcom,msm-dai-q6-afe-loopback-tx {
 		compatible = "qcom,msm-dai-q6-dev";
 		qcom,msm-dai-q6-dev-id = <24577>;
+	};
+
+	pcie: qcom,msm-pcm-pcie {
+		compatible = "qcom,msm-pcm-pcie";
 	};
 };
