@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/of.h>
@@ -284,7 +291,6 @@ int cam_eeprom_parse_dt(struct cam_eeprom_ctrl_t *e_ctrl)
 	int                             i, rc = 0;
 	struct cam_hw_soc_info         *soc_info = &e_ctrl->soc_info;
 	struct device_node             *of_node = NULL;
-	struct device_node             *of_parent = NULL;
 	struct cam_eeprom_soc_private  *soc_private =
 		(struct cam_eeprom_soc_private *)e_ctrl->soc_info.soc_private;
 	uint32_t                        temp;
@@ -294,8 +300,6 @@ int cam_eeprom_parse_dt(struct cam_eeprom_ctrl_t *e_ctrl)
 		return -EINVAL;
 	}
 
-	e_ctrl->is_multimodule_mode = false;
-
 	rc = cam_soc_util_get_dt_properties(soc_info);
 	if (rc < 0) {
 		CAM_ERR(CAM_EEPROM, "Failed to read DT properties rc : %d", rc);
@@ -303,11 +307,6 @@ int cam_eeprom_parse_dt(struct cam_eeprom_ctrl_t *e_ctrl)
 	}
 
 	of_node = soc_info->dev->of_node;
-
-	if (of_property_read_bool(of_node, "multimodule-support")) {
-		CAM_DBG(CAM_UTIL, "Multi Module is Supported");
-		e_ctrl->is_multimodule_mode = true;
-	}
 
 	rc = of_property_read_string(of_node, "eeprom-name",
 		&soc_private->eeprom_name);
@@ -325,14 +324,16 @@ int cam_eeprom_parse_dt(struct cam_eeprom_ctrl_t *e_ctrl)
 			return rc;
 		}
 
-		of_parent = of_get_parent(of_node);
-		if (of_property_read_u32(of_parent, "cell-index",
-				&e_ctrl->cci_num) < 0)
+		rc = of_property_read_u32(of_node, "cci-device",
+			&e_ctrl->cci_num);
+		CAM_DBG(CAM_ACTUATOR, "cci-device %d, rc %d",
+			e_ctrl->cci_num, rc);
+		if (rc < 0) {
 			/* Set default master 0 */
 			e_ctrl->cci_num = CCI_DEVICE_0;
-
+			rc = 0;
+		}
 		e_ctrl->io_master_info.cci_client->cci_device = e_ctrl->cci_num;
-		CAM_DBG(CAM_EEPROM, "cci-index %d", e_ctrl->cci_num, rc);
 	}
 
 	if (e_ctrl->io_master_info.master_type == SPI_MASTER) {

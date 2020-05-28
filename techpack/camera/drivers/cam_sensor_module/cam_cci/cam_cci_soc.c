@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include "cam_cci_dev.h"
@@ -14,7 +21,7 @@ int cam_cci_init(struct v4l2_subdev *sd,
 	struct cci_device *cci_dev;
 	enum cci_i2c_master_t master = c_ctrl->cci_info->cci_i2c_master;
 	struct cam_ahb_vote ahb_vote;
-	struct cam_axi_vote axi_vote = {0};
+	struct cam_axi_vote axi_vote;
 	struct cam_hw_soc_info *soc_info = NULL;
 	void __iomem *base = NULL;
 
@@ -38,9 +45,10 @@ int cam_cci_init(struct v4l2_subdev *sd,
 
 	CAM_DBG(CAM_CCI, "Base address %pK", base);
 
+#if 0
 	if (cci_dev->ref_count++) {
-		CAM_DBG(CAM_CCI, "ref_count %d", cci_dev->ref_count);
-		CAM_DBG(CAM_CCI, "master %d", master);
+		CAM_INFO(CAM_CCI, "ref_count %d, dev=%s", cci_dev->ref_count, cci_dev->device_name);
+		CAM_INFO(CAM_CCI, "master %d", master);
 		if (master < MASTER_MAX && master >= 0) {
 			mutex_lock(&cci_dev->cci_master_info[master].mutex);
 			flush_workqueue(cci_dev->write_wq[master]);
@@ -52,9 +60,8 @@ int cam_cci_init(struct v4l2_subdev *sd,
 			for (i = 0; i < NUM_QUEUES; i++)
 				reinit_completion(
 				&cci_dev->cci_master_info[master].report_q[i]);
-			/* Set reset pending flag to true */
-			cci_dev->cci_master_info[master].reset_pending = true;
-			cci_dev->cci_master_info[master].status = 0;
+			/* Set reset pending flag to TRUE */
+			cci_dev->cci_master_info[master].reset_pending = TRUE;
 			/* Set proper mask to RESET CMD address */
 			if (master == MASTER_0)
 				cam_io_w_mb(CCI_M0_RESET_RMSK,
@@ -68,25 +75,23 @@ int cam_cci_init(struct v4l2_subdev *sd,
 				CCI_TIMEOUT);
 			if (rc <= 0)
 				CAM_ERR(CAM_CCI, "wait failed %d", rc);
-			cci_dev->cci_master_info[master].status = 0;
 			mutex_unlock(&cci_dev->cci_master_info[master].mutex);
 		}
 		return 0;
 	}
+#endif
 
+	if ((cci_dev->ref_count) &&
+		(cci_dev->cci_state == CCI_STATE_ENABLED)) {
+		cci_dev->ref_count++;
+		return 0;
+	}
+
+	cci_dev->ref_count++;
 	ahb_vote.type = CAM_VOTE_ABSOLUTE;
-	ahb_vote.vote.level = CAM_LOWSVS_VOTE;
-	axi_vote.num_paths = 1;
-	axi_vote.axi_path[0].path_data_type =
-		CAM_AXI_PATH_DATA_ALL;
-	axi_vote.axi_path[0].transac_type =
-		CAM_AXI_TRANSACTION_WRITE;
-	axi_vote.axi_path[0].camnoc_bw =
-		CAM_CPAS_DEFAULT_AXI_BW;
-	axi_vote.axi_path[0].mnoc_ab_bw =
-		CAM_CPAS_DEFAULT_AXI_BW;
-	axi_vote.axi_path[0].mnoc_ib_bw =
-		CAM_CPAS_DEFAULT_AXI_BW;
+	ahb_vote.vote.level = CAM_SVS_VOTE;
+	axi_vote.compressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
+	axi_vote.uncompressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
 
 	rc = cam_cpas_start(cci_dev->cpas_handle,
 		&ahb_vote, &axi_vote);
@@ -133,8 +138,7 @@ int cam_cci_init(struct v4l2_subdev *sd,
 		}
 	}
 
-	cci_dev->cci_master_info[master].reset_pending = true;
-	cci_dev->cci_master_info[master].status = 0;
+	cci_dev->cci_master_info[master].reset_pending = TRUE;
 	cam_io_w_mb(CCI_RESET_CMD_RMSK, base +
 			CCI_RESET_CMD_ADDR);
 	cam_io_w_mb(0x1, base + CCI_RESET_CMD_ADDR);
@@ -176,6 +180,8 @@ int cam_cci_init(struct v4l2_subdev *sd,
 		base + CCI_I2C_M1_RD_THRESHOLD_ADDR);
 
 	cci_dev->cci_state = CCI_STATE_ENABLED;
+
+	CAM_INFO(CAM_CCI, "End init ref_count %d dev=%s", cci_dev->ref_count,cci_dev->device_name);
 
 	return 0;
 
@@ -394,9 +400,10 @@ int cam_cci_soc_release(struct cci_device *cci_dev)
 		return -EINVAL;
 	}
 	if (--cci_dev->ref_count) {
-		CAM_DBG(CAM_CCI, "ref_count Exit %d", cci_dev->ref_count);
+		CAM_INFO(CAM_CCI, "ref_count Exit %d dev=%s", cci_dev->ref_count,cci_dev->device_name);
 		return 0;
 	}
+
 	for (i = 0; i < MASTER_MAX; i++)
 		if (cci_dev->write_wq[i])
 			flush_workqueue(cci_dev->write_wq[i]);
@@ -415,6 +422,7 @@ int cam_cci_soc_release(struct cci_device *cci_dev)
 	cci_dev->cycles_per_us = 0;
 
 	cam_cpas_stop(cci_dev->cpas_handle);
+	CAM_INFO(CAM_CCI, "End release ref_count %d dev=%s", cci_dev->ref_count,cci_dev->device_name);
 
 	return rc;
 }

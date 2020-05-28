@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_VFE_LITE17X_H_
@@ -56,13 +63,6 @@ static struct cam_vfe_rdi_ver2_reg vfe17x_rdi_reg = {
 	.reg_update_cmd           = 0x000004AC,
 };
 
-static struct cam_vfe_rdi_common_reg_data vfe17x_rdi_reg_data = {
-	.subscribe_irq_mask0      = 0x780001E0,
-	.subscribe_irq_mask1      = 0x0,
-	.error_irq_mask0          = 0x0,
-	.error_irq_mask1          = 0x3C,
-};
-
 static struct cam_vfe_rdi_reg_data  vfe17x_rdi_0_data = {
 	.reg_update_cmd_data      = 0x2,
 	.sof_irq_mask             = 0x8000000,
@@ -97,7 +97,6 @@ static struct cam_vfe_top_ver2_hw_info vfe17x_top_hw_info = {
 	.rdi_hw_info = {
 		.common_reg = &vfe17x_top_common_reg,
 		.rdi_reg    = &vfe17x_rdi_reg,
-		.common_reg_data = &vfe17x_rdi_reg_data,
 		.reg_data = {
 			&vfe17x_rdi_0_data,
 			&vfe17x_rdi_1_data,
@@ -105,7 +104,6 @@ static struct cam_vfe_top_ver2_hw_info vfe17x_top_hw_info = {
 			&vfe17x_rdi_3_data,
 			},
 		},
-	.num_mux = 4,
 	.mux_type = {
 		CAM_VFE_RDI_VER_1_0,
 		CAM_VFE_RDI_VER_1_0,

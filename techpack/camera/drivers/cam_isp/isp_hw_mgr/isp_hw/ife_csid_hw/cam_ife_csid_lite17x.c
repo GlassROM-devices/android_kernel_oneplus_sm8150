@@ -1,36 +1,34 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/module.h>
 #include "cam_ife_csid_lite17x.h"
-#include "cam_ife_csid_lite480.h"
 #include "cam_ife_csid_core.h"
 #include "cam_ife_csid_dev.h"
 
 #define CAM_CSID_LITE_DRV_NAME                    "csid_lite"
 
-static struct cam_ife_csid_hw_info cam_ife_csid_lite_17x_hw_info = {
+static struct cam_ife_csid_hw_info cam_ife_csid_lite_hw_info = {
 	.csid_reg = &cam_ife_csid_lite_17x_reg_offset,
-};
-
-static struct cam_ife_csid_hw_info cam_ife_csid_lite_480_hw_info = {
-	.csid_reg = &cam_ife_csid_lite_480_reg_offset,
 };
 
 static const struct of_device_id cam_ife_csid_lite_dt_match[] = {
 	{
 		.compatible = "qcom,csid-lite170",
-		.data = &cam_ife_csid_lite_17x_hw_info,
+		.data = &cam_ife_csid_lite_hw_info,
 	},
 	{
 		.compatible = "qcom,csid-lite175",
-		.data = &cam_ife_csid_lite_17x_hw_info,
-	},
-	{
-		.compatible = "qcom,csid-lite480",
-		.data = &cam_ife_csid_lite_480_hw_info,
+		.data = &cam_ife_csid_lite_hw_info,
 	},
 	{}
 };

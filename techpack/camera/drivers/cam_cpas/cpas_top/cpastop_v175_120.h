@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CPASTOP_V175_120_H_
@@ -706,7 +713,6 @@ static struct cam_camnoc_specific
 		.ubwc_ctl = {
 			.enable = false,
 		},
-
 	},
 	{
 		/*SidebandManager_main_SidebandManager_FlagOutSet0_Low*/
@@ -749,10 +755,12 @@ static struct cam_cpas_hw_errata_wa_list cam175_cpas120_errata_wa_list = {
 
 static struct cam_camnoc_info cam175_cpas120_camnoc_info = {
 	.specific = &cam_cpas_v175_120_camnoc_specific[0],
-	.specific_size =  ARRAY_SIZE(cam_cpas_v175_120_camnoc_specific),
+	.specific_size = sizeof(cam_cpas_v175_120_camnoc_specific) /
+		sizeof(cam_cpas_v175_120_camnoc_specific[0]),
 	.irq_sbm = &cam_cpas_v175_120_irq_sbm,
 	.irq_err = &cam_cpas_v175_120_irq_err[0],
-	.irq_err_size = ARRAY_SIZE(cam_cpas_v175_120_irq_err),
+	.irq_err_size = sizeof(cam_cpas_v175_120_irq_err) /
+		sizeof(cam_cpas_v175_120_irq_err[0]),
 	.err_logger = &cam175_cpas120_err_logger_offsets,
 	.errata_wa_list = &cam175_cpas120_errata_wa_list,
 };

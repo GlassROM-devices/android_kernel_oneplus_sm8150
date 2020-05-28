@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_VFE_BUS_H_
@@ -12,18 +19,7 @@
 
 #define CAM_VFE_BUS_VER_1_0             0x1000
 #define CAM_VFE_BUS_VER_2_0             0x2000
-#define CAM_VFE_BUS_VER_3_0             0x3000
-
-#define CAM_VFE_BUS_RD_VER_1_0          0x1000
-
-#define CAM_VFE_ADD_REG_VAL_PAIR(buf_array, index, offset, val)    \
-	do {                                               \
-		buf_array[(index)++] = offset;             \
-		buf_array[(index)++] = val;                \
-	} while (0)
-
-#define ALIGNUP(value, alignment) \
-	((value + alignment - 1) / alignment * alignment)
+#define CAM_VFE_BUS_RD_VER_4_0          0x4000
 
 enum cam_vfe_bus_plane_type {
 	PLANE_Y,
@@ -79,7 +75,7 @@ int cam_vfe_bus_init(uint32_t          bus_version,
 	struct cam_hw_intf            *hw_intf,
 	void                          *bus_hw_info,
 	void                          *vfe_irq_controller,
-	struct cam_vfe_bus           **vfe_bus);
+	struct cam_vfe_bus            **vfe_bus);
 
 /*
  * cam_vfe_bus_deinit()

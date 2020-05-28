@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_COMMON_UTIL_H_
@@ -29,7 +36,7 @@
  *                         -EINVAL for Fail
  */
 int cam_common_util_get_string_index(const char **strings,
-	uint32_t num_strings, const char *matching_string, uint32_t *index);
+	uint32_t num_strings, char *matching_string, uint32_t *index);
 
 /**
  * cam_common_util_remove_duplicate_arr()
@@ -45,4 +52,26 @@ int cam_common_util_get_string_index(const char **strings,
 uint32_t cam_common_util_remove_duplicate_arr(int32_t *array,
 	uint32_t num);
 
+/**
+ * cam_common_util_get_time_diff()
+ *
+ * @brief                  Get the time difference between 2 timestamps in usecs
+ *
+ * @t1:                    Pointer to the later time
+ * @t2:                    Pointer to the prev
+ *
+ * @return:                differnce in usecs
+ */
+uint64_t cam_common_util_get_time_diff(struct timeval *t1, struct timeval *t2);
+
+/**
+ * cam_comomon_util_get_curr_timestamp()
+ *
+ * @brief                 Get the current timestamp
+ *
+ * @time:                 Pointer to the time
+ *
+ * @return:               void
+ */
+void cam_common_util_get_curr_timestamp(struct timeval *time_stamp);
 #endif /* _CAM_COMMON_UTIL_H_ */

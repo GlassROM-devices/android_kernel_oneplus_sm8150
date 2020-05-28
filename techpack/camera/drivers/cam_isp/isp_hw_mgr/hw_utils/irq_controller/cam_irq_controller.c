@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/slab.h>
@@ -53,8 +60,6 @@ struct cam_irq_evt_handler {
  * @clear_reg_offset:       Offset of IRQ CLEAR register
  * @status_reg_offset:      Offset of IRQ STATUS register
  * @top_half_enable_mask:   Array of enabled bit_mask sorted by priority
- * @pclear_mask:            Partial mask to be cleared in case entire status
- *                          register is not to be cleared
  */
 struct cam_irq_register_obj {
 	uint32_t                     index;
@@ -62,7 +67,6 @@ struct cam_irq_register_obj {
 	uint32_t                     clear_reg_offset;
 	uint32_t                     status_reg_offset;
 	uint32_t                     top_half_enable_mask[CAM_IRQ_PRIORITY_MAX];
-	uint32_t                     pclear_mask;
 };
 
 /**
@@ -87,8 +91,6 @@ struct cam_irq_register_obj {
  * @hdl_idx:                Unique identity of handler assigned on Subscribe.
  *                          Used to Unsubscribe.
  * @lock:                   Lock for use by controller
- * @clear_all:              Flag to indicate whether to clear entire status
- *                          register
  */
 struct cam_irq_controller {
 	const char                     *name;
@@ -103,7 +105,6 @@ struct cam_irq_controller {
 	uint32_t                        hdl_idx;
 	spinlock_t                      lock;
 	struct cam_irq_th_payload       th_payload;
-	bool                            clear_all;
 };
 
 int cam_irq_controller_deinit(void **irq_controller)
@@ -131,8 +132,7 @@ int cam_irq_controller_deinit(void **irq_controller)
 int cam_irq_controller_init(const char       *name,
 	void __iomem                         *mem_base,
 	struct cam_irq_controller_reg_info   *register_info,
-	void                                **irq_controller,
-	bool                                  clear_all)
+	void                                **irq_controller)
 {
 	struct cam_irq_controller *controller = NULL;
 	int i, rc = 0;
@@ -201,7 +201,6 @@ int cam_irq_controller_init(const char       *name,
 	controller->global_clear_bitmask = register_info->global_clear_bitmask;
 	controller->global_clear_offset  = register_info->global_clear_offset;
 	controller->mem_base             = mem_base;
-	controller->clear_all            = clear_all;
 
 	CAM_DBG(CAM_IRQ_CTRL, "global_clear_bitmask: 0x%x",
 		controller->global_clear_bitmask);
@@ -327,9 +326,6 @@ int cam_irq_controller_subscribe_irq(void *irq_controller,
 		spin_lock_irqsave(&controller->lock, flags);
 	for (i = 0; i < controller->num_registers; i++) {
 		controller->irq_register_arr[i].top_half_enable_mask[priority]
-			|= evt_bit_mask_arr[i];
-
-		controller->irq_register_arr[i].pclear_mask
 			|= evt_bit_mask_arr[i];
 
 		irq_mask = cam_io_r_mb(controller->mem_base +
@@ -621,8 +617,7 @@ static void cam_irq_controller_th_processing(
 				evt_handler->bottom_half, &bh_cmd);
 			if (rc || !bh_cmd) {
 				CAM_ERR_RATE_LIMIT(CAM_ISP,
-					"No payload, IRQ handling frozen for %s",
-					controller->name);
+					"No payload, IRQ handling frozen");
 				continue;
 			}
 		}
@@ -701,19 +696,11 @@ irqreturn_t cam_irq_controller_handle_irq(int irq_num, void *priv)
 	for (i = 0; i < controller->num_registers; i++) {
 		irq_register = &controller->irq_register_arr[i];
 		controller->irq_status_arr[i] = cam_io_r_mb(
-			controller->mem_base + irq_register->status_reg_offset);
-
-		if (controller->clear_all)
-			cam_io_w_mb(controller->irq_status_arr[i],
-				controller->mem_base +
-				irq_register->clear_reg_offset);
-		else
-			cam_io_w_mb(
-				controller->irq_register_arr[i].pclear_mask &
-				controller->irq_status_arr[i],
-				controller->mem_base +
-				irq_register->clear_reg_offset);
-
+			controller->mem_base +
+			controller->irq_register_arr[i].status_reg_offset);
+		cam_io_w_mb(controller->irq_status_arr[i],
+			controller->mem_base +
+			controller->irq_register_arr[i].clear_reg_offset);
 		CAM_DBG(CAM_IRQ_CTRL, "Read irq status%d (0x%x) = 0x%x", i,
 			controller->irq_register_arr[i].status_reg_offset,
 			controller->irq_status_arr[i]);

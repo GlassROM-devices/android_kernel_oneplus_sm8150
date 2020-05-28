@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/of.h>
@@ -8,6 +15,7 @@
 #include <linux/videodev2.h>
 #include <linux/uaccess.h>
 #include <linux/platform_device.h>
+#include <linux/firmware.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
 
@@ -41,7 +49,7 @@ int cam_jpeg_enc_init_hw(void *device_priv,
 	struct cam_hw_soc_info *soc_info = NULL;
 	struct cam_jpeg_enc_device_core_info *core_info = NULL;
 	struct cam_ahb_vote ahb_vote;
-	struct cam_axi_vote axi_vote = {0};
+	struct cam_axi_vote axi_vote;
 	int rc;
 
 	if (!device_priv) {
@@ -66,19 +74,9 @@ int cam_jpeg_enc_init_hw(void *device_priv,
 	}
 
 	ahb_vote.type = CAM_VOTE_ABSOLUTE;
-	ahb_vote.vote.level = CAM_LOWSVS_VOTE;
-	axi_vote.num_paths = 2;
-	axi_vote.axi_path[0].path_data_type = CAM_AXI_PATH_DATA_ALL;
-	axi_vote.axi_path[0].transac_type = CAM_AXI_TRANSACTION_READ;
-	axi_vote.axi_path[0].camnoc_bw = JPEG_VOTE;
-	axi_vote.axi_path[0].mnoc_ab_bw = JPEG_VOTE;
-	axi_vote.axi_path[0].mnoc_ib_bw = JPEG_VOTE;
-	axi_vote.axi_path[1].path_data_type = CAM_AXI_PATH_DATA_ALL;
-	axi_vote.axi_path[1].transac_type = CAM_AXI_TRANSACTION_WRITE;
-	axi_vote.axi_path[1].camnoc_bw = JPEG_VOTE;
-	axi_vote.axi_path[1].mnoc_ab_bw = JPEG_VOTE;
-	axi_vote.axi_path[1].mnoc_ib_bw = JPEG_VOTE;
-
+	ahb_vote.vote.level = CAM_SVS_VOTE;
+	axi_vote.compressed_bw = JPEG_VOTE;
+	axi_vote.uncompressed_bw = JPEG_VOTE;
 
 	rc = cam_cpas_start(core_info->cpas_handle,
 		&ahb_vote, &axi_vote);
@@ -378,6 +376,64 @@ int cam_jpeg_enc_stop_hw(void *data,
 	return 0;
 }
 
+int cam_jpeg_enc_hw_dump(
+	struct cam_hw_info *jpeg_enc_dev,
+	struct cam_jpeg_hw_dump_args *dump_args)
+{
+
+	struct cam_hw_soc_info *soc_info = NULL;
+	int i;
+	char *dst;
+	uint32_t *addr, *start;
+	struct cam_jpeg_hw_dump_header *hdr;
+	uint32_t num_reg, min_len, remain_len, reg_start_offset;
+	struct cam_jpeg_enc_device_core_info *core_info;
+	struct cam_jpeg_enc_device_hw_info *hw_info = NULL;
+
+	soc_info = &jpeg_enc_dev->soc_info;
+	core_info = (struct cam_jpeg_enc_device_core_info *)
+		jpeg_enc_dev->core_info;
+	hw_info = core_info->jpeg_enc_hw_info;
+	spin_lock(&jpeg_enc_dev->hw_lock);
+	if (jpeg_enc_dev->hw_state == CAM_HW_STATE_POWER_DOWN) {
+		CAM_ERR(CAM_JPEG, "JPEG HW is in off state");
+		spin_unlock(&jpeg_enc_dev->hw_lock);
+		return -EINVAL;
+	}
+	spin_unlock(&jpeg_enc_dev->hw_lock);
+	remain_len = dump_args->buf_len - dump_args->offset;
+	min_len =  2 * (sizeof(struct cam_jpeg_hw_dump_header) +
+		    CAM_JPEG_HW_DUMP_TAG_MAX_LEN) +
+		    soc_info->reg_map[0].size;
+	if (remain_len < min_len) {
+		CAM_ERR(CAM_JPEG, "dump buffer exhaust %d %d",
+			remain_len, min_len);
+		return 0;
+	}
+	dst = (char *)dump_args->cpu_addr + dump_args->offset;
+	hdr = (struct cam_jpeg_hw_dump_header *)dst;
+	snprintf(hdr->tag, CAM_JPEG_HW_DUMP_TAG_MAX_LEN,
+		"JPEG_REG:");
+	hdr->word_size = sizeof(uint32_t);
+	addr = (uint32_t *)(dst + sizeof(struct cam_jpeg_hw_dump_header));
+	start = addr;
+	*addr++ = soc_info->index;
+	num_reg = (hw_info->reg_dump.end_offset -
+		hw_info->reg_dump.start_offset)/4;
+	reg_start_offset = hw_info->reg_dump.start_offset;
+	for (i = 0; i < num_reg; i++) {
+		*addr++ = soc_info->mem_block[0]->start +
+			reg_start_offset + i*4;
+		*addr++ = cam_io_r(soc_info->reg_map[0].mem_base + (i*4));
+	}
+	hdr->size = hdr->word_size * (addr - start);
+	dump_args->offset += hdr->size +
+		sizeof(struct cam_jpeg_hw_dump_header);
+	CAM_DBG(CAM_JPEG, "offset %d", dump_args->offset);
+
+	return 0;
+}
+
 int cam_jpeg_enc_process_cmd(void *device_priv, uint32_t cmd_type,
 	void *cmd_args, uint32_t arg_size)
 {
@@ -416,6 +472,12 @@ int cam_jpeg_enc_process_cmd(void *device_priv, uint32_t cmd_type,
 			core_info->irq_cb.data = NULL;
 		}
 		rc = 0;
+		break;
+	}
+	case CAM_JPEG_CMD_HW_DUMP:
+	{
+		rc = cam_jpeg_enc_hw_dump(jpeg_enc_dev,
+			cmd_args);
 		break;
 	}
 	default:

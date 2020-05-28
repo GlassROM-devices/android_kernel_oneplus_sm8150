@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/slab.h>
@@ -11,7 +18,7 @@
 #include "cam_ife_csid_hw_intf.h"
 #include "cam_debug_util.h"
 
-static struct cam_hw_intf *cam_ife_csid_hw_list[CAM_IFE_CSID_HW_NUM_MAX] = {
+static struct cam_hw_intf *cam_ife_csid_hw_list[CAM_IFE_CSID_HW_RES_MAX] = {
 	0, 0, 0, 0};
 
 static char csid_dev_name[8];
@@ -76,7 +83,7 @@ int cam_ife_csid_probe(struct platform_device *pdev)
 	/* need to setup the pdev before call the ife hw probe init */
 	csid_dev->csid_info = csid_hw_data;
 
-	rc = cam_ife_csid_hw_probe_init(csid_hw_intf, csid_dev_idx, false);
+	rc = cam_ife_csid_hw_probe_init(csid_hw_intf, csid_dev_idx);
 	if (rc)
 		goto free_dev;
 
@@ -85,7 +92,7 @@ int cam_ife_csid_probe(struct platform_device *pdev)
 		csid_hw_intf->hw_idx);
 
 
-	if (csid_hw_intf->hw_idx < CAM_IFE_CSID_HW_NUM_MAX)
+	if (csid_hw_intf->hw_idx < CAM_IFE_CSID_HW_RES_MAX)
 		cam_ife_csid_hw_list[csid_hw_intf->hw_idx] = csid_hw_intf;
 	else
 		goto free_dev;

@@ -1,12 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/module.h>
+#include <linux/ion.h>
+#include <linux/iommu.h>
 #include <linux/timer.h>
 #include <linux/kernel.h>
 
@@ -413,7 +422,7 @@ int cam_hw_cdm_submit_bl(struct cam_hw_info *cdm_hw,
 	}
 
 	for (i = 0; i < req->data->cmd_arrary_count ; i++) {
-		dma_addr_t hw_vaddr_ptr = 0;
+		uint64_t hw_vaddr_ptr = 0;
 		size_t len = 0;
 
 		if ((!cdm_cmd->cmd[i].len) &&
@@ -473,17 +482,6 @@ int cam_hw_cdm_submit_bl(struct cam_hw_info *cdm_hw,
 
 		if ((!rc) && (hw_vaddr_ptr) && (len) &&
 			(len >= cdm_cmd->cmd[i].offset)) {
-
-			if ((len - cdm_cmd->cmd[i].offset) <
-				cdm_cmd->cmd[i].len) {
-				CAM_ERR(CAM_CDM,
-					"Not enough buffer cmd offset: %u cmd length: %u",
-					cdm_cmd->cmd[i].offset,
-					cdm_cmd->cmd[i].len);
-				rc = -EINVAL;
-				break;
-			}
-
 			CAM_DBG(CAM_CDM, "Got the HW VA");
 			if (core->bl_tag >=
 				(CAM_CDM_HWFIFO_SIZE - 1))
@@ -665,12 +663,6 @@ irqreturn_t cam_hw_cdm_irq(int irq_num, void *data)
 			kfree(payload);
 			return IRQ_HANDLED;
 		}
-		if (cam_cdm_write_hw_reg(cdm_hw, CDM_IRQ_CLEAR,
-			payload->irq_status))
-			CAM_ERR(CAM_CDM, "Failed to Write CDM HW IRQ Clear");
-		if (cam_cdm_write_hw_reg(cdm_hw, CDM_IRQ_CLEAR_CMD, 0x01))
-			CAM_ERR(CAM_CDM, "Failed to Write CDM HW IRQ cmd");
-
 		if (payload->irq_status &
 			CAM_CDM_IRQ_STATUS_INFO_INLINE_IRQ_MASK) {
 			if (cam_cdm_read_hw_reg(cdm_hw, CDM_IRQ_USR_DATA,
@@ -683,6 +675,11 @@ irqreturn_t cam_hw_cdm_irq(int irq_num, void *data)
 		payload->hw = cdm_hw;
 		INIT_WORK((struct work_struct *)&payload->work,
 			cam_hw_cdm_work);
+		if (cam_cdm_write_hw_reg(cdm_hw, CDM_IRQ_CLEAR,
+			payload->irq_status))
+			CAM_ERR(CAM_CDM, "Failed to Write CDM HW IRQ Clear");
+		if (cam_cdm_write_hw_reg(cdm_hw, CDM_IRQ_CLEAR_CMD, 0x01))
+			CAM_ERR(CAM_CDM, "Failed to Write CDM HW IRQ cmd");
 		work_status = queue_work(cdm_core->work_queue, &payload->work);
 		if (work_status == false) {
 			CAM_ERR(CAM_CDM, "Failed to queue work for irq=0x%x",
@@ -838,7 +835,7 @@ int cam_hw_cdm_probe(struct platform_device *pdev)
 	struct cam_cdm_private_dt_data *soc_private = NULL;
 	struct cam_cpas_register_params cpas_parms;
 	struct cam_ahb_vote ahb_vote;
-	struct cam_axi_vote axi_vote = {0};
+	struct cam_axi_vote axi_vote;
 
 	cdm_hw_intf = kzalloc(sizeof(struct cam_hw_intf), GFP_KERNEL);
 	if (!cdm_hw_intf)
@@ -915,6 +912,11 @@ int cam_hw_cdm_probe(struct platform_device *pdev)
 	cam_smmu_set_client_page_fault_handler(cdm_core->iommu_hdl.non_secure,
 		cam_hw_cdm_iommu_fault_handler, cdm_hw);
 
+	rc = cam_smmu_ops(cdm_core->iommu_hdl.non_secure, CAM_SMMU_ATTACH);
+	if (rc < 0) {
+		CAM_ERR(CAM_CDM, "Attach iommu non secure handle failed");
+		goto destroy_non_secure_hdl;
+	}
 	cdm_core->iommu_hdl.secure = -1;
 
 	cdm_core->work_queue = alloc_workqueue(cdm_core->name,
@@ -943,14 +945,9 @@ int cam_hw_cdm_probe(struct platform_device *pdev)
 	cdm_core->cpas_handle = cpas_parms.client_handle;
 
 	ahb_vote.type = CAM_VOTE_ABSOLUTE;
-	ahb_vote.vote.level = CAM_LOWSVS_VOTE;
-	axi_vote.num_paths = 1;
-	axi_vote.axi_path[0].path_data_type = CAM_AXI_PATH_DATA_ALL;
-	axi_vote.axi_path[0].transac_type = CAM_AXI_TRANSACTION_READ;
-	axi_vote.axi_path[0].camnoc_bw = CAM_CPAS_DEFAULT_AXI_BW;
-	axi_vote.axi_path[0].mnoc_ab_bw = CAM_CPAS_DEFAULT_AXI_BW;
-	axi_vote.axi_path[0].mnoc_ib_bw = CAM_CPAS_DEFAULT_AXI_BW;
-
+	ahb_vote.vote.level = CAM_SVS_VOTE;
+	axi_vote.compressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
+	axi_vote.uncompressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
 	rc = cam_cpas_start(cdm_core->cpas_handle, &ahb_vote, &axi_vote);
 	if (rc) {
 		CAM_ERR(CAM_CDM, "CPAS start failed");

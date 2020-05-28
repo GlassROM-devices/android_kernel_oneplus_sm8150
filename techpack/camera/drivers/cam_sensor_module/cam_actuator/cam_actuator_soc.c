@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/of.h>
@@ -21,7 +28,6 @@ int32_t cam_actuator_parse_dt(struct cam_actuator_ctrl_t *a_ctrl,
 		(struct cam_actuator_soc_private *)a_ctrl->soc_info.soc_private;
 	struct cam_sensor_power_ctrl_t  *power_info = &soc_private->power_info;
 	struct device_node              *of_node = NULL;
-	struct device_node              *of_parent = NULL;
 
 	/* Initialize mutex */
 	mutex_init(&(a_ctrl->actuator_mutex));
@@ -47,13 +53,16 @@ int32_t cam_actuator_parse_dt(struct cam_actuator_ctrl_t *a_ctrl,
 			return rc;
 		}
 
-		of_parent = of_get_parent(of_node);
-		if (of_property_read_u32(of_parent, "cell-index",
-				&a_ctrl->cci_num) < 0)
+		rc = of_property_read_u32(of_node, "cci-device",
+			&a_ctrl->cci_num);
+		CAM_DBG(CAM_ACTUATOR, "cci-device %d, rc %d",
+			a_ctrl->cci_num, rc);
+		if (rc < 0) {
 			/* Set default master 0 */
 			a_ctrl->cci_num = CCI_DEVICE_0;
+			rc = 0;
+		}
 		a_ctrl->io_master_info.cci_client->cci_device = a_ctrl->cci_num;
-		CAM_DBG(CAM_ACTUATOR, "cci-device %d", a_ctrl->cci_num);
 	}
 
 	if (!soc_info->gpio_data) {

@@ -1,17 +1,29 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_ISP_HW_H_
 #define _CAM_ISP_HW_H_
 
 #include <linux/completion.h>
-#include <media/cam_isp.h>
 #include "cam_hw.h"
+#include <uapi/media/cam_isp.h>
 #include "cam_soc_util.h"
 #include "cam_irq_controller.h"
-#include "cam_hw_intf.h"
+#include <uapi/media/cam_isp.h>
+
+#define CAM_ISP_FPS_60                           60
+
+/* Maximum length of tag while dumping */
+#define CAM_ISP_HW_DUMP_TAG_MAX_LEN 32
 
 /*
  * struct cam_isp_timestamp:
@@ -19,11 +31,13 @@
  * @mono_time:          Monotonic boot time
  * @vt_time:            AV Timer time
  * @ticks:              Qtimer ticks
+ * @time_usecs:         time in micro seconds
  */
 struct cam_isp_timestamp {
 	struct timeval          mono_time;
 	struct timeval          vt_time;
 	uint64_t                ticks;
+	uint64_t                time_usecs;
 };
 
 /*
@@ -88,20 +102,20 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_CMD_STRIPE_UPDATE,
 	CAM_ISP_HW_CMD_CLOCK_UPDATE,
 	CAM_ISP_HW_CMD_BW_UPDATE,
-	CAM_ISP_HW_CMD_BW_UPDATE_V2,
 	CAM_ISP_HW_CMD_BW_CONTROL,
 	CAM_ISP_HW_CMD_STOP_BUS_ERR_IRQ,
+	CAM_ISP_HW_CMD_GET_REG_DUMP,
 	CAM_ISP_HW_CMD_UBWC_UPDATE,
 	CAM_ISP_HW_CMD_SOF_IRQ_DEBUG,
 	CAM_ISP_HW_CMD_SET_CAMIF_DEBUG,
 	CAM_ISP_HW_CMD_CSID_CLOCK_UPDATE,
 	CAM_ISP_HW_CMD_FE_UPDATE_IN_RD,
 	CAM_ISP_HW_CMD_FE_UPDATE_BUS_RD,
-	CAM_ISP_HW_CMD_UBWC_UPDATE_V2,
-	CAM_ISP_HW_CMD_CORE_CONFIG,
-	CAM_ISP_HW_CMD_WM_CONFIG_UPDATE,
-	CAM_ISP_HW_CMD_CSID_QCFA_SUPPORTED,
-	CAM_ISP_HW_CMD_QUERY_REGSPACE_DATA,
+	CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP,
+	CAM_ISP_HW_CMD_FPS_CONFIG,
+	CAM_ISP_HW_CMD_DUMP_HW,
+	CAM_ISP_HW_CMD_SET_STATS_DMI_DUMP,
+	CAM_ISP_HW_CMD_GET_RDI_IRQ_MASK,
 	CAM_ISP_HW_CMD_MAX,
 };
 
@@ -157,24 +171,6 @@ struct cam_isp_resource_node {
 };
 
 /*
- * struct cam_isp_hw_event_info:
- *
- * @Brief:          Structure to pass event details to hw mgr
- *
- * @res_type:       Type of IFE resource
- * @res_id:         Unique resource ID
- * @hw_idx:         IFE hw index
- * @err_type:       Error type if any
- *
- */
-struct cam_isp_hw_event_info {
-	enum cam_isp_resource_type     res_type;
-	uint32_t                       res_id;
-	uint32_t                       hw_idx;
-	uint32_t                       err_type;
-};
-
-/*
  * struct cam_isp_hw_cmd_buf_update:
  *
  * @Brief:           Contain the new created command buffer information
@@ -201,9 +197,23 @@ struct cam_isp_hw_cmd_buf_update {
  *
  */
 struct cam_isp_hw_get_wm_update {
-	dma_addr_t                     *image_buf;
+	uint64_t                       *image_buf;
 	uint32_t                        num_buf;
 	struct cam_buf_io_cfg          *io_cfg;
+};
+
+/*
+ * struct cam_isp_hw_rup_data:
+ *
+ * @Brief:         RUP for required resources.
+ *
+ * @is_fe_enable   if fetch engine enabled
+ * @res_bitmap     resource bitmap for set resources
+ *
+ */
+struct cam_isp_hw_rup_data {
+	bool                            is_fe_enable;
+	unsigned long                   res_bitmap;
 };
 
 /*
@@ -229,8 +239,7 @@ struct cam_isp_hw_get_cmd_update {
 		struct cam_isp_bw_config             *bw_update;
 		struct cam_ubwc_plane_cfg_v1         *ubwc_update;
 		struct cam_fe_config                 *fe_update;
-		struct cam_vfe_generic_ubwc_config   *ubwc_config;
-		struct cam_isp_vfe_wm_config         *wm_config;
+		struct cam_isp_hw_rup_data           *rup_data;
 	};
 };
 
@@ -248,5 +257,40 @@ struct cam_isp_hw_dual_isp_update_args {
 	enum cam_isp_hw_split_id         split_id;
 	struct cam_isp_resource_node    *res;
 	struct cam_isp_dual_config      *dual_cfg;
+};
+
+/*
+ * struct cam_isp_hw_dump_args:
+ *
+ * @Brief:        isp hw dump args
+ *
+ * @ req_id:         request id
+ * @ cpu_addr:       cpu address
+ * @ buf_len:        buf len
+ * @ offset:         offset of buffer
+ * @ ctxt_to_hw_map: ctx to hw map
+ */
+struct cam_isp_hw_dump_args {
+	uint64_t                req_id;
+	uintptr_t               cpu_addr;
+	size_t                  buf_len;
+	uint32_t                offset;
+	void                    *ctxt_to_hw_map;
+};
+
+/**
+ * struct cam_isp_hw_dump_header - ISP context dump header
+ *
+ * @Brief:        isp hw dump header
+ *
+ * @tag:       Tag name for the header
+ * @word_size: Size of word
+ * @size:      Size of data
+ *
+ */
+struct cam_isp_hw_dump_header {
+	char      tag[CAM_ISP_HW_DUMP_TAG_MAX_LEN];
+	uint64_t  size;
+	uint32_t  word_size;
 };
 #endif /* _CAM_ISP_HW_H_ */

@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/of.h>
@@ -12,11 +19,9 @@
 #include <media/v4l2-subdev.h>
 #include <media/cam_cpas.h>
 #include <media/cam_req_mgr.h>
-#include <dt-bindings/msm/msm-camera.h>
 
 #include "cam_subdev.h"
 #include "cam_cpas_hw_intf.h"
-#include "cam_cpas_soc.h"
 
 #define CAM_CPAS_DEV_NAME    "cam-cpas"
 #define CAM_CPAS_INTF_INITIALIZED() (g_cpas_intf && g_cpas_intf->probe_done)
@@ -45,92 +50,6 @@ struct cam_cpas_intf {
 
 static struct cam_cpas_intf *g_cpas_intf;
 
-const char *cam_cpas_axi_util_path_type_to_string(
-	uint32_t path_data_type)
-{
-	switch (path_data_type) {
-	/* IFE Paths */
-	case CAM_AXI_PATH_DATA_IFE_LINEAR:
-		return "IFE_LINEAR";
-	case CAM_AXI_PATH_DATA_IFE_VID:
-		return "IFE_VID";
-	case CAM_AXI_PATH_DATA_IFE_DISP:
-		return "IFE_DISP";
-	case CAM_AXI_PATH_DATA_IFE_STATS:
-		return "IFE_STATS";
-	case CAM_AXI_PATH_DATA_IFE_RDI0:
-		return "IFE_RDI0";
-	case CAM_AXI_PATH_DATA_IFE_RDI1:
-		return "IFE_RDI1";
-	case CAM_AXI_PATH_DATA_IFE_RDI2:
-		return "IFE_RDI2";
-	case CAM_AXI_PATH_DATA_IFE_RDI3:
-		return "IFE_RDI3";
-	case CAM_AXI_PATH_DATA_IFE_PDAF:
-		return "IFE_PDAF";
-	case CAM_AXI_PATH_DATA_IFE_PIXEL_RAW:
-		return "IFE_PIXEL_RAW";
-
-	/* IPE Paths */
-	case CAM_AXI_PATH_DATA_IPE_RD_IN:
-		return "IPE_RD_IN";
-	case CAM_AXI_PATH_DATA_IPE_RD_REF:
-		return "IPE_RD_REF";
-	case CAM_AXI_PATH_DATA_IPE_WR_VID:
-		return "IPE_WR_VID";
-	case CAM_AXI_PATH_DATA_IPE_WR_DISP:
-		return "IPE_WR_DISP";
-	case CAM_AXI_PATH_DATA_IPE_WR_REF:
-		return "IPE_WR_REF";
-
-	/* Common Paths */
-	case CAM_AXI_PATH_DATA_ALL:
-		return "DATA_ALL";
-	default:
-		return "IFE_PATH_INVALID";
-	}
-}
-EXPORT_SYMBOL(cam_cpas_axi_util_path_type_to_string);
-
-const char *cam_cpas_axi_util_trans_type_to_string(
-	uint32_t transac_type)
-{
-	switch (transac_type) {
-	case CAM_AXI_TRANSACTION_READ:
-		return "TRANSAC_READ";
-	case CAM_AXI_TRANSACTION_WRITE:
-		return "TRANSAC_WRITE";
-	default:
-		return "TRANSAC_INVALID";
-	}
-}
-EXPORT_SYMBOL(cam_cpas_axi_util_trans_type_to_string);
-
-int cam_cpas_is_feature_supported(uint32_t flag)
-{
-	struct cam_hw_info *cpas_hw = NULL;
-	struct cam_cpas_private_soc *soc_private = NULL;
-	uint32_t feature_mask;
-
-	if (!CAM_CPAS_INTF_INITIALIZED()) {
-		CAM_ERR(CAM_CPAS, "cpas intf not initialized");
-		return -ENODEV;
-	}
-
-	cpas_hw = (struct cam_hw_info *) g_cpas_intf->hw_intf->hw_priv;
-	soc_private =
-		(struct cam_cpas_private_soc *)cpas_hw->soc_info.soc_private;
-	feature_mask = soc_private->feature_mask;
-
-	if (flag >= CAM_CPAS_FUSE_FEATURE_MAX) {
-		CAM_ERR(CAM_CPAS, "Unknown feature flag %x", flag);
-		return -EINVAL;
-	}
-
-	return feature_mask & flag ? 1 : 0;
-}
-EXPORT_SYMBOL(cam_cpas_is_feature_supported);
-
 int cam_cpas_get_cpas_hw_version(uint32_t *hw_version)
 {
 	struct cam_hw_info *cpas_hw = NULL;
@@ -156,6 +75,7 @@ int cam_cpas_get_cpas_hw_version(uint32_t *hw_version)
 
 	return 0;
 }
+
 
 int cam_cpas_get_hw_info(uint32_t *camera_family,
 	struct cam_hw_version *camera_version,
@@ -271,11 +191,6 @@ int cam_cpas_update_axi_vote(uint32_t client_handle,
 		return -ENODEV;
 	}
 
-	if (!axi_vote) {
-		CAM_ERR(CAM_CPAS, "NULL axi vote");
-		return -EINVAL;
-	}
-
 	if (g_cpas_intf->hw_intf->hw_ops.process_cmd) {
 		struct cam_cpas_hw_cmd_axi_vote cmd_axi_vote;
 
@@ -364,11 +279,6 @@ int cam_cpas_start(uint32_t client_handle,
 	if (!CAM_CPAS_INTF_INITIALIZED()) {
 		CAM_ERR(CAM_CPAS, "cpas intf not initialized");
 		return -ENODEV;
-	}
-
-	if (!axi_vote) {
-		CAM_ERR(CAM_CPAS, "NULL axi vote");
-		return -EINVAL;
 	}
 
 	if (g_cpas_intf->hw_intf->hw_ops.start) {

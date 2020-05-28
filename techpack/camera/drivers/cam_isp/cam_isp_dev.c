@@ -1,17 +1,25 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/module.h>
+#include <linux/ion.h>
 #include <linux/iommu.h>
 #include <linux/timer.h>
 #include <linux/kernel.h>
 
-#include <media/cam_req_mgr.h>
+#include <uapi/media/cam_req_mgr.h>
 #include "cam_isp_dev.h"
 #include "cam_hw_mgr_intf.h"
 #include "cam_isp_hw_mgr_intf.h"
@@ -120,7 +128,7 @@ static int cam_isp_dev_probe(struct platform_device *pdev)
 	int iommu_hdl = -1;
 
 	g_isp_dev.sd.internal_ops = &cam_isp_subdev_internal_ops;
-	/* Initialize the v4l2 subdevice first. (create cam_node) */
+	/* Initialze the v4l2 subdevice first. (create cam_node) */
 	rc = cam_subdev_probe(&g_isp_dev.sd, pdev, CAM_ISP_DEV_NAME,
 		CAM_IFE_DEVICE_TYPE);
 	if (rc) {

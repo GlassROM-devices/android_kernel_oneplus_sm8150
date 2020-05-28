@@ -1,13 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include "cam_vfe_bus.h"
 #include "cam_vfe_bus_ver1.h"
 #include "cam_vfe_bus_ver2.h"
 #include "cam_vfe_bus_rd_ver1.h"
-#include "cam_vfe_bus_ver3.h"
 #include "cam_debug_util.h"
 
 int cam_vfe_bus_init(uint32_t          bus_version,
@@ -22,36 +28,17 @@ int cam_vfe_bus_init(uint32_t          bus_version,
 
 	switch (bus_type) {
 	case BUS_TYPE_WR:
-		switch (bus_version) {
-		case CAM_VFE_BUS_VER_2_0:
+		if (CAM_VFE_BUS_VER_2_0)
 			rc = cam_vfe_bus_ver2_init(soc_info, hw_intf,
 				bus_hw_info, vfe_irq_controller, vfe_bus);
-			break;
-		case CAM_VFE_BUS_VER_3_0:
-			rc = cam_vfe_bus_ver3_init(soc_info, hw_intf,
-				bus_hw_info, vfe_irq_controller, vfe_bus);
-			break;
-		default:
-			CAM_ERR(CAM_ISP, "Unsupported Bus WR Version 0x%x",
-				bus_version);
-			break;
-		}
 		break;
 	case BUS_TYPE_RD:
-		switch (bus_version) {
-		case CAM_VFE_BUS_RD_VER_1_0:
-			/* Call vfe bus rd init function */
-			rc = cam_vfe_bus_rd_ver1_init(soc_info, hw_intf,
-				bus_hw_info, vfe_irq_controller, vfe_bus);
-			break;
-		default:
-			CAM_ERR(CAM_ISP, "Unsupported Bus RD Version 0x%x",
-				bus_version);
-			break;
-		}
+		/* Call vfe bus rd init function */
+		rc = cam_vfe_bus_rd_ver1_init(soc_info, hw_intf,
+			bus_hw_info, vfe_irq_controller, vfe_bus);
 		break;
 	default:
-		CAM_ERR(CAM_ISP, "Unsupported Bus type %d", bus_type);
+		CAM_ERR(CAM_ISP, "Unsupported Bus Version %x", bus_version);
 		break;
 	}
 
@@ -67,9 +54,6 @@ int cam_vfe_bus_deinit(uint32_t        bus_version,
 	case CAM_VFE_BUS_VER_2_0:
 		rc = cam_vfe_bus_ver2_deinit(vfe_bus);
 		break;
-	case CAM_VFE_BUS_VER_3_0:
-		rc = cam_vfe_bus_ver3_deinit(vfe_bus);
-		break;
 	default:
 		CAM_ERR(CAM_ISP, "Unsupported Bus Version %x", bus_version);
 		break;
@@ -77,3 +61,4 @@ int cam_vfe_bus_deinit(uint32_t        bus_version,
 
 	return rc;
 }
+

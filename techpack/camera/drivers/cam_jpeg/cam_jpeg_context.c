@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/debugfs.h>
@@ -9,6 +16,7 @@
 #include <linux/uaccess.h>
 
 #include "cam_mem_mgr.h"
+#include "cam_sync_api.h"
 #include "cam_jpeg_context.h"
 #include "cam_context_utils.h"
 #include "cam_debug_util.h"
@@ -83,6 +91,18 @@ static int __cam_jpeg_ctx_release_dev_in_acquired(struct cam_context *ctx,
 	return rc;
 }
 
+static int __cam_jpeg_ctx_dump_dev_in_acquired(struct cam_context *ctx,
+	struct cam_dump_req_cmd *cmd)
+{
+	int rc;
+
+	rc = cam_context_dump_dev_to_hw(ctx, cmd);
+	if (rc)
+		CAM_ERR(CAM_ICP, "Failed to dump device, rc=%d", rc);
+
+	return rc;
+}
+
 static int __cam_jpeg_ctx_flush_dev_in_acquired(struct cam_context *ctx,
 	struct cam_flush_dev_cmd *cmd)
 {
@@ -145,6 +165,7 @@ static struct cam_ctx_ops
 			.config_dev = __cam_jpeg_ctx_config_dev_in_acquired,
 			.stop_dev = __cam_jpeg_ctx_stop_dev_in_acquired,
 			.flush_dev = __cam_jpeg_ctx_flush_dev_in_acquired,
+			.dump_dev = __cam_jpeg_ctx_dump_dev_in_acquired,
 		},
 		.crm_ops = { },
 		.irq_ops = __cam_jpeg_ctx_handle_buf_done_in_acquired,

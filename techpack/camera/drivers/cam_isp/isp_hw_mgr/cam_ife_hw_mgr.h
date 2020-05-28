@@ -1,13 +1,19 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_IFE_HW_MGR_H_
 #define _CAM_IFE_HW_MGR_H_
 
 #include <linux/completion.h>
-#include <linux/time.h>
 #include "cam_isp_hw_mgr.h"
 #include "cam_vfe_hw_intf.h"
 #include "cam_ife_csid_hw_intf.h"
@@ -82,8 +88,8 @@ struct ctx_base_info {
  * @csid_debug:                csid debug information
  * @enable_recovery:           enable recovery
  * @enable_diag_sensor_status: enable sensor diagnosis status
- * @enable_req_dump:           Enable request dump on HW errors
- * @per_req_reg_dump:          Enable per request reg dump
+ * @enable_reg_dump:           enable register dump on error
+ * @enable_dmi_dump:           enable stats dmi and cfg reg dump
  *
  */
 struct cam_ife_hw_mgr_debug {
@@ -91,8 +97,8 @@ struct cam_ife_hw_mgr_debug {
 	uint64_t       csid_debug;
 	uint32_t       enable_recovery;
 	uint32_t       camif_debug;
-	bool           enable_req_dump;
-	bool           per_req_reg_dump;
+	uint32_t       enable_reg_dump;
+	uint32_t       enable_dmi_dump;
 };
 
 /**
@@ -125,19 +131,13 @@ struct cam_ife_hw_mgr_debug {
  * @eof_cnt                 eof count value per core, used for dual VFE
  * @overflow_pending        flat to specify the overflow is pending for the
  *                          context
- * @cdm_done                flag to indicate cdm has finished writing shadow
- *                          registers
  * @is_rdi_only_context     flag to specify the context has only rdi resource
  * @config_done_complete    indicator for configuration complete
- * @reg_dump_buf_desc:      cmd buffer descriptors for reg dump
- * @num_reg_dump_buf:       Count of descriptors in reg_dump_buf_desc
- * @applied_req_id:         Last request id to be applied
- * @last_dump_flush_req_id  Last req id for which reg dump on flush was called
- * @last_dump_err_req_id    Last req id for which reg dump on error was called
  * @init_done               indicate whether init hw is done
  * @is_fe_enable            indicate whether fetch engine\read path is enabled
- * @is_dual                 indicate whether context is in dual VFE mode
- * @ts                      captured timestamp when the ctx is acquired
+ * @res_bitmap              fill resource bitmap for which rup to be set
+ * @dual_ife_irq_mismatch_cnt   irq mismatch count value per core, used for
+ *                              dual VFE
  */
 struct cam_ife_hw_mgr_ctx {
 	struct list_head                list;
@@ -170,19 +170,12 @@ struct cam_ife_hw_mgr_ctx {
 	uint32_t                        epoch_cnt[CAM_IFE_HW_NUM_MAX];
 	uint32_t                        eof_cnt[CAM_IFE_HW_NUM_MAX];
 	atomic_t                        overflow_pending;
-	atomic_t                        cdm_done;
 	uint32_t                        is_rdi_only_context;
 	struct completion               config_done_complete;
-	struct cam_cmd_buf_desc         reg_dump_buf_desc[
-						CAM_REG_DUMP_MAX_BUF_ENTRIES];
-	uint32_t                        num_reg_dump_buf;
-	uint64_t                        applied_req_id;
-	uint64_t                        last_dump_flush_req_id;
-	uint64_t                        last_dump_err_req_id;
 	bool                            init_done;
 	bool                            is_fe_enable;
-	bool                            is_dual;
-	struct timespec64               ts;
+	uint32_t                        dual_ife_irq_mismatch_cnt;
+	unsigned long                   res_bitmap;
 };
 
 /**
@@ -232,5 +225,27 @@ struct cam_ife_hw_mgr {
  *
  */
 int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl);
+
+/**
+ * cam_ife_mgr_do_tasklet_buf_done()
+ *
+ * @brief:              Main tasklet handle function for the buf done event
+ *
+ * @handler_priv:       Tasklet information handle
+ * @evt_payload_priv:   Event payload for the handler funciton
+ *
+ */
+int cam_ife_mgr_do_tasklet_buf_done(void *handler_priv, void *evt_payload_priv);
+
+/**
+ * cam_ife_mgr_do_tasklet()
+ *
+ * @brief:              Main tasklet handle function for mux resource events
+ *
+ * @handler_priv:       Tasklet information handle
+ * @evt_payload_priv:   Event payload for the handler funciton
+ *
+ */
+int cam_ife_mgr_do_tasklet(void *handler_priv, void *evt_payload_priv);
 
 #endif /* _CAM_IFE_HW_MGR_H_ */

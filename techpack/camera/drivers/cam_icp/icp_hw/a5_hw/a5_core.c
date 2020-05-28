@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/slab.h>
@@ -235,13 +242,49 @@ fw_download_failed:
 	return rc;
 }
 
+static int cam_a5_fw_dump(struct cam_icp_hw_dump_args *dump_args,
+	struct cam_a5_device_core_info *core_info)
+{
+	u8 *dest;
+	u8 *src;
+	uint64_t size_required = 0;
+	struct cam_icp_dump_header *hdr;
+
+	if (!core_info || !dump_args) {
+		CAM_ERR(CAM_ICP, "invalid params %pK %pK",
+		    core_info, dump_args);
+		return -EINVAL;
+	}
+	if (!core_info->fw_kva_addr || !dump_args->cpu_addr) {
+		CAM_ERR(CAM_ICP, "invalid params %pK, 0x%zx",
+		    core_info->fw_kva_addr, dump_args->cpu_addr);
+		return -EINVAL;
+	}
+	size_required = core_info->fw_buf_len +
+		sizeof(struct cam_icp_dump_header);
+	if ((dump_args->buf_len - dump_args->offset) < size_required) {
+		CAM_WARN(CAM_ICP, "Dump buffer exhaust %lld %lld",
+		    size_required, core_info->fw_buf_len);
+		return 0;
+	}
+	dest = (u8 *)dump_args->cpu_addr + dump_args->offset;
+	hdr = (struct cam_icp_dump_header *)dest;
+	snprintf(hdr->tag, CAM_ICP_DUMP_TAG_MAX_LEN, "ICP_FW:");
+	hdr->word_size = sizeof(u8);
+	hdr->size = core_info->fw_buf_len;
+	src = (u8 *)core_info->fw_kva_addr;
+	dest = (u8 *)dest + sizeof(struct cam_icp_dump_header);
+	memcpy_fromio(dest, src, core_info->fw_buf_len);
+	dump_args->offset += hdr->size + sizeof(struct cam_icp_dump_header);
+	return 0;
+}
+
 int cam_a5_init_hw(void *device_priv,
 	void *init_hw_args, uint32_t arg_size)
 {
 	struct cam_hw_info *a5_dev = device_priv;
 	struct cam_hw_soc_info *soc_info = NULL;
 	struct cam_a5_device_core_info *core_info = NULL;
-	struct a5_soc_info *a5_soc_info;
 	struct cam_icp_cpas_vote cpas_vote;
 	int rc = 0;
 
@@ -259,31 +302,16 @@ int cam_a5_init_hw(void *device_priv,
 		return -EINVAL;
 	}
 
-	a5_soc_info = soc_info->soc_private;
-
 	cpas_vote.ahb_vote.type = CAM_VOTE_ABSOLUTE;
-	cpas_vote.ahb_vote.vote.level = CAM_LOWSVS_VOTE;
-	cpas_vote.axi_vote.num_paths = 1;
-	cpas_vote.axi_vote.axi_path[0].path_data_type =
-		CAM_ICP_DEFAULT_AXI_PATH;
-	cpas_vote.axi_vote.axi_path[0].transac_type =
-		CAM_ICP_DEFAULT_AXI_TRANSAC;
-	cpas_vote.axi_vote.axi_path[0].camnoc_bw =
-		CAM_ICP_A5_BW_BYTES_VOTE;
-	cpas_vote.axi_vote.axi_path[0].mnoc_ab_bw =
-		CAM_ICP_A5_BW_BYTES_VOTE;
-	cpas_vote.axi_vote.axi_path[0].mnoc_ib_bw =
-		CAM_ICP_A5_BW_BYTES_VOTE;
-	cpas_vote.axi_vote.axi_path[0].ddr_ab_bw =
-		CAM_ICP_A5_BW_BYTES_VOTE;
-	cpas_vote.axi_vote.axi_path[0].ddr_ib_bw =
-		CAM_ICP_A5_BW_BYTES_VOTE;
+	cpas_vote.ahb_vote.vote.level = CAM_SVS_VOTE;
+	cpas_vote.axi_vote.compressed_bw = CAM_ICP_A5_BW_BYTES_VOTE;
+	cpas_vote.axi_vote.uncompressed_bw = CAM_ICP_A5_BW_BYTES_VOTE;
 
 	rc = cam_cpas_start(core_info->cpas_handle,
 		&cpas_vote.ahb_vote, &cpas_vote.axi_vote);
 	if (rc) {
-		CAM_ERR(CAM_ICP, "cpas start failed: %d", rc);
-		goto error;
+		CAM_ERR(CAM_ICP, "cpass start failed: %d", rc);
+		return rc;
 	}
 	core_info->cpas_start = true;
 
@@ -294,15 +322,8 @@ int cam_a5_init_hw(void *device_priv,
 			CAM_ERR(CAM_ICP, "cpas stop is failed");
 		else
 			core_info->cpas_start = false;
-	} else {
-		CAM_DBG(CAM_ICP, "a5_qos %d", a5_soc_info->a5_qos_val);
-		if (a5_soc_info->a5_qos_val)
-			cam_io_w_mb(a5_soc_info->a5_qos_val,
-				soc_info->reg_map[A5_SIERRA_BASE].mem_base +
-				ICP_SIERRA_A5_CSR_ACCESS);
 	}
 
-error:
 	return rc;
 }
 
@@ -388,10 +409,7 @@ int cam_a5_process_cmd(void *device_priv, uint32_t cmd_type,
 	struct cam_a5_device_hw_info *hw_info = NULL;
 	struct a5_soc_info *a5_soc = NULL;
 	unsigned long flags;
-	uint32_t ubwc_ipe_cfg[ICP_UBWC_MAX] = {0};
-	uint32_t ubwc_bps_cfg[ICP_UBWC_MAX] = {0};
-	uint32_t index = 0;
-	int rc = 0, ddr_type = 0;
+	int rc = 0;
 
 	if (!device_priv) {
 		CAM_ERR(CAM_ICP, "Invalid arguments");
@@ -486,61 +504,18 @@ int cam_a5_process_cmd(void *device_priv, uint32_t cmd_type,
 			core_info->cpas_start = false;
 		}
 		break;
-	case CAM_ICP_A5_CMD_UBWC_CFG: {
-		struct a5_ubwc_cfg_ext *ubwc_cfg_ext = NULL;
-
+	case CAM_ICP_A5_CMD_UBWC_CFG:
 		a5_soc = soc_info->soc_private;
 		if (!a5_soc) {
 			CAM_ERR(CAM_ICP, "A5 private soc info is NULL");
 			return -EINVAL;
 		}
-
-		if (a5_soc->ubwc_config_ext) {
-			/* Invoke kernel API to determine DDR type */
-			ddr_type = of_fdt_get_ddrtype();
-			if ((ddr_type == DDR_TYPE_LPDDR5) ||
-				(ddr_type == DDR_TYPE_LPDDR5X))
-				index = 1;
-
-			ubwc_cfg_ext = &a5_soc->uconfig.ubwc_cfg_ext;
-			ubwc_ipe_cfg[0] =
-				ubwc_cfg_ext->ubwc_ipe_fetch_cfg[index];
-			ubwc_ipe_cfg[1] =
-				ubwc_cfg_ext->ubwc_ipe_write_cfg[index];
-			ubwc_bps_cfg[0] =
-				ubwc_cfg_ext->ubwc_bps_fetch_cfg[index];
-			ubwc_bps_cfg[1] =
-				ubwc_cfg_ext->ubwc_bps_write_cfg[index];
-			rc = hfi_cmd_ubwc_config_ext(&ubwc_ipe_cfg[0],
-					&ubwc_bps_cfg[0]);
-		} else {
-			rc = hfi_cmd_ubwc_config(a5_soc->uconfig.ubwc_cfg);
-		}
-
+		rc = hfi_cmd_ubwc_config(a5_soc->ubwc_cfg);
 		break;
-	}
-	case CAM_ICP_A5_CMD_CLK_UPDATE: {
-		int32_t clk_level = 0;
-		struct cam_ahb_vote ahb_vote;
+	case CAM_ICP_A5_CMD_HW_DUMP: {
+		struct cam_icp_hw_dump_args *dump_args = cmd_args;
 
-		if (!cmd_args) {
-			CAM_ERR(CAM_ICP, "Invalid args");
-			return -EINVAL;
-		}
-
-		clk_level = *((int32_t *)cmd_args);
-		CAM_DBG(CAM_ICP,
-			"Update ICP clock to level [%d]", clk_level);
-		rc = cam_a5_update_clk_rate(soc_info, clk_level);
-		if (rc)
-			CAM_ERR(CAM_ICP,
-				"Failed to update clk to level: %d rc: %d",
-				clk_level, rc);
-
-		ahb_vote.type = CAM_VOTE_ABSOLUTE;
-		ahb_vote.vote.level = clk_level;
-		cam_cpas_update_ahb_vote(
-			core_info->cpas_handle, &ahb_vote);
+		rc = cam_a5_fw_dump(dump_args, core_info);
 		break;
 	}
 	default:

@@ -1,17 +1,26 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
-
 
 #ifndef _CAM_ACTUATOR_DEV_H_
 #define _CAM_ACTUATOR_DEV_H_
 
 #include <cam_sensor_io.h>
 #include <linux/delay.h>
+#include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/module.h>
+#include <linux/irqreturn.h>
+#include <linux/ion.h>
 #include <linux/iommu.h>
 #include <linux/timer.h>
 #include <linux/kernel.h>
@@ -30,11 +39,15 @@
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
 
+#define TRUE  1
+#define FALSE 0
+
 #define ACTUATOR_DRIVER_I2C "i2c_actuator"
 #define CAMX_ACTUATOR_DEV_NAME "cam-actuator-driver"
 
 #define MSM_ACTUATOR_MAX_VREGS (10)
 #define ACTUATOR_MAX_POLL_COUNT 10
+
 
 enum cam_actuator_apply_state_t {
 	ACT_APPLY_SETTINGS_NOW,
@@ -115,11 +128,6 @@ struct cam_actuator_ctrl_t {
 	struct cam_actuator_query_cap act_info;
 	struct intf_params bridge_intf;
 	uint32_t last_flush_req;
-
-	bool is_actuator_ready;
-	struct cam_sensor_i2c_reg_array poll_register;
-	enum camera_sensor_i2c_type addr_type;
-	enum camera_sensor_i2c_type data_type;
 };
 
 #endif /* _CAM_ACTUATOR_DEV_H_ */

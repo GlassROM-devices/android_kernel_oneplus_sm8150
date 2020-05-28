@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/ratelimit.h>
@@ -82,6 +89,7 @@ struct cam_vfe_bus_rd_ver1_rm_resource_data {
 	struct cam_vfe_bus_rd_ver1_reg_offset_bus_client  *hw_regs;
 	void                *ctx;
 
+	uint32_t             irq_enabled;
 	bool                 init_cfg_done;
 	bool                 hfr_cfg_done;
 
@@ -137,8 +145,8 @@ struct cam_vfe_bus_rd_ver1_priv {
 	struct cam_isp_resource_node  vfe_bus_rd[
 		CAM_VFE_BUS_RD_VER1_VFE_BUSRD_MAX];
 
-	int                                 irq_handle;
-	int                                 error_irq_handle;
+	uint32_t                            irq_handle;
+	uint32_t                            error_irq_handle;
 };
 
 static int cam_vfe_bus_process_cmd(
@@ -218,7 +226,7 @@ static int cam_vfe_bus_get_rm_idx(
 
 static int cam_vfe_bus_acquire_rm(
 	struct cam_vfe_bus_rd_ver1_priv          *ver1_bus_rd_priv,
-	struct cam_isp_out_port_generic_info     *out_port_info,
+	struct cam_isp_out_port_info             *out_port_info,
 	void                                     *tasklet,
 	void                                     *ctx,
 	enum cam_vfe_bus_rd_ver1_vfe_bus_rd_type  vfe_bus_rd_res_id,
@@ -253,6 +261,7 @@ static int cam_vfe_bus_acquire_rm(
 	rm_res_local->tasklet_info = tasklet;
 
 	rsrc_data = rm_res_local->res_priv;
+	rsrc_data->irq_enabled = subscribe_irq;
 	rsrc_data->ctx = ctx;
 	rsrc_data->is_dual = is_dual;
 	/* Set RM offset value to default */
@@ -271,6 +280,7 @@ static int cam_vfe_bus_release_rm(void   *bus_priv,
 	struct cam_vfe_bus_rd_ver1_rm_resource_data *rsrc_data =
 		rm_res->res_priv;
 
+	rsrc_data->irq_enabled = 0;
 	rsrc_data->offset = 0;
 	rsrc_data->width = 0;
 	rsrc_data->height = 0;
@@ -315,7 +325,7 @@ static int cam_vfe_bus_start_rm(struct cam_isp_resource_node *rm_res)
 	CAM_DBG(CAM_ISP, "min_vbi: 0x%x", rm_data->min_vbi);
 
 	/* Write All the values*/
-	offset = rm_data->hw_regs->buf_size;
+	offset = rm_data->hw_regs->buffer_width_cfg;
 	buf_size = ((rm_data->width)&(0x0000FFFF)) |
 		((rm_data->height<<16)&(0xFFFF0000));
 	cam_io_w_mb(buf_size, common_data->mem_base + offset);
@@ -504,7 +514,7 @@ static int cam_vfe_bus_acquire_vfe_bus_rd(void *bus_priv, void *acquire_args,
 		rc = cam_vfe_bus_acquire_rm(ver1_bus_rd_priv,
 			bus_rd_acquire_args->out_port_info,
 			acq_args->tasklet,
-			acq_args->priv,
+			bus_rd_acquire_args->ctx,
 			bus_rd_res_id,
 			i,
 			subscribe_irq,
@@ -806,7 +816,8 @@ static int cam_vfe_bus_rd_update_rm(void *priv, void *cmd_args,
 		CAM_DBG(CAM_ISP, "size offset 0x%x buf_size 0x%x",
 			rm_data->hw_regs->buf_size, buf_size);
 		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
-			rm_data->hw_regs->buf_size, buf_size);
+			rm_data->hw_regs->buffer_width_cfg,
+			buf_size);
 		CAM_DBG(CAM_ISP, "RM %d image size 0x%x",
 			rm_data->index, reg_val_pair[j-1]);
 
@@ -940,7 +951,7 @@ static int cam_vfe_bus_init_hw(void *hw_priv,
 	void *init_hw_args, uint32_t arg_size)
 {
 	struct cam_vfe_bus_rd_ver1_priv    *bus_priv = hw_priv;
-	uint32_t                            top_irq_reg_mask[3] = {0};
+	uint32_t                            top_irq_reg_mask[2] = {0};
 	uint32_t                            offset = 0, val = 0;
 	struct cam_vfe_bus_rd_ver1_reg_offset_common  *common_reg;
 
@@ -961,9 +972,8 @@ static int cam_vfe_bus_init_hw(void *hw_priv,
 		NULL,
 		NULL);
 
-	if (bus_priv->irq_handle < 1) {
+	if (bus_priv->irq_handle <= 0) {
 		CAM_ERR(CAM_ISP, "Failed to subscribe BUS IRQ");
-		bus_priv->irq_handle = 0;
 		return -EFAULT;
 	}
 	/* no clock gating at bus input */
@@ -1001,6 +1011,10 @@ static int cam_vfe_bus_deinit_hw(void *hw_priv,
 		rc = cam_irq_controller_unsubscribe_irq(
 			bus_priv->common_data.bus_irq_controller,
 			bus_priv->error_irq_handle);
+		if (rc)
+			CAM_ERR(CAM_ISP,
+				"Failed to unsubscribe error irq rc=%d", rc);
+
 		bus_priv->error_irq_handle = 0;
 	}
 
@@ -1008,6 +1022,10 @@ static int cam_vfe_bus_deinit_hw(void *hw_priv,
 		rc = cam_irq_controller_unsubscribe_irq(
 			bus_priv->common_data.vfe_irq_controller,
 			bus_priv->irq_handle);
+		if (rc)
+			CAM_ERR(CAM_ISP,
+				"Failed to unsubscribe irq rc=%d", rc);
+
 		bus_priv->irq_handle = 0;
 	}
 
@@ -1107,7 +1125,7 @@ int cam_vfe_bus_rd_ver1_init(
 
 	rc = cam_irq_controller_init(drv_name, bus_priv->common_data.mem_base,
 		&bus_rd_hw_info->common_reg.irq_reg_info,
-		&bus_priv->common_data.bus_irq_controller, true);
+		&bus_priv->common_data.bus_irq_controller);
 	if (rc) {
 		CAM_ERR(CAM_ISP, "cam_irq_controller_init failed");
 		goto free_bus_priv;

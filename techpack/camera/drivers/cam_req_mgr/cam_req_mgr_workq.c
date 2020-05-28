@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include "cam_req_mgr_workq.h"
@@ -180,7 +187,8 @@ int cam_req_mgr_workq_create(char *name, int32_t num_tasks,
 	char buf[128] = "crm_workq-";
 
 	if (!*workq) {
-		crm_workq = kzalloc(sizeof(struct cam_req_mgr_core_workq),
+		crm_workq = (struct cam_req_mgr_core_workq *)
+			kzalloc(sizeof(struct cam_req_mgr_core_workq),
 			GFP_KERNEL);
 		if (crm_workq == NULL)
 			return -ENOMEM;
@@ -215,8 +223,10 @@ int cam_req_mgr_workq_create(char *name, int32_t num_tasks,
 		INIT_LIST_HEAD(&crm_workq->task.empty_head);
 		crm_workq->in_irq = in_irq;
 		crm_workq->task.num_task = num_tasks;
-		crm_workq->task.pool = kcalloc(crm_workq->task.num_task,
-				sizeof(struct crm_workq_task), GFP_KERNEL);
+		crm_workq->task.pool = (struct crm_workq_task *)
+			kcalloc(crm_workq->task.num_task,
+				sizeof(struct crm_workq_task),
+				GFP_KERNEL);
 		if (!crm_workq->task.pool) {
 			CAM_WARN(CAM_CRM, "Insufficient memory %zu",
 				sizeof(struct crm_workq_task) *
@@ -244,7 +254,6 @@ void cam_req_mgr_workq_destroy(struct cam_req_mgr_core_workq **crm_workq)
 {
 	unsigned long flags = 0;
 	struct workqueue_struct   *job;
-
 	CAM_DBG(CAM_CRM, "destroy workque %pK", crm_workq);
 	if (*crm_workq) {
 		WORKQ_ACQUIRE_LOCK(*crm_workq, flags);

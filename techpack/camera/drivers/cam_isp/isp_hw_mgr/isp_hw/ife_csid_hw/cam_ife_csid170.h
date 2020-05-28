@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_IFE_CSID_170_H_
@@ -286,6 +293,10 @@ static struct cam_ife_csid_common_reg_offset
 	.ppp_irq_mask_all                             = 0x0,
 	.measure_en_hbi_vbi_cnt_mask                  = 0xC,
 	.format_measure_en_val                        = 1,
+	.format_measure_height_mask_val               = 0xFFFF,
+	.format_measure_height_shift_val              = 0x10,
+	.format_measure_width_mask_val                = 0xFFFF,
+	.format_measure_width_shift_val               = 0x0,
 };
 
 static struct cam_ife_csid_reg_offset cam_ife_csid_170_reg_offset = {

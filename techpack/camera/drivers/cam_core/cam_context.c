@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/slab.h>
@@ -54,15 +61,12 @@ int cam_context_shutdown(struct cam_context *ctx)
 		rc = -EINVAL;
 	}
 
-	if (ctx->dev_hdl != -1) {
-		rc = cam_destroy_device_hdl(ctx->dev_hdl);
-		if (rc)
-			CAM_ERR(CAM_CORE,
-				"destroy device hdl failed for node %s",
-				ctx->dev_name);
-		else
-			ctx->dev_hdl = -1;
-	}
+	rc = cam_destroy_device_hdl(ctx->dev_hdl);
+	if (rc)
+		CAM_ERR(CAM_CORE, "destroy device hdl failed for node %s",
+			ctx->dev_name);
+	else
+		ctx->dev_hdl = -1;
 
 	return rc;
 }
@@ -168,7 +172,6 @@ int cam_context_handle_crm_apply_req(struct cam_context *ctx,
 		return -EINVAL;
 	}
 
-	mutex_lock(&ctx->ctx_mutex);
 	if (ctx->state_machine[ctx->state].crm_ops.apply_req) {
 		rc = ctx->state_machine[ctx->state].crm_ops.apply_req(ctx,
 			apply);
@@ -177,7 +180,6 @@ int cam_context_handle_crm_apply_req(struct cam_context *ctx,
 			ctx->dev_hdl, ctx->state);
 		rc = -EPROTO;
 	}
-	mutex_unlock(&ctx->ctx_mutex);
 
 	return rc;
 }
@@ -230,6 +232,28 @@ int cam_context_handle_crm_process_evt(struct cam_context *ctx,
 	return rc;
 }
 
+int cam_context_handle_crm_dump_req(struct cam_context *ctx,
+	struct cam_req_mgr_dump_info *dump)
+{
+	int rc = 0;
+
+	if (!ctx->state_machine) {
+		CAM_ERR(CAM_CORE, "Context is not ready");
+		return -EINVAL;
+	}
+	mutex_lock(&ctx->ctx_mutex);
+	if (ctx->state_machine[ctx->state].crm_ops.dump_req) {
+		rc = ctx->state_machine[ctx->state].crm_ops.dump_req(ctx,
+			dump);
+	} else {
+		CAM_ERR(CAM_CORE, "No crm dump req in dev %d, state %d",
+			ctx->dev_hdl, ctx->state);
+	}
+	mutex_unlock(&ctx->ctx_mutex);
+
+	return rc;
+}
+
 int cam_context_dump_pf_info(struct cam_context *ctx, unsigned long iova,
 	uint32_t buf_info)
 {
@@ -240,16 +264,15 @@ int cam_context_dump_pf_info(struct cam_context *ctx, unsigned long iova,
 		return -EINVAL;
 	}
 
-	if ((ctx->state > CAM_CTX_AVAILABLE) &&
-		(ctx->state < CAM_CTX_STATE_MAX)) {
-		if (ctx->state_machine[ctx->state].pagefault_ops) {
-			rc = ctx->state_machine[ctx->state].pagefault_ops(
-				ctx, iova, buf_info);
-		} else {
-			CAM_WARN(CAM_CORE, "No dump ctx in dev %d, state %d",
-				ctx->dev_hdl, ctx->state);
-		}
+	mutex_lock(&ctx->ctx_mutex);
+	if (ctx->state_machine[ctx->state].pagefault_ops) {
+		rc = ctx->state_machine[ctx->state].pagefault_ops(ctx, iova,
+			buf_info);
+	} else {
+		CAM_WARN(CAM_CORE, "No dump ctx in dev %d, state %d",
+			ctx->dev_hdl, ctx->state);
 	}
+	mutex_unlock(&ctx->ctx_mutex);
 
 	return rc;
 }
@@ -499,27 +522,29 @@ int cam_context_handle_stop_dev(struct cam_context *ctx,
 	return rc;
 }
 
-int cam_context_handle_info_dump(void *context,
-	enum cam_context_dump_id id)
+int cam_context_handle_dump_dev(struct cam_context *ctx,
+	struct cam_dump_req_cmd *cmd)
 {
 	int rc = 0;
-	struct cam_context *ctx = (struct cam_context *)context;
 
 	if (!ctx || !ctx->state_machine) {
 		CAM_ERR(CAM_CORE, "Context is not ready");
 		return -EINVAL;
 	}
 
-	mutex_lock(&ctx->ctx_mutex);
-	if (ctx->state_machine[ctx->state].dumpinfo_ops)
-		rc = ctx->state_machine[ctx->state].dumpinfo_ops(ctx,
-			id);
-	mutex_unlock(&ctx->ctx_mutex);
+	if (!cmd) {
+		CAM_ERR(CAM_CORE, "Invalid stop device command payload");
+		return -EINVAL;
+	}
 
-	if (rc)
-		CAM_WARN(CAM_CORE,
-			"Dump for id %u failed on ctx_id %u name %s state %d",
-			id, ctx->ctx_id, ctx->dev_name, ctx->state);
+	mutex_lock(&ctx->ctx_mutex);
+	if (ctx->state_machine[ctx->state].ioctl_ops.dump_dev)
+		rc = ctx->state_machine[ctx->state].ioctl_ops.dump_dev(
+			ctx, cmd);
+	else
+		CAM_WARN(CAM_CORE, "No dump device in dev %d, name %s state %d",
+			ctx->dev_hdl, ctx->dev_name, ctx->state);
+	mutex_unlock(&ctx->ctx_mutex);
 
 	return rc;
 }

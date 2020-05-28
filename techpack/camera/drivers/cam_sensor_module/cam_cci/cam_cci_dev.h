@@ -1,18 +1,27 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_CCI_DEV_H_
 #define _CAM_CCI_DEV_H_
 
 #include <linux/delay.h>
+#include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 #include <linux/module.h>
 #include <linux/irqreturn.h>
+#include <linux/ion.h>
 #include <linux/iommu.h>
 #include <linux/timer.h>
 #include <linux/kernel.h>
@@ -25,7 +34,7 @@
 #include <cam_sensor_cmn_header.h>
 #include <cam_io_util.h>
 #include <cam_sensor_util.h>
-#include "cam_subdev.h"
+#include <cam_subdev.h>
 #include <cam_cpas_api.h>
 #include "cam_cci_hwreg.h"
 #include "cam_soc_util.h"
@@ -41,6 +50,9 @@
 
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
+
+#define TRUE  1
+#define FALSE 0
 
 #define CCI_PINCTRL_STATE_DEFAULT "cci_default"
 #define CCI_PINCTRL_STATE_SLEEP "cci_suspend"
@@ -295,7 +307,14 @@ struct cci_write_async {
 
 irqreturn_t cam_cci_irq(int irq_num, void *data);
 
-struct v4l2_subdev *cam_cci_get_subdev(int cci_dev_index);
+#ifdef CONFIG_SPECTRA_CAMERA
+extern struct v4l2_subdev *cam_cci_get_subdev(int cci_dev_index);
+#else
+static inline struct v4l2_subdev *cam_cci_get_subdev(int cci_dev_index)
+{
+	return NULL;
+}
+#endif
 
 #define VIDIOC_MSM_CCI_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct cam_cci_ctrl *)

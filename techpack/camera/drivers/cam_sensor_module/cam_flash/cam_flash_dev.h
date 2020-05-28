@@ -1,6 +1,14 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
  */
 
 #ifndef _CAM_FLASH_DEV_H_
@@ -86,7 +94,7 @@ struct cam_flash_intf_params {
 struct cam_flash_common_attr {
 	bool      is_settings_valid;
 	uint64_t  request_id;
-	uint32_t  count;
+	uint16_t  count;
 	uint8_t   cmd_type;
 };
 
@@ -97,7 +105,7 @@ struct cam_flash_common_attr {
  */
 struct cam_flash_init_packet {
 	struct cam_flash_common_attr  cmn_attr;
-	uint32_t                      flash_type;
+	uint8_t                       flash_type;
 };
 
 /**
@@ -167,7 +175,7 @@ struct cam_flash_func_tbl {
  * @flash_num_sources   : Number of flash sources
  * @torch_num_source    : Number of torch sources
  * @flash_mutex         : Mutex for flash operations
- * @flash_state         : Current flash state (LOW/OFF/ON/INIT)
+  * @flash_state         : Current flash state (LOW/OFF/ON/INIT)
  * @flash_type          : Flash types (PMIC/I2C/GPIO)
  * @is_regulator_enable : Regulator disable/enable notifier
  * @func_tbl            : Function table for different HW
@@ -175,7 +183,6 @@ struct cam_flash_func_tbl {
  * @flash_trigger       : Flash trigger ptr
  * @torch_trigger       : Torch trigger ptr
  * @cci_i2c_master      : I2C structure
- * @cci_device_num      : cci parent cell index
  * @io_master_info      : Information about the communication master
  * @i2c_data            : I2C register settings
  * @last_flush_req      : last request to flush
@@ -203,7 +210,6 @@ struct cam_flash_ctrl {
 	struct led_trigger           *torch_trigger[CAM_FLASH_MAX_LED_TRIGGERS];
 /* I2C related setting */
 	enum   cci_i2c_master_t             cci_i2c_master;
-	enum   cci_device_num               cci_num;
 	struct camera_io_master             io_master_info;
 	struct i2c_data_settings            i2c_data;
 	uint32_t                            last_flush_req;

@@ -1,17 +1,21 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_VFE_HW_INTF_H_
 #define _CAM_VFE_HW_INTF_H_
 
 #include "cam_isp_hw.h"
-#include "cam_ife_csid_hw_intf.h"
-#include "cam_ife_csid_hw_intf.h"
-#include "cam_cpas_api.h"
 
-#define CAM_VFE_HW_NUM_MAX            7
+#define CAM_VFE_HW_NUM_MAX                       4
 
 #define VFE_CORE_BASE_IDX             0
 /*
@@ -21,8 +25,6 @@
 #define VFE_VBIF_BASE_IDX             1
 #define VFE_BUS_BASE_IDX              1
 
-#define CAM_VFE_MAX_UBWC_PORTS        4
-
 enum cam_isp_hw_vfe_in_mux {
 	CAM_ISP_HW_VFE_IN_CAMIF       = 0,
 	CAM_ISP_HW_VFE_IN_TESTGEN     = 1,
@@ -31,8 +33,7 @@ enum cam_isp_hw_vfe_in_mux {
 	CAM_ISP_HW_VFE_IN_RDI1        = 4,
 	CAM_ISP_HW_VFE_IN_RDI2        = 5,
 	CAM_ISP_HW_VFE_IN_RDI3        = 6,
-	CAM_ISP_HW_VFE_IN_PDLIB       = 7,
-	CAM_ISP_HW_VFE_IN_LCR         = 8,
+	CAM_ISP_HW_VFE_IN_CAMIF_LITE  = 7,
 	CAM_ISP_HW_VFE_IN_MAX,
 };
 
@@ -58,9 +59,7 @@ enum cam_vfe_hw_irq_status {
 enum cam_vfe_hw_irq_regs {
 	CAM_IFE_IRQ_CAMIF_REG_STATUS0           = 0,
 	CAM_IFE_IRQ_CAMIF_REG_STATUS1           = 1,
-	CAM_IFE_IRQ_CAMIF_REG_STATUS2           = 2,
-	CAM_IFE_IRQ_VIOLATION_STATUS            = 3,
-	CAM_IFE_IRQ_BUS_OVERFLOW_STATUS         = 4,
+	CAM_IFE_IRQ_VIOLATION_STATUS            = 2,
 	CAM_IFE_IRQ_REGISTERS_MAX,
 };
 
@@ -73,12 +72,6 @@ enum cam_vfe_bus_irq_regs {
 	CAM_IFE_IRQ_BUS_DUAL_COMP_ERR           = 5,
 	CAM_IFE_IRQ_BUS_DUAL_COMP_OWRT          = 6,
 	CAM_IFE_BUS_IRQ_REGISTERS_MAX,
-};
-
-enum cam_vfe_bus_ver3_irq_regs {
-	CAM_IFE_IRQ_BUS_VER3_REG_STATUS0             = 0,
-	CAM_IFE_IRQ_BUS_VER3_REG_STATUS1             = 1,
-	CAM_IFE_IRQ_BUS_VER3_REG_MAX,
 };
 
 enum cam_vfe_reset_type {
@@ -118,16 +111,18 @@ struct cam_vfe_hw_get_hw_cap {
  *                           (Default is Master in case of Single VFE)
  * @dual_slave_core:         If Master and Slave exists, HW Index of Slave
  * @cdm_ops:                 CDM operations
+ * @ctx:                     Context data
  */
 struct cam_vfe_hw_vfe_out_acquire_args {
-	struct cam_isp_resource_node         *rsrc_node;
-	struct cam_isp_out_port_generic_info *out_port_info;
-	uint32_t                              unique_id;
-	uint32_t                              is_dual;
-	enum cam_isp_hw_split_id              split_id;
-	uint32_t                              is_master;
-	uint32_t                              dual_slave_core;
-	struct cam_cdm_utils_ops             *cdm_ops;
+	struct cam_isp_resource_node      *rsrc_node;
+	struct cam_isp_out_port_info      *out_port_info;
+	uint32_t                           unique_id;
+	uint32_t                           is_dual;
+	enum cam_isp_hw_split_id           split_id;
+	uint32_t                           is_master;
+	uint32_t                           dual_slave_core;
+	struct cam_cdm_utils_ops          *cdm_ops;
+	void                              *ctx;
 };
 
 /*
@@ -147,7 +142,7 @@ struct cam_vfe_hw_vfe_in_acquire_args {
 	uint32_t                              res_id;
 	void                                 *cdm_ops;
 	enum cam_isp_hw_sync_mode             sync_mode;
-	struct cam_isp_in_port_generic_info  *in_port;
+	struct cam_isp_in_port_info          *in_port;
 };
 
 /*
@@ -157,8 +152,6 @@ struct cam_vfe_hw_vfe_in_acquire_args {
  * @tasklet:                 Tasklet to associate with this resource. This is
  *                           used to schedule bottom of IRQ events associated
  *                           with this resource.
- * @priv:                    Context data
- * @event_cb:                Callback function to hw mgr in case of hw events
  * @vfe_out:                 Acquire args for VFE_OUT
  * @vfe_bus_rd               Acquire args for VFE_BUS_READ
  * @vfe_in:                  Acquire args for VFE_IN
@@ -166,8 +159,6 @@ struct cam_vfe_hw_vfe_in_acquire_args {
 struct cam_vfe_acquire_args {
 	enum cam_isp_resource_type           rsrc_type;
 	void                                *tasklet;
-	void                                *priv;
-	cam_hw_mgr_event_cb_func             event_cb;
 	union {
 		struct cam_vfe_hw_vfe_out_acquire_args  vfe_out;
 		struct cam_vfe_hw_vfe_out_acquire_args  vfe_bus_rd;
@@ -187,25 +178,14 @@ struct cam_vfe_clock_update_args {
 };
 
 /*
- * struct cam_vfe_core_config_args:
+ * struct cam_vfe_fps_config_args:
  *
- * @node_res:                Resource to get the time stamp
- * @core_config:             Core config for IFE
+ * @node_res:                Resource to get the fps value
+ * @fps:                     FPS value to configure EPOCH
  */
-struct cam_vfe_core_config_args {
+struct cam_vfe_fps_config_args {
 	struct cam_isp_resource_node      *node_res;
-	struct cam_isp_core_config         core_config;
-};
-
-/*
- * struct cam_vfe_bw_update_args_v2:
- *
- * @node_res:             Resource to get the BW
- * @isp_vote:             Vote info according to usage data (left/right/rdi)
- */
-struct cam_vfe_bw_update_args_v2 {
-	struct cam_isp_resource_node      *node_res;
-	struct cam_axi_vote                isp_vote;
+	uint32_t                           fps;
 };
 
 /*
@@ -257,14 +237,24 @@ struct cam_vfe_bw_control_args {
  *                           related to VFE_TOP resources
  *
  * @list:                    list_head node for the payload
+ * @core_index:              Index of VFE HW that generated this IRQ event
+ * @core_info:               Private data of handler in bottom half context
+ * @evt_id:                  IRQ event
  * @irq_reg_val:             IRQ and Error register values, read when IRQ was
  *                           handled
+ * @error_type:              Identify different errors
+ * @enable_reg_dump:         enable register dump on error
  * @ts:                      Timestamp
  */
 struct cam_vfe_top_irq_evt_payload {
-	struct list_head            list;
-	uint32_t                    irq_reg_val[CAM_IFE_IRQ_REGISTERS_MAX];
-	struct cam_isp_timestamp    ts;
+	struct list_head           list;
+	uint32_t                   core_index;
+	void                      *core_info;
+	uint32_t                   evt_id;
+	uint32_t                   irq_reg_val[CAM_IFE_IRQ_REGISTERS_MAX];
+	uint32_t                   error_type;
+	bool                       enable_reg_dump;
+	struct cam_isp_timestamp   ts;
 };
 
 /*
@@ -281,69 +271,38 @@ struct cam_vfe_top_irq_evt_payload {
  *                           handled
  * @error_type:              Identify different errors
  * @ts:                      Timestamp
+ * @ctx:                     Context data received during acquire
  */
 struct cam_vfe_bus_irq_evt_payload {
 	struct list_head            list;
 	uint32_t                    core_index;
 	uint32_t                    debug_status_0;
-	uint32_t                    ccif_violation_status;
-	uint32_t                    overflow_status;
-	uint32_t                    image_size_violation_status;
 	uint32_t                    evt_id;
 	uint32_t                    irq_reg_val[CAM_IFE_BUS_IRQ_REGISTERS_MAX];
+	uint32_t                    error_type;
 	struct cam_isp_timestamp    ts;
+	void                       *ctx;
+	uint32_t                    enable_dump;
 };
 
-/**
- * struct cam_ubwc_generic_plane_config - UBWC Plane configuration info
+/*
+ * struct cam_vfe_irq_handler_priv:
  *
- * @port_type:                  Port Type
- * @meta_stride:                UBWC metadata stride
- * @meta_size:                  UBWC metadata plane size
- * @meta_offset:                UBWC metadata offset
- * @packer_config:              UBWC packer config
- * @mode_config:                UBWC mode config
- * @static ctrl:                UBWC static ctrl
- * @ctrl_2:                     UBWC ctrl 2
- * @tile_config:                UBWC tile config
- * @h_init:                     UBWC horizontal initial coordinate in pixels
- * @v_init:                     UBWC vertical initial coordinate in lines
- * @stats_ctrl_2:               UBWC stats control
- * @lossy_threshold0            UBWC lossy threshold 0
- * @lossy_threshold1            UBWC lossy threshold 1
- * @lossy_var_offset            UBWC offset variance threshold
- * @bandwidth limit             UBWC bandwidth limit
- */
-struct cam_vfe_generic_ubwc_plane_config {
-	uint32_t                port_type;
-	uint32_t                meta_stride;
-	uint32_t                meta_size;
-	uint32_t                meta_offset;
-	uint32_t                packer_config;
-	uint32_t                mode_config_0;
-	uint32_t                mode_config_1;
-	uint32_t                tile_config;
-	uint32_t                h_init;
-	uint32_t                v_init;
-	uint32_t                static_ctrl;
-	uint32_t                ctrl_2;
-	uint32_t                stats_ctrl_2;
-	uint32_t                lossy_threshold_0;
-	uint32_t                lossy_threshold_1;
-	uint32_t                lossy_var_offset;
-	uint32_t                bandwidth_limit;
-};
-
-/**
- * struct cam_ubwc_generic_config - UBWC Configuration Payload
+ * @Brief:                   This structure is used as private data to
+ *                           register with IRQ controller. It has information
+ *                           needed by top half and bottom half.
  *
- * @api_version:         UBWC config api version
- * @ubwc_plane_config:   Array of UBWC configurations per plane
+ * @core_index:              Index of VFE HW that generated this IRQ event
+ * @core_info:               Private data of handler in bottom half context
+ * @mem_base:                Mapped base address of the register space
+ * @reset_complete:          Completion structure to be signaled if Reset IRQ
+ *                           is Set
  */
-struct cam_vfe_generic_ubwc_config {
-	uint32_t   api_version;
-	struct cam_vfe_generic_ubwc_plane_config
-		ubwc_plane_cfg[CAM_PACKET_MAX_PLANES - 1];
+struct cam_vfe_irq_handler_priv {
+	uint32_t                     core_index;
+	void                        *core_info;
+	void __iomem                *mem_base;
+	struct completion           *reset_complete;
 };
 
 /*

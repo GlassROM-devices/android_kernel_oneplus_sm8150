@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- *  Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _HFI_DEFS_H_
@@ -66,21 +73,6 @@
 #define HFI_CMD_SYS_GET_PROPERTY       (HFI_CMD_COMMON_START + 0x4)
 #define HFI_CMD_SYS_PING               (HFI_CMD_COMMON_START + 0x5)
 #define HFI_CMD_SYS_RESET              (HFI_CMD_COMMON_START + 0x6)
-
-/* General Frame process errors */
-#define CAMERAICP_SUCCESS              0
-#define CAMERAICP_EFAILED              1
-#define CAMERAICP_ENOMEMORY            2
-#define CAMERAICP_EBADSTATE            3
-#define CAMERAICP_EBADPARM             4
-#define CAMERAICP_EBADITEM             5
-#define CAMERAICP_EINVALIDFORMAT       6
-#define CAMERAICP_EUNSUPPORTED         7
-#define CAMERAICP_EOUTOFBOUND          8
-#define CAMERAICP_ETIMEDOUT            9
-#define CAMERAICP_EABORTED             10
-#define CAMERAICP_EHWVIOLATION         11
-#define CAMERAICP_ECDMERROR            12
 
 /* Core level commands */
 /* IPE/BPS core Commands */
@@ -163,13 +155,12 @@
 /* System  level property base offset */
 #define HFI_PROPERTY_ICP_COMMON_START  (HFI_DOMAIN_BASE_ICP + 0x0)
 
-#define HFI_PROP_SYS_DEBUG_CFG           (HFI_PROPERTY_ICP_COMMON_START + 0x1)
-#define HFI_PROP_SYS_UBWC_CFG            (HFI_PROPERTY_ICP_COMMON_START + 0x2)
-#define HFI_PROP_SYS_IMAGE_VER           (HFI_PROPERTY_ICP_COMMON_START + 0x3)
-#define HFI_PROP_SYS_SUPPORTED           (HFI_PROPERTY_ICP_COMMON_START + 0x4)
-#define HFI_PROP_SYS_IPEBPS_PC           (HFI_PROPERTY_ICP_COMMON_START + 0x5)
-#define HFI_PROP_SYS_FW_DUMP_CFG         (HFI_PROPERTY_ICP_COMMON_START + 0x8)
-#define HFI_PROPERTY_SYS_UBWC_CONFIG_EX  (HFI_PROPERTY_ICP_COMMON_START + 0x9)
+#define HFI_PROP_SYS_DEBUG_CFG         (HFI_PROPERTY_ICP_COMMON_START + 0x1)
+#define HFI_PROP_SYS_UBWC_CFG          (HFI_PROPERTY_ICP_COMMON_START + 0x2)
+#define HFI_PROP_SYS_IMAGE_VER         (HFI_PROPERTY_ICP_COMMON_START + 0x3)
+#define HFI_PROP_SYS_SUPPORTED         (HFI_PROPERTY_ICP_COMMON_START + 0x4)
+#define HFI_PROP_SYS_IPEBPS_PC         (HFI_PROPERTY_ICP_COMMON_START + 0x5)
+#define HFI_PROP_SYS_FW_DUMP_CFG       (HFI_PROPERTY_ICP_COMMON_START + 0x8)
 
 /* Capabilities reported at sys init */
 #define HFI_CAPS_PLACEHOLDER_1         (HFI_COMMON_BASE + 0x1)
@@ -223,10 +214,6 @@
 #define HFI_DEBUG_CFG_ARM9WD     0x10000000
 
 #define HFI_DEV_VERSION_MAX      0x5
-
-/* Hang dump settings */
-#define HFI_SET_HANG_DUMP_ALWAYS     0x2
-#define HFI_SET_HANG_DUMP_ON_FAILURE 0x1
 
 /**
  * start of sys command packet types
@@ -294,18 +281,7 @@ struct hfi_ipe_bps_pc {
 struct hfi_cmd_ubwc_cfg {
 	uint32_t ubwc_fetch_cfg;
 	uint32_t ubwc_write_cfg;
-} __packed;
-
-/**
- * struct hfi_cmd_ubwc_cfg_ext
- * Payload structure to configure HFI_UBWC_CFG_TYPE_EXT
- * @bps: UBWC configuration for bps
- * @ipe: UBWC configuration for ipe
- */
-struct hfi_cmd_ubwc_cfg_ext {
-	struct hfi_cmd_ubwc_cfg bps;
-	struct hfi_cmd_ubwc_cfg ipe;
-} __packed;
+};
 
 /**
  * struct hfi_cmd_sys_init
@@ -457,7 +433,7 @@ struct hfi_msg_init_done {
 
 /**
  * struct hfi_msg_pc_prep_done
- * system power collapse preparation done message
+ * system power collapse preperation done message
  * @size: packet size in bytes
  * @pkt_type: opcode of a packet
  * @err_type: error code associated with the response

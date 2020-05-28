@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef __CAM_SYNC_API_H__
@@ -10,7 +17,7 @@
 #include <linux/list.h>
 #include <linux/completion.h>
 #include <linux/videodev2.h>
-#include <media/cam_sync.h>
+#include <uapi/media/cam_sync.h>
 
 #define SYNC_DEBUG_NAME_LEN 63
 typedef void (*sync_callback)(int32_t sync_obj, int status, void *data);
@@ -140,5 +147,14 @@ int cam_sync_destroy(int32_t sync_obj);
  */
 int cam_sync_wait(int32_t sync_obj, uint64_t timeout_ms);
 
+/**
+ * @brief: Check if sync object is valid
+ *
+ * @param sync_obj: int referencing the sync object to be checked
+ *
+ * @return 0 upon success, -EINVAL if sync object is in bad state or arguments
+ * are invalid
+ */
+int cam_sync_check_valid(int32_t sync_obj);
 
 #endif /* __CAM_SYNC_API_H__ */

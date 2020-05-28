@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef CAM_JPEG_ENC_CORE_H
@@ -10,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/dma-buf.h>
 
 #include "cam_jpeg_hw_intf.h"
 
@@ -39,10 +47,16 @@ struct cam_jpeg_enc_int_status {
 	uint32_t stopdone;
 };
 
+struct cam_jpeg_enc_reg_dump {
+	uint32_t start_offset;
+	uint32_t end_offset;
+};
+
 struct cam_jpeg_enc_device_hw_info {
 	struct cam_jpeg_enc_reg_offsets reg_offset;
 	struct cam_jpeg_enc_regval reg_val;
 	struct cam_jpeg_enc_int_status int_status;
+	struct cam_jpeg_enc_reg_dump reg_dump;
 };
 
 enum cam_jpeg_enc_core_state {

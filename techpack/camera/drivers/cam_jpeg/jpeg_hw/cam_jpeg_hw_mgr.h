@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef CAM_JPEG_HW_MGR_H
@@ -20,6 +27,12 @@
 #define CAM_JPEG_WORKQ_TASK_CMD_TYPE 1
 #define CAM_JPEG_WORKQ_TASK_MSG_TYPE 2
 #define CAM_JPEG_HW_CFG_Q_MAX        50
+
+/*
+ * Response time threshold in ms beyond which a request is not expected
+ * to be with JPEG hw
+ */
+#define CAM_JPEG_RESPONSE_TIME_THRESHOLD   100000
 
 /**
  * struct cam_jpeg_process_frame_work_data_t
@@ -69,12 +82,14 @@ struct cam_jpeg_hw_cdm_info_t {
  * @hw_cfg_args: Hw config args
  * @dev_type: Dev type for cfg request
  * @req_id: Request Id
+ * @submit_timestamp: Timestamp of submitting request
  */
 struct cam_jpeg_hw_cfg_req {
 	struct list_head list;
 	struct cam_hw_config_args hw_cfg_args;
 	uint32_t dev_type;
 	uintptr_t req_id;
+	struct timeval submit_timestamp;
 };
 
 /**

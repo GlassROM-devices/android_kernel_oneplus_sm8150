@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/module.h>
@@ -8,6 +15,7 @@
 #include <linux/mutex.h>
 #include <linux/msm_ion.h>
 #include <linux/slab.h>
+#include <asm/cacheflush.h>
 #include <linux/ion_kernel.h>
 #include <linux/dma-buf.h>
 
@@ -175,7 +183,7 @@ static void cam_mem_put_slot(int32_t idx)
 }
 
 int cam_mem_get_io_buf(int32_t buf_handle, int32_t mmu_handle,
-	dma_addr_t *iova_ptr, size_t *len_ptr)
+	uint64_t *iova_ptr, size_t *len_ptr)
 {
 	int rc = 0, idx;
 
@@ -188,10 +196,10 @@ int cam_mem_get_io_buf(int32_t buf_handle, int32_t mmu_handle,
 
 	idx = CAM_MEM_MGR_GET_HDL_IDX(buf_handle);
 	if (idx >= CAM_MEM_BUFQ_MAX || idx <= 0)
-		return -ENOENT;
+		return -EINVAL;
 
 	if (!tbl.bufq[idx].active)
-		return -EAGAIN;
+		return -EINVAL;
 
 	mutex_lock(&tbl.bufq[idx].q_lock);
 	if (buf_handle != tbl.bufq[idx].buf_handle) {
@@ -227,12 +235,9 @@ EXPORT_SYMBOL(cam_mem_get_io_buf);
 
 int cam_mem_get_cpu_buf(int32_t buf_handle, uintptr_t *vaddr_ptr, size_t *len)
 {
+	int rc = 0;
 	int idx;
-
-	if (!atomic_read(&cam_mem_mgr_state)) {
-		CAM_ERR(CAM_MEM, "failed. mem_mgr not initialized");
-		return -EINVAL;
-	}
+	struct dma_buf *dmabuf = NULL;
 
 	if (!atomic_read(&cam_mem_mgr_state)) {
 		CAM_ERR(CAM_MEM, "failed. mem_mgr not initialized");
@@ -256,17 +261,72 @@ int cam_mem_get_cpu_buf(int32_t buf_handle, uintptr_t *vaddr_ptr, size_t *len)
 		return -EINVAL;
 
 	if (tbl.bufq[idx].kmdvaddr) {
-		*vaddr_ptr = tbl.bufq[idx].kmdvaddr;
-		*len = tbl.bufq[idx].len;
+		dmabuf = tbl.bufq[idx].dma_buf;
+		if (!dmabuf) {
+			CAM_ERR(CAM_MEM, "Invalid DMA buffer pointer");
+			return -EINVAL;
+		}
+		rc = dma_buf_begin_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
+		if (rc) {
+			CAM_ERR(CAM_MEM, "dma begin access failed rc=%d", rc);
+			return rc;
+		}
 	} else {
-		CAM_ERR(CAM_MEM, "No KMD access was requested for 0x%x handle",
-			buf_handle);
 		return -EINVAL;
 	}
 
-	return 0;
+	*vaddr_ptr = tbl.bufq[idx].kmdvaddr;
+	*len = tbl.bufq[idx].len;
+
+	return rc;
 }
 EXPORT_SYMBOL(cam_mem_get_cpu_buf);
+
+int cam_mem_put_cpu_buf(int32_t buf_handle)
+{
+	int rc = 0;
+	int idx;
+	struct dma_buf *dmabuf = NULL;
+
+	if (!atomic_read(&cam_mem_mgr_state)) {
+		CAM_ERR(CAM_MEM, "failed. mem_mgr not initialized");
+		return -EINVAL;
+	}
+
+	if (!buf_handle)
+		return -EINVAL;
+
+	idx = CAM_MEM_MGR_GET_HDL_IDX(buf_handle);
+	if (idx >= CAM_MEM_BUFQ_MAX || idx <= 0)
+		return -EINVAL;
+
+	if (!tbl.bufq[idx].active)
+		return -EPERM;
+
+	if (buf_handle != tbl.bufq[idx].buf_handle)
+		return -EINVAL;
+
+	dmabuf = tbl.bufq[idx].dma_buf;
+	if (!dmabuf) {
+		CAM_ERR(CAM_CRM, "Invalid DMA buffer pointer");
+		return -EINVAL;
+	}
+
+	if ((tbl.bufq[idx].flags & CAM_MEM_FLAG_KMD_ACCESS) &&
+		(tbl.bufq[idx].kmdvaddr)) {
+		rc = dma_buf_end_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
+		if (rc) {
+			CAM_ERR(CAM_MEM, "dma begin access failed rc=%d", rc);
+			return rc;
+		}
+	} else {
+		CAM_ERR(CAM_MEM, "Invalid buf flag");
+		rc = -EINVAL;
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(cam_mem_put_cpu_buf);
 
 int cam_mem_mgr_cache_ops(struct cam_mem_cache_ops_cmd *cmd)
 {
@@ -373,7 +433,6 @@ static int cam_mem_util_get_dma_buf_fd(size_t len,
 	struct dma_buf **buf,
 	int *fd)
 {
-	struct dma_buf *dmabuf = NULL;
 	int rc = 0;
 
 	if (!buf || !fd) {
@@ -397,11 +456,7 @@ static int cam_mem_util_get_dma_buf_fd(size_t len,
 	 * when we close fd, refcount becomes 1 and when we do
 	 * dmap_put_buf, ref count becomes 0 and memory will be freed.
 	 */
-	dmabuf = dma_buf_get(*fd);
-	if (IS_ERR_OR_NULL(dmabuf)) {
-		CAM_ERR(CAM_MEM, "dma_buf_get failed, *fd=%d", *fd);
-		rc = -EINVAL;
-	}
+	dma_buf_get(*fd);
 
 	return rc;
 
@@ -505,15 +560,11 @@ static int cam_mem_util_map_hw_va(uint32_t flags,
 	int i;
 	int rc = -1;
 	int dir = cam_mem_util_get_dma_dir(flags);
-	bool dis_delayed_unmap = false;
 
 	if (dir < 0) {
 		CAM_ERR(CAM_MEM, "fail to map DMA direction, dir=%d", dir);
 		return dir;
 	}
-
-	if (flags & CAM_MEM_FLAG_DISABLE_DELAYED_UNMAP)
-		dis_delayed_unmap = true;
 
 	CAM_DBG(CAM_MEM,
 		"map_hw_va : fd = %d,  flags = 0x%x, dir=%d, num_hdls=%d",
@@ -538,7 +589,6 @@ static int cam_mem_util_map_hw_va(uint32_t flags,
 		for (i = 0; i < num_hdls; i++) {
 			rc = cam_smmu_map_user_iova(mmu_hdls[i],
 				fd,
-				dis_delayed_unmap,
 				dir,
 				(dma_addr_t *)hw_vaddr,
 				len,
@@ -952,7 +1002,7 @@ static int cam_mem_util_unmap(int32_t idx,
 				CAM_ERR(CAM_MEM,
 					"Failed, dmabuf=%pK, kmdvaddr=%pK",
 					tbl.bufq[idx].dma_buf,
-					(void *) tbl.bufq[idx].kmdvaddr);
+					tbl.bufq[idx].kmdvaddr);
 		}
 	}
 

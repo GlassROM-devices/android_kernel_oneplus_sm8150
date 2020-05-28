@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 #ifndef _CAM_REQ_MGR_CORE_H_
 #define _CAM_REQ_MGR_CORE_H_
@@ -13,10 +20,9 @@
 #define CAM_REQ_MGR_MAX_LINKED_DEV     16
 #define MAX_REQ_SLOTS                  48
 
-#define CAM_REQ_MGR_WATCHDOG_TIMEOUT       1000
-#define CAM_REQ_MGR_WATCHDOG_TIMEOUT_MAX   50000
-#define CAM_REQ_MGR_SCHED_REQ_TIMEOUT      1000
-#define CAM_REQ_MGR_SIMULATE_SCHED_REQ     30
+#define CAM_REQ_MGR_WATCHDOG_TIMEOUT   5000
+#define CAM_REQ_MGR_SCHED_REQ_TIMEOUT  1000
+#define CAM_REQ_MGR_SIMULATE_SCHED_REQ 30
 
 #define FORCE_DISABLE_RECOVERY  2
 #define FORCE_ENABLE_RECOVERY   1
@@ -26,17 +32,9 @@
 
 #define MAX_SYNC_COUNT 65535
 
-/* Default frame rate is 30 */
-#define DEFAULT_FRAME_DURATION 33333333
-
 #define SYNC_LINK_SOF_CNT_MAX_LMT 1
 
 #define MAXIMUM_LINKS_PER_SESSION  4
-
-#define MAXIMUM_RETRY_ATTEMPTS 3
-
-#define VERSION_1  1
-#define VERSION_2  2
 
 /**
  * enum crm_workq_task_type
@@ -52,6 +50,7 @@ enum crm_workq_task_type {
 	CRM_WORKQ_TASK_NOTIFY_FREEZE,
 	CRM_WORKQ_TASK_SCHED_REQ,
 	CRM_WORKQ_TASK_FLUSH_REQ,
+	CRM_WORKQ_TASK_DUMP_REQ,
 	CRM_WORKQ_TASK_INVALID,
 };
 
@@ -130,23 +129,9 @@ enum cam_req_mgr_link_state {
 };
 
 /**
- * struct cam_req_mgr_traverse_result
- * @req_id        : Req id that is not ready
- * @pd            : pipeline delay
- * @masked_value  : Holds the dev bit for devices not ready
- *                  for the given request
- */
-struct cam_req_mgr_traverse_result {
-	int64_t  req_id;
-	uint32_t pd;
-	uint32_t masked_value;
-};
-
-/**
  * struct cam_req_mgr_traverse
  * @idx              : slot index
  * @result           : contains which all tables were able to apply successfully
- * @result_data      : holds the result of traverse in case it fails
  * @tbl              : pointer of pipeline delay based request table
  * @apply_data       : pointer which various tables will update during traverse
  * @in_q             : input request queue pointer
@@ -154,14 +139,13 @@ struct cam_req_mgr_traverse_result {
  * @open_req_cnt     : Count of open requests yet to be serviced in the kernel.
  */
 struct cam_req_mgr_traverse {
-	int32_t                            idx;
-	uint32_t                           result;
-	struct cam_req_mgr_traverse_result result_data;
-	struct cam_req_mgr_req_tbl        *tbl;
-	struct cam_req_mgr_apply          *apply_data;
-	struct cam_req_mgr_req_queue      *in_q;
-	bool                               validate_only;
-	int32_t                            open_req_cnt;
+	int32_t                       idx;
+	uint32_t                      result;
+	struct cam_req_mgr_req_tbl   *tbl;
+	struct cam_req_mgr_apply     *apply_data;
+	struct cam_req_mgr_req_queue *in_q;
+	bool                          validate_only;
+	int32_t                       open_req_cnt;
 };
 
 /**
@@ -227,15 +211,13 @@ struct cam_req_mgr_req_tbl {
 /**
  * struct cam_req_mgr_slot
  * - Internal Book keeping
- * @idx                : slot index
- * @skip_idx           : if req id in this slot needs to be skipped/not applied
- * @status             : state machine for life cycle of a slot
+ * @idx          : slot index
+ * @skip_idx     : if req id in this slot needs to be skipped/not applied
+ * @status       : state machine for life cycle of a slot
  * - members updated due to external events
- * @recover            : if user enabled recovery for this request.
- * @req_id             : mask tracking which all devices have request ready
- * @sync_mode          : Sync mode in which req id in this slot has to applied
- * @additional_timeout : Adjusted watchdog timeout value associated with
- * this request
+ * @recover      : if user enabled recovery for this request.
+ * @req_id       : mask tracking which all devices have request ready
+ * @sync_mode    : Sync mode in which req id in this slot has to applied
  */
 struct cam_req_mgr_slot {
 	int32_t               idx;
@@ -244,7 +226,6 @@ struct cam_req_mgr_slot {
 	int32_t               recover;
 	int64_t               req_id;
 	int32_t               sync_mode;
-	int32_t               additional_timeout;
 };
 
 /**
@@ -339,12 +320,6 @@ struct cam_req_mgr_connected_device {
  * @in_msync_mode        : Flag to determine if a link is in master-slave mode
  * @initial_sync_req     : The initial req which is required to sync with the
  *                         other link
- * @retry_cnt            : Counter that tracks number of attempts to apply
- *                         the same req
- * @is_shutdown          : Flag to indicate if link needs to be disconnected
- *                         as part of shutdown.
- * @sof_timestamp_value  : SOF timestamp value
- * @prev_sof_timestamp   : Previous SOF timestamp value
  */
 struct cam_req_mgr_core_link {
 	int32_t                              link_hdl;
@@ -371,10 +346,6 @@ struct cam_req_mgr_core_link {
 	bool                                 initial_skip;
 	bool                                 in_msync_mode;
 	int64_t                              initial_sync_req;
-	uint32_t                             retry_cnt;
-	bool                                 is_shutdown;
-	uint64_t                             sof_timestamp;
-	uint64_t                             prev_sof_timestamp;
 };
 
 /**
@@ -427,13 +398,11 @@ int cam_req_mgr_create_session(struct cam_req_mgr_session_info *ses_info);
  * cam_req_mgr_destroy_session()
  * @brief    : destroy session
  * @ses_info : session handle info, input param
- * @is_shutdown: To indicate if devices on link need to be disconnected.
  *
  * Called as part of session destroy
  * return success/failure
  */
-int cam_req_mgr_destroy_session(struct cam_req_mgr_session_info *ses_info,
-	bool is_shutdown);
+int cam_req_mgr_destroy_session(struct cam_req_mgr_session_info *ses_info);
 
 /**
  * cam_req_mgr_link()
@@ -444,9 +413,7 @@ int cam_req_mgr_destroy_session(struct cam_req_mgr_session_info *ses_info,
  * a unique link handle for the link and is specific to a
  * session. Returns link handle
  */
-int cam_req_mgr_link(struct cam_req_mgr_ver_info *link_info);
-int cam_req_mgr_link_v2(struct cam_req_mgr_ver_info *link_info);
-
+int cam_req_mgr_link(struct cam_req_mgr_link_info *link_info);
 
 /**
  * cam_req_mgr_unlink()
@@ -505,4 +472,12 @@ void cam_req_mgr_handle_core_shutdown(void);
  */
 int cam_req_mgr_link_control(struct cam_req_mgr_link_control *control);
 
+/**
+ * cam_req_mgr_dump_request()
+ * @brief:   Dumps the request information
+ * @dump_req: Dump request
+ */
+int cam_req_mgr_dump_request(struct cam_dump_req_cmd *dump_req);
+
 #endif
+

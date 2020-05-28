@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_VFE_SOC_H_
@@ -11,7 +18,11 @@
 
 #define CAM_VFE_DSP_CLK_NAME "ife_dsp_clk"
 
-#define UBWC_STATIC_CONFIG_MAX 2
+enum cam_cpas_handle_id {
+	CAM_CPAS_HANDLE_CAMIF,
+	CAM_CPAS_HANDLE_RAW,
+	CAM_CPAS_HANDLE_MAX,
+};
 
 /*
  * struct cam_vfe_soc_private:
@@ -22,17 +33,13 @@
  *                           This handle is used for all further interface
  *                           with CPAS.
  * @cpas_version:            Has cpas version read from Hardware
- * @ubwc_static_ctrl:        UBWC static control configuration
- * @is_ife_lite:             Flag to indicate full vs lite IFE
  */
 struct cam_vfe_soc_private {
-	uint32_t    cpas_handle;
+	uint32_t    cpas_handle[CAM_CPAS_HANDLE_MAX];
 	uint32_t    cpas_version;
 	struct clk *dsp_clk;
 	int32_t     dsp_clk_index;
 	int32_t     dsp_clk_rate;
-	uint32_t    ubwc_static_ctrl[UBWC_STATIC_CONFIG_MAX];
-	bool        is_ife_lite;
 };
 
 /*

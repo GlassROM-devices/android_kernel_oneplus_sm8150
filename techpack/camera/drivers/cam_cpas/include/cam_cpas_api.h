@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_CPAS_API_H_
@@ -16,9 +23,6 @@
 
 /* Default AXI Bandwidth vote */
 #define CAM_CPAS_DEFAULT_AXI_BW 1024
-
-#define CAM_CPAS_MAX_PATHS_PER_CLIENT 15
-#define CAM_CPAS_API_PATH_DATA_STD_START 512
 
 /**
  * enum cam_cpas_reg_base - Enum for register base identifier. These
@@ -44,10 +48,9 @@ enum cam_cpas_hw_version {
 	CAM_CPAS_TITAN_175_V100 = 0x175100,
 	CAM_CPAS_TITAN_175_V101 = 0x175101,
 	CAM_CPAS_TITAN_175_V120 = 0x175120,
-	CAM_CPAS_TITAN_175_V130 = 0x175130,
-	CAM_CPAS_TITAN_480_V100 = 0x480100,
 	CAM_CPAS_TITAN_MAX
 };
+
 
 /**
  * enum cam_camnoc_irq_type - Enum for camnoc irq types
@@ -57,9 +60,6 @@ enum cam_cpas_hw_version {
  *                              observed at any slave port is logged into
  *                              the error logger register and an IRQ is
  *                              triggered
- * @CAM_CAMNOC_IRQ_IFE_UBWC_STATS_ENCODE_ERROR: Triggered if any error detected
- *                                              in the IFE UBWC-Stats encoder
- *                                              instance
  * @CAM_CAMNOC_IRQ_IFE02_UBWC_ENCODE_ERROR  : Triggered if any error detected
  *                                            in the IFE0 UBWC encoder instance
  * @CAM_CAMNOC_IRQ_IFE13_UBWC_ENCODE_ERROR  : Triggered if any error detected
@@ -70,12 +70,6 @@ enum cam_cpas_hw_version {
  * @CAM_CAMNOC_IRQ_IFE1_WR_UBWC_ENCODE_ERROR  : Triggered if any error detected
  *                                            in the IFE1 UBWC encoder
  *                                            instance
- * @CAM_CAMNOC_IRQ_IPE1_BPS_UBWC_DECODE_ERROR: Triggered if any error detected
- *                                             in the IPE1/BPS read path decoder
- *                                             instance
- * @CAM_CAMNOC_IRQ_IPE0_UBWC_DECODE_ERROR    : Triggered if any error detected
- *                                             in the IPE0 read path decoder
- *                                             instance
  * @CAM_CAMNOC_IRQ_IPE_BPS_UBWC_DECODE_ERROR: Triggered if any error detected
  *                                            in the IPE/BPS UBWC decoder
  *                                            instance
@@ -87,13 +81,10 @@ enum cam_cpas_hw_version {
  */
 enum cam_camnoc_irq_type {
 	CAM_CAMNOC_IRQ_SLAVE_ERROR,
-	CAM_CAMNOC_IRQ_IFE_UBWC_STATS_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_IFE02_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_IFE13_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_IFE0_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_IFE1_WRITE_UBWC_ENCODE_ERROR,
-	CAM_CAMNOC_IRQ_IPE1_BPS_UBWC_DECODE_ERROR,
-	CAM_CAMNOC_IRQ_IPE0_UBWC_DECODE_ERROR,
 	CAM_CAMNOC_IRQ_IPE_BPS_UBWC_DECODE_ERROR,
 	CAM_CAMNOC_IRQ_IPE_BPS_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_AHB_TIMEOUT,
@@ -342,13 +333,20 @@ struct cam_ahb_vote {
 /**
  * struct cam_axi_vote : AXI vote
  *
- * @num_paths: Number of paths on which BW vote is sent to CPAS
- * @axi_path: Per path BW vote info
+ * @uncompressed_bw : Bus bandwidth required in Bytes for uncompressed data
+ *                    This is the required bandwidth for uncompressed
+ *                    data traffic between hw core and camnoc.
+ * @compressed_bw   : Bus bandwidth required in Bytes for compressed data.
+ *                    This is the required bandwidth for compressed
+ *                    data traffic between camnoc and mmnoc.
+ *
+ * If one of the above is not applicable to a hw client, it has to
+ * fill the same values in both.
  *
  */
 struct cam_axi_vote {
-	uint32_t num_paths;
-	struct cam_axi_per_path_bw_vote axi_path[CAM_CPAS_MAX_PATHS_PER_CLIENT];
+	uint64_t   uncompressed_bw;
+	uint64_t   compressed_bw;
 };
 
 /**
@@ -524,45 +522,5 @@ int cam_cpas_get_hw_info(
  */
 int cam_cpas_get_cpas_hw_version(
 	uint32_t				 *hw_version);
-
-/**
- * cam_cpas_is_feature_supported()
- *
- * @brief: API to get camera features
- *
- * @flag  : Camera hw features to check
- *
- * @return 1 if feature is supported
- *
- */
-int cam_cpas_is_feature_supported(
-	uint32_t flag);
-
-/**
- * cam_cpas_axi_util_path_type_to_string()
- *
- * @brief: API to get string for given path type
- *
- * @path_data_type  : Path type
- *
- * @return string.
- *
- */
-const char *cam_cpas_axi_util_path_type_to_string(
-	uint32_t path_data_type);
-
-/**
- * cam_cpas_axi_util_trans_type_to_string()
- *
- * @brief: API to get string for given transaction type
- *
- * @path_data_type  : Transaction type
- *
- * @return string.
- *
- */
-const char *cam_cpas_axi_util_trans_type_to_string(
-	uint32_t path_data_type);
-
 
 #endif /* _CAM_CPAS_API_H_ */

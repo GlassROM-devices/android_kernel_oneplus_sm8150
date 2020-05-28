@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_CSIPHY_1_1_HWREG_H_
@@ -256,7 +263,7 @@ csiphy_reg_t csiphy_3ph_v1_1_reg[MAX_LANES][MAX_SETTINGS_PER_LANE] = {
 		{0x015C, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x09B0, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0980, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
-		{0x09B0, 0x24, 0x00, CSIPHY_DEFAULT_PARAMS},
+		{0x09B0, 0x23, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x015C, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0984, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0988, 0x04, 0x00, CSIPHY_DEFAULT_PARAMS},
@@ -301,7 +308,7 @@ csiphy_reg_t csiphy_3ph_v1_1_reg[MAX_LANES][MAX_SETTINGS_PER_LANE] = {
 		{0x035C, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0AB0, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0A80, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
-		{0x0AB0, 0x24, 0x00, CSIPHY_DEFAULT_PARAMS},
+		{0x0AB0, 0x23, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x035C, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0A84, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0A88, 0x04, 0x00, CSIPHY_DEFAULT_PARAMS},
@@ -346,7 +353,7 @@ csiphy_reg_t csiphy_3ph_v1_1_reg[MAX_LANES][MAX_SETTINGS_PER_LANE] = {
 		{0x055C, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0BB0, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0B80, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
-		{0x0BB0, 0x24, 0x00, CSIPHY_DEFAULT_PARAMS},
+		{0x0BB0, 0x23, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x055C, 0x40, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0B84, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0B88, 0x04, 0x00, CSIPHY_DEFAULT_PARAMS},

@@ -1,17 +1,23 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 #ifndef _CAM_EEPROM_DEV_H_
 #define _CAM_EEPROM_DEV_H_
 
 #include <linux/i2c.h>
-#include <linux/kernel.h>
-#include <linux/list.h>
 #include <linux/gpio.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-ioctl.h>
+#include <media/cam_sensor.h>
 #include <cam_sensor_i2c.h>
 #include <cam_sensor_spi.h>
 #include <cam_sensor_io.h>
@@ -20,7 +26,6 @@
 #include <cam_req_mgr_interface.h>
 #include <cam_mem_mgr.h>
 #include <cam_subdev.h>
-#include <media/cam_sensor.h>
 #include "cam_soc_util.h"
 #include "cam_context.h"
 
@@ -30,7 +35,7 @@
 #define PROPERTY_MAXSIZE 32
 
 #define MSM_EEPROM_MEMORY_MAP_MAX_SIZE         80
-#define MSM_EEPROM_MAX_MEM_MAP_CNT             100
+#define MSM_EEPROM_MAX_MEM_MAP_CNT             8
 #define MSM_EEPROM_MEM_MAP_PROPERTIES_CNT      8
 
 enum cam_eeprom_state {
@@ -145,31 +150,22 @@ struct cam_eeprom_intf_params {
 	struct cam_req_mgr_crm_cb *crm_cb;
 };
 
-struct eebin_info {
-	uint32_t start_address;
-	uint32_t size;
-	uint32_t is_valid;
-};
-
 /**
- * struct cam_eeprom_ctrl_t - EEPROM control structure
- * @device_name         :   Device name
- * @pdev                :   platform device
- * @spi                 :   spi device
- * @eeprom_mutex        :   eeprom mutex
- * @soc_info            :   eeprom soc related info
- * @io_master_info      :   Information about the communication master
- * @gpio_num_info       :   gpio info
- * @cci_i2c_master      :   I2C structure
- * @v4l2_dev_str        :   V4L2 device structure
- * @bridge_intf         :   bridge interface params
- * @cam_eeprom_state    :   eeprom_device_state
- * @userspace_probe     :   flag indicates userspace or kernel probe
- * @cal_data            :   Calibration data
- * @device_name         :   Device name
- * @is_multimodule_mode :   To identify multimodule node
- * @wr_settings         :   I2C write settings
- * @eebin_info          :   EEBIN address, size info
+ * struct cam_cmd_conditional_wait - Conditional wait command
+ * @device_name     :   Device name
+ * @pdev            :   platform device
+ * @spi             :   spi device
+ * @eeprom_mutex    :   eeprom mutex
+ * @soc_info        :   eeprom soc related info
+ * @io_master_info  :   Information about the communication master
+ * @gpio_num_info   :   gpio info
+ * @cci_i2c_master  :   I2C structure
+ * @v4l2_dev_str    :   V4L2 device structure
+ * @bridge_intf     :   bridge interface params
+ * @cam_eeprom_state:   eeprom_device_state
+ * @userspace_probe :   flag indicates userspace or kernel probe
+ * @cal_data        :   Calibration data
+ *
  */
 struct cam_eeprom_ctrl_t {
 	char device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
@@ -187,9 +183,6 @@ struct cam_eeprom_ctrl_t {
 	enum cam_eeprom_state cam_eeprom_state;
 	bool userspace_probe;
 	struct cam_eeprom_memory_block_t cal_data;
-	uint16_t is_multimodule_mode;
-	struct i2c_settings_array wr_settings;
-	struct eebin_info eebin_info;
 };
 
 int32_t cam_eeprom_update_i2c_info(struct cam_eeprom_ctrl_t *e_ctrl,

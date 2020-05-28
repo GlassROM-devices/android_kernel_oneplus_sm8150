@@ -1,16 +1,25 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_SENSOR_DEV_H_
 #define _CAM_SENSOR_DEV_H_
 
 #include <linux/delay.h>
+#include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/module.h>
 #include <linux/irqreturn.h>
+#include <linux/ion.h>
 #include <linux/iommu.h>
 #include <linux/timer.h>
 #include <linux/kernel.h>
@@ -27,6 +36,9 @@
 
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
+
+#define TRUE  1
+#define FALSE 0
 
 #undef CDBG
 #ifdef CAM_SENSOR_DEBUG
@@ -111,6 +123,8 @@ struct cam_sensor_ctrl_t {
 	bool bob_pwm_switch;
 	uint32_t last_flush_req;
 	uint16_t pipeline_delay;
+	uint32_t sensor_eeprom_same_cci;
 };
 
+void cam_request_timeout_ws(void);
 #endif /* _CAM_SENSOR_DEV_H_ */

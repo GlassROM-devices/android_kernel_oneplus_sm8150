@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/of.h>
@@ -79,14 +86,10 @@ static int cam_ois_get_dt_data(struct cam_ois_ctrl_t *o_ctrl)
  */
 int cam_ois_driver_soc_init(struct cam_ois_ctrl_t *o_ctrl)
 {
-	int                            rc = 0;
-	const char                     *p = NULL;
+	int                             rc = 0;
 	struct cam_hw_soc_info         *soc_info = &o_ctrl->soc_info;
 	struct device_node             *of_node = NULL;
-	struct device_node             *of_parent = NULL;
-	int                             ret = 0;
 	int                             id;
-
 	if (!soc_info->dev) {
 		CAM_ERR(CAM_OIS, "soc_info is not initialized");
 		return -EINVAL;
@@ -106,82 +109,44 @@ int cam_ois_driver_soc_init(struct cam_ois_ctrl_t *o_ctrl)
 			return rc;
 		}
 
-		of_parent = of_get_parent(of_node);
-		if (of_property_read_u32(of_parent, "cell-index",
-				&o_ctrl->cci_num) < 0)
+		rc = of_property_read_u32(of_node, "cci-device",
+			&o_ctrl->cci_num);
+		CAM_DBG(CAM_ACTUATOR, "cci-device %d, rc %d",
+			o_ctrl->cci_num, rc);
+		if (rc < 0) {
 			/* Set default master 0 */
 			o_ctrl->cci_num = CCI_DEVICE_0;
-
+			rc = 0;
+		}
 		o_ctrl->io_master_info.cci_client->cci_device = o_ctrl->cci_num;
-		CAM_DBG(CAM_OIS, "cci-device %d", o_ctrl->cci_num);
-
 	}
 
 	rc = cam_ois_get_dt_data(o_ctrl);
 	if (rc < 0)
 		CAM_DBG(CAM_OIS, "failed: ois get dt data rc %d", rc);
 
-	ret = of_property_read_u32(of_node, "ois_gyro,position", &id);
-	if (ret) {
-	    o_ctrl->ois_gyro_position = 1;
-		CAM_ERR(CAM_OIS, "get ois_gyro,position failed rc:%d, set default value to %d", ret, o_ctrl->ois_gyro_position);
+	rc = of_property_read_u32(of_node, "ois_gyro,id", &id);
+	if (rc < 0) {
+	    o_ctrl->ois_gyro_id = 1;
+		CAM_ERR(CAM_OIS, "get ois_gyro,id failed rc:%d, default 1", rc);
 	} else {
-	    o_ctrl->ois_gyro_position = (uint8_t)id;
-		CAM_INFO(CAM_OIS, "read ois_gyro,position success, value:%d", o_ctrl->ois_gyro_position);
+	    o_ctrl->ois_gyro_id = (uint8_t)id;
+		CAM_INFO(CAM_OIS, "read ois_gyro,id success, id:%d, rc:%d", o_ctrl->ois_gyro_id, rc);
+		if (o_ctrl->ois_gyro_id == 1) {
+			CAM_INFO(CAM_OIS, "821 gyro backside");
+		} else if (o_ctrl->ois_gyro_id == 2) {
+			CAM_INFO(CAM_OIS, "827 gyro upside");
+		}
+        else if (o_ctrl->ois_gyro_id == 3) {
+			CAM_INFO(CAM_OIS, "857 gyro upside");
+		}
 	}
-
-	ret = of_property_read_u32(of_node, "ois,type", &id);
-	if (ret) {
-	    o_ctrl->ois_type = CAM_OIS_MASTER;
-		CAM_ERR(CAM_OIS, "get ois,type failed rc:%d, default %d", ret, o_ctrl->ois_type);
-	} else {
-	    o_ctrl->ois_type = (uint8_t)id;
-		CAM_INFO(CAM_OIS, "read ois,type success, value:%d", o_ctrl->ois_type);
-	}
-
-	ret = of_property_read_u32(of_node, "ois_gyro,type", &id);
-	if (ret) {
-	    o_ctrl->ois_gyro_vendor = 0x02;
-		CAM_ERR(CAM_OIS, "get ois_gyro,type failed rc:%d, default %d", ret, o_ctrl->ois_gyro_vendor);
-	} else {
-	    o_ctrl->ois_gyro_vendor = (uint8_t)id;
-		CAM_INFO(CAM_OIS, "read ois_gyro,type success, value:%d", o_ctrl->ois_gyro_vendor);
-	}
-
-	ret = of_property_read_string_index(of_node, "ois,name", 0, (const char **)&p);
-	if (ret) {
-		CAM_ERR(CAM_OIS, "get ois,name failed rc:%d, set default value to %s", ret, o_ctrl->ois_name);
-	} else {
-	    memcpy(o_ctrl->ois_name, p, sizeof(o_ctrl->ois_name));
-		CAM_INFO(CAM_OIS, "read ois,name success, value:%s", o_ctrl->ois_name);
-	}
-
-	ret = of_property_read_u32(of_node, "ois_module,vendor", &id);
-	if (ret) {
-	    o_ctrl->ois_module_vendor = 0x01;
-		CAM_ERR(CAM_OIS, "get ois_module,vendor failed rc:%d, default %d", ret, o_ctrl->ois_module_vendor);
-	} else {
-	    o_ctrl->ois_module_vendor = (uint8_t)id;
-		CAM_INFO(CAM_OIS, "read ois_module,vendor success, value:%d", o_ctrl->ois_module_vendor);
-	}
-
-	ret = of_property_read_u32(of_node, "ois_actuator,vednor", &id);
-	if (ret) {
-	    o_ctrl->ois_actuator_vendor = 0x01;
-		CAM_ERR(CAM_OIS, "get ois_actuator,vednor failed rc:%d, default %d", ret, o_ctrl->ois_actuator_vendor);
-	} else {
-	    o_ctrl->ois_actuator_vendor = (uint8_t)id;
-		CAM_INFO(CAM_OIS, "read ois_actuator,vednor success, value:%d", o_ctrl->ois_actuator_vendor);
-	}
-
-	ret = of_property_read_u32(of_node, "ois,fw", &id);
-	if (ret) {
-	    o_ctrl->ois_fw_flag = 0x01;
-		CAM_ERR(CAM_OIS, "get ois,fw failed rc:%d, default %d", ret, o_ctrl->ois_fw_flag);
-	} else {
-	    o_ctrl->ois_fw_flag = (uint8_t)id;
-		CAM_INFO(CAM_OIS, "read ois,fw success, value:%d", o_ctrl->ois_fw_flag);
-	}
-
+        if (of_property_read_u32(of_node, "master_cci,id", &id) < 0) {
+            o_ctrl->cci_master_id = 1;
+            CAM_INFO(CAM_OIS, " cci_master_id,id fallback, default 1");
+        } else {
+            o_ctrl->cci_master_id = (uint8_t)id;
+            CAM_INFO(CAM_OIS,"cci_master_id,id:%d", id);
+        }
 	return rc;
 }

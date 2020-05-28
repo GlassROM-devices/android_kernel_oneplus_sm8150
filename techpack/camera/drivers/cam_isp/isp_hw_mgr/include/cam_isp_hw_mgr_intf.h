@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_ISP_HW_MGR_INTF_H_
@@ -9,17 +16,23 @@
 #include <linux/of.h>
 #include <linux/time.h>
 #include <linux/list.h>
-#include <media/cam_isp.h>
+#include <uapi/media/cam_isp.h>
 #include "cam_hw_mgr_intf.h"
 
-/* MAX IFE instance */
-#define CAM_IFE_HW_NUM_MAX   7
-#define CAM_IFE_RDI_NUM_MAX  4
-#define CAM_ISP_BW_CONFIG_V1 1
-#define CAM_ISP_BW_CONFIG_V2 2
+/*
+ * bit position in resource bitmap
+ */
+#define CAM_IFE_REG_UPD_CMD_PIX_BIT     0
+#define CAM_IFE_REG_UPD_CMD_RDI0_BIT    1
+#define CAM_IFE_REG_UPD_CMD_RDI1_BIT    2
+#define CAM_IFE_REG_UPD_CMD_RDI2_BIT    3
+#define CAM_IFE_REG_UPD_CMD_RDI3_BIT    4
+#define CAM_IFE_REG_UPD_CMD_DUAL_PD_BIT 5
 
-/* Appliacble vote paths for dual ife, based on no. of UAPI definitions */
-#define CAM_ISP_MAX_PER_PATH_VOTES 30
+/* MAX IFE instance */
+#define CAM_IFE_HW_NUM_MAX   4
+#define CAM_IFE_RDI_NUM_MAX  4
+
 /**
  *  enum cam_isp_hw_event_type - Collection of the ISP hardware events
  */
@@ -83,19 +96,6 @@ struct cam_isp_start_args {
 };
 
 /**
- * struct cam_isp_bw_config_internal_v2 - Bandwidth configuration
- *
- * @usage_type:                 ife hw index
- * @num_paths:                  Number of data paths
- * @axi_path                    per path vote info
- */
-struct cam_isp_bw_config_internal_v2 {
-	uint32_t                          usage_type;
-	uint32_t                          num_paths;
-	struct cam_axi_per_path_bw_vote   axi_path[CAM_ISP_MAX_PER_PATH_VOTES];
-};
-
-/**
  * struct cam_isp_bw_config_internal - Internal Bandwidth configuration
  *
  * @usage_type:                 Usage type (Single/Dual)
@@ -104,6 +104,7 @@ struct cam_isp_bw_config_internal_v2 {
  * @right_pix_vote:             Bandwidth vote for right ISP
  * @rdi_vote:                   RDI bandwidth requirements
  */
+
 struct cam_isp_bw_config_internal {
 	uint32_t                       usage_type;
 	uint32_t                       num_rdi;
@@ -115,63 +116,60 @@ struct cam_isp_bw_config_internal {
 /**
  * struct cam_isp_prepare_hw_update_data - hw prepare data
  *
- * @ife_mgr_ctx:            IFE HW manager Context for current request
  * @packet_opcode_type:     Packet header opcode in the packet header
  *                          this opcode defines, packet is init packet or
  *                          update packet
- * @bw_config_version:      BW config version indicator
  * @bw_config:              BW config information
- * @bw_config_v2:           BW config info for AXI bw voting v2
  * @bw_config_valid:        Flag indicating whether the bw_config at the index
  *                          is valid or not
- * @reg_dump_buf_desc:     cmd buffer descriptors for reg dump
- * @num_reg_dump_buf:      Count of descriptors in reg_dump_buf_desc
+ * @fps:                    fps vaue which has been updated in hw
  *
  */
 struct cam_isp_prepare_hw_update_data {
-	struct cam_ife_hw_mgr_ctx            *ife_mgr_ctx;
-	uint32_t                              packet_opcode_type;
-	uint32_t                              bw_config_version;
-	struct cam_isp_bw_config_internal     bw_config[CAM_IFE_HW_NUM_MAX];
-	struct cam_isp_bw_config_internal_v2  bw_config_v2[CAM_IFE_HW_NUM_MAX];
-	bool                                bw_config_valid[CAM_IFE_HW_NUM_MAX];
-	struct cam_cmd_buf_desc               reg_dump_buf_desc[
-						CAM_REG_DUMP_MAX_BUF_ENTRIES];
-	uint32_t                              num_reg_dump_buf;
+	uint32_t                          packet_opcode_type;
+	struct cam_isp_bw_config_internal bw_config[CAM_IFE_HW_NUM_MAX];
+	bool                              bw_config_valid[CAM_IFE_HW_NUM_MAX];
+	uint32_t                          fps;
 };
 
 
 /**
  * struct cam_isp_hw_sof_event_data - Event payload for CAM_HW_EVENT_SOF
  *
- * @timestamp:   Time stamp for the sof event
- * @boot_time:   Boot time stamp for the sof event
+ * @timestamp:          Time stamp for the sof event
+ * @boot_time:          Boot time stamp for the sof event
+ * @irq_mono_boot_time: Time stamp till the execution of IRQ wrt event started
  *
  */
 struct cam_isp_hw_sof_event_data {
 	uint64_t       timestamp;
 	uint64_t       boot_time;
+	uint64_t       irq_mono_boot_time;
 };
 
 /**
  * struct cam_isp_hw_reg_update_event_data - Event payload for
  *                         CAM_HW_EVENT_REG_UPDATE
  *
- * @timestamp:     Time stamp for the reg update event
+ * @timestamp:          Time stamp for the reg update event
+ * @irq_mono_boot_time: Time stamp till the execution of IRQ wrt event started
  *
  */
 struct cam_isp_hw_reg_update_event_data {
 	uint64_t       timestamp;
+	uint64_t       irq_mono_boot_time;
 };
 
 /**
  * struct cam_isp_hw_epoch_event_data - Event payload for CAM_HW_EVENT_EPOCH
  *
- * @timestamp:     Time stamp for the epoch event
+ * @timestamp:          Time stamp for the epoch event
+ * @irq_mono_boot_time: Time stamp till the execution of this event started
  *
  */
 struct cam_isp_hw_epoch_event_data {
 	uint64_t       timestamp;
+	uint64_t       irq_mono_boot_time;
 };
 
 /**
@@ -180,6 +178,7 @@ struct cam_isp_hw_epoch_event_data {
  * @num_handles:           Number of resource handeles
  * @resource_handle:       Resource handle array
  * @timestamp:             Timestamp for the buf done event
+ * @irq_mono_boot_time:    Time stamp till the execution of this event started
  *
  */
 struct cam_isp_hw_done_event_data {
@@ -187,16 +186,19 @@ struct cam_isp_hw_done_event_data {
 	uint32_t             resource_handle[
 				CAM_NUM_OUT_PER_COMP_IRQ_MAX];
 	uint64_t       timestamp;
+	uint64_t       irq_mono_boot_time;
 };
 
 /**
  * struct cam_isp_hw_eof_event_data - Event payload for CAM_HW_EVENT_EOF
  *
  * @timestamp:             Timestamp for the eof event
+ * @irq_mono_boot_time:    Time stamp till the execution of this event started
  *
  */
 struct cam_isp_hw_eof_event_data {
 	uint64_t       timestamp;
+	uint64_t       irq_mono_boot_time;
 };
 
 /**
@@ -206,13 +208,13 @@ struct cam_isp_hw_eof_event_data {
  * @timestamp:             Timestamp for the error event
  * @recovery_enabled:      Identifies if the context needs to recover & reapply
  *                         this request
- * @enable_req_dump:       Enable request dump on HW errors
+ * @enable_reg_dump:       enable register dump
  */
 struct cam_isp_hw_error_event_data {
 	uint32_t             error_type;
 	uint64_t             timestamp;
 	bool                 recovery_enabled;
-	bool                 enable_req_dump;
+	bool                 enable_reg_dump;
 };
 
 /* enum cam_isp_hw_mgr_command - Hardware manager command type */

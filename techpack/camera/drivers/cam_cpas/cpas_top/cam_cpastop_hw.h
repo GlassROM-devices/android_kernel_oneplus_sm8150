@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_CPASTOP_HW_H_
@@ -17,21 +24,12 @@
  *                                 observed at any slave port is logged into
  *                                 the error logger register and an IRQ is
  *                                 triggered
- * @CAM_CAMNOC_HW_IRQ_IFE_UBWC_STATS_ENCODE_ERROR: Triggered if any error
- *                                                 detected in the IFE UBWC-
- *                                                 Stats encoder instance
  * @CAM_CAMNOC_HW_IRQ_IFE02_UBWC_ENCODE_ERROR  : Triggered if any error
  *                                               detected in the IFE0 UBWC
  *                                               encoder instance
  * @CAM_CAMNOC_HW_IRQ_IFE13_UBWC_ENCODE_ERROR  : Triggered if any error
  *                                               detected in the IFE1 or IFE3
  *                                               UBWC encoder instance
- * @CAM_CAMNOC_HW_IRQ_IPE1_BPS_UBWC_DECODE_ERROR: Triggered if any error
- *                                                detected in the IPE1/BPS read
- *                                                path decoder instance
- * @CAM_CAMNOC_HW_IRQ_IPE0_UBWC_DECODE_ERROR   : Triggered if any error detected
- *                                               in the IPE0 read path decoder
- *                                               instance
  * @CAM_CAMNOC_HW_IRQ_IPE_BPS_UBWC_DECODE_ERROR: Triggered if any error
  *                                               detected in the IPE/BPS
  *                                               UBWC decoder instance
@@ -52,8 +50,6 @@
 enum cam_camnoc_hw_irq_type {
 	CAM_CAMNOC_HW_IRQ_SLAVE_ERROR =
 		CAM_CAMNOC_IRQ_SLAVE_ERROR,
-	CAM_CAMNOC_HW_IRQ_IFE_UBWC_STATS_ENCODE_ERROR =
-		CAM_CAMNOC_IRQ_IFE_UBWC_STATS_ENCODE_ERROR,
 	CAM_CAMNOC_HW_IRQ_IFE02_UBWC_ENCODE_ERROR =
 		CAM_CAMNOC_IRQ_IFE02_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_HW_IRQ_IFE13_UBWC_ENCODE_ERROR =
@@ -62,10 +58,6 @@ enum cam_camnoc_hw_irq_type {
 		CAM_CAMNOC_IRQ_IFE0_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_HW_IRQ_IFE1_WRITE_UBWC_ENCODE_ERROR =
 		CAM_CAMNOC_IRQ_IFE1_WRITE_UBWC_ENCODE_ERROR,
-	CAM_CAMNOC_HW_IRQ_IPE1_BPS_UBWC_DECODE_ERROR =
-		CAM_CAMNOC_IRQ_IPE1_BPS_UBWC_DECODE_ERROR,
-	CAM_CAMNOC_HW_IRQ_IPE0_UBWC_DECODE_ERROR =
-		CAM_CAMNOC_IRQ_IPE0_UBWC_DECODE_ERROR,
 	CAM_CAMNOC_HW_IRQ_IPE_BPS_UBWC_DECODE_ERROR =
 		CAM_CAMNOC_IRQ_IPE_BPS_UBWC_DECODE_ERROR,
 	CAM_CAMNOC_HW_IRQ_IPE_BPS_UBWC_ENCODE_ERROR =
@@ -85,10 +77,6 @@ enum cam_camnoc_hw_irq_type {
  * @CAM_CAMNOC_CDM: Indicates CDM HW connection to camnoc
  * @CAM_CAMNOC_IFE02: Indicates IFE0, IFE2 HW connection to camnoc
  * @CAM_CAMNOC_IFE13: Indicates IFE1, IFE3 HW connection to camnoc
- * @CAM_CAMNOC_IFE_LINEAR: Indicates linear data from all IFEs to cammnoc
- * @CAM_CAMNOC_IFE_UBWC_STATS: Indicates ubwc+stats from all IFEs to cammnoc
- * @CAM_CAMNOC_IFE_RDI_WR: Indicates RDI write data from all IFEs to cammnoc
- * @CAM_CAMNOC_IFE_RDI_RD: Indicates RDI read data from all IFEs to cammnoc
  * @CAM_CAMNOC_IFE0123_RDI_WRITE: RDI write only for all IFEx
  * @CAM_CAMNOC_IFE0_NRDI_WRITE: IFE0 non-RDI write
  * @CAM_CAMNOC_IFE01_RDI_READ: IFE0/1 RDI READ
@@ -99,10 +87,6 @@ enum cam_camnoc_hw_irq_type {
  *         connection to camnoc
  * @CAM_CAMNOC_IPE_VID_DISP_WRITE: Indicates IPE's VID/DISP Wrire HW
  *         connection to camnoc
- * @CAM_CAMNOC_IPE0_RD: Indicates IPE's Read0 HW connection to camnoc
- * @CAM_CAMNOC_IPE1_BPS_RD: Indicates IPE's Read1 + BPS Read HW connection
- *         to camnoc
- * @CAM_CAMNOC_IPE_BPS_WR: Indicates IPE+BPS Write HW connection to camnoc
  * @CAM_CAMNOC_JPEG: Indicates JPEG HW connection to camnoc
  * @CAM_CAMNOC_FD: Indicates FD HW connection to camnoc
  * @CAM_CAMNOC_ICP: Indicates ICP HW connection to camnoc
@@ -111,10 +95,6 @@ enum cam_camnoc_port_type {
 	CAM_CAMNOC_CDM,
 	CAM_CAMNOC_IFE02,
 	CAM_CAMNOC_IFE13,
-	CAM_CAMNOC_IFE_LINEAR,
-	CAM_CAMNOC_IFE_UBWC_STATS,
-	CAM_CAMNOC_IFE_RDI_WR,
-	CAM_CAMNOC_IFE_RDI_RD,
 	CAM_CAMNOC_IFE0123_RDI_WRITE,
 	CAM_CAMNOC_IFE0_NRDI_WRITE,
 	CAM_CAMNOC_IFE01_RDI_READ,
@@ -122,9 +102,6 @@ enum cam_camnoc_port_type {
 	CAM_CAMNOC_IPE_BPS_LRME_READ,
 	CAM_CAMNOC_IPE_BPS_LRME_WRITE,
 	CAM_CAMNOC_IPE_VID_DISP_WRITE,
-	CAM_CAMNOC_IPE0_RD,
-	CAM_CAMNOC_IPE1_BPS_RD,
-	CAM_CAMNOC_IPE_BPS_WR,
 	CAM_CAMNOC_JPEG,
 	CAM_CAMNOC_FD,
 	CAM_CAMNOC_ICP,
@@ -208,12 +185,10 @@ struct cam_cpas_hw_errata_wa {
  *
  * @camnoc_flush_slave_pending_trans: Errata workaround info for flushing
  *         camnoc slave pending transactions before turning off CPAS_TOP gdsc
- * @tcsr_camera_hf_sf_ares_glitch: Errata workaround info from ignoring
- *         erroneous signals at camera start
+ *
  */
 struct cam_cpas_hw_errata_wa_list {
 	struct cam_cpas_hw_errata_wa camnoc_flush_slave_pending_trans;
-	struct cam_cpas_hw_errata_wa tcsr_camera_hf_sf_ares_glitch;
 };
 
 /**

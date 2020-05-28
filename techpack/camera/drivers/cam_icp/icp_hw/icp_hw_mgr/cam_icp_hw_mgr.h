@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef CAM_ICP_HW_MGR_H
@@ -23,7 +30,7 @@
 #define CAM_ICP_ROLE_PARENT     1
 #define CAM_ICP_ROLE_CHILD      2
 
-#define CAM_FRAME_CMD_MAX       20
+#define CAM_FRAME_CMD_MAX       CAM_ICP_CTX_REQ_MAX
 
 #define CAM_MAX_OUT_RES         6
 #define CAM_MAX_IN_RES          8
@@ -51,7 +58,6 @@
 #define CPAS_IPE0_BIT           0x1000
 #define CPAS_IPE1_BIT           0x2000
 #define CPAS_BPS_BIT            0x400
-#define CPAS_TITAN_480_IPE0_BIT 0x800
 
 #define ICP_PWR_CLP_BPS         0x00000001
 #define ICP_PWR_CLP_IPE0        0x00010000
@@ -64,8 +70,11 @@
 
 #define CAM_ICP_CTX_MAX_CMD_BUFFERS 0x2
 
-/* Current appliacble vote paths, based on number of UAPI definitions */
-#define CAM_ICP_MAX_PER_PATH_VOTES 6
+/*
+ * Response time threshold in ms beyond which a request is not expected
+ * to be with ICP hw
+ */
+#define CAM_ICP_CTX_RESPONSE_TIME_THRESHOLD   300000
 
 /**
  * struct icp_hfi_mem_info
@@ -77,8 +86,6 @@
  * @fw_buf: Memory info of firmware
  * @qdss_buf: Memory info of qdss
  * @sfr_buf: Memory info for sfr buffer
- * @shmem: Memory info for shared region
- * @io_mem: Memory info for io region
  */
 struct icp_hfi_mem_info {
 	struct cam_mem_mgr_memory_desc qtbl;
@@ -90,7 +97,6 @@ struct icp_hfi_mem_info {
 	struct cam_mem_mgr_memory_desc qdss_buf;
 	struct cam_mem_mgr_memory_desc sfr_buf;
 	struct cam_smmu_region_info shmem;
-	struct cam_smmu_region_info io_mem;
 };
 
 /**
@@ -127,36 +133,18 @@ struct clk_work_data {
 	void *data;
 };
 
-/*
- * struct icp_frame_info
- * @request_id: request id
- * @io_config: the address of io config
- * @hfi_cfg_io_cmd: command struct to be sent to hfi
- */
+/**
+  * struct icp_frame_info
+  * @request_id: request id
+  * @io_config: the address of io config
+  * @hfi_cfg_io_cmd: command struct to be sent to hfi
+  */
 struct icp_frame_info {
 	uint64_t request_id;
-	dma_addr_t io_config;
+	uint64_t io_config;
 	struct hfi_cmd_ipebps_async hfi_cfg_io_cmd;
 };
 
-/**
- * struct cam_icp_clk_bw_request_v2
- *
- * @budget_ns: Time required to process frame
- * @frame_cycles: Frame cycles needed to process the frame
- * @rt_flag: Flag to indicate real time stream
- * @reserved: Reserved filed.
- * @num_paths: Number of paths for per path bw vote
- * @axi_path: Per path vote info for IPE/BPS
- */
-struct cam_icp_clk_bw_req_internal_v2 {
-	uint64_t budget_ns;
-	uint32_t frame_cycles;
-	uint32_t rt_flag;
-	uint32_t reserved;
-	uint32_t num_paths;
-	struct cam_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
-};
 
 /**
  * struct hfi_frame_process_info
@@ -169,8 +157,8 @@ struct cam_icp_clk_bw_req_internal_v2 {
  * @out_resource: Out sync info
  * @fw_process_flag: Frame process flag
  * @clk_info: Clock information for a request
- * @clk_info_v2: Clock info for AXI bw voting v2
  * @frame_info: information needed to process request
+ * @submit_timestamp: Submit timestamp to hw
  */
 struct hfi_frame_process_info {
 	struct hfi_cmd_ipebps_async hfi_frame_cmd[CAM_FRAME_CMD_MAX];
@@ -184,8 +172,8 @@ struct hfi_frame_process_info {
 	uint32_t in_free_resource[CAM_FRAME_CMD_MAX];
 	uint32_t fw_process_flag[CAM_FRAME_CMD_MAX];
 	struct cam_icp_clk_bw_request clk_info[CAM_FRAME_CMD_MAX];
-	struct cam_icp_clk_bw_req_internal_v2 clk_info_v2[CAM_FRAME_CMD_MAX];
 	struct icp_frame_info frame_info[CAM_FRAME_CMD_MAX];
+	struct timeval submit_timestamp[CAM_FRAME_CMD_MAX];
 };
 
 /**
@@ -197,9 +185,6 @@ struct hfi_frame_process_info {
  * #uncompressed_bw: Current bandwidth voting
  * @compressed_bw: Current compressed bandwidth voting
  * @clk_rate: Supported clock rates for the context
- * @num_paths: Number of valid AXI paths
- * @axi_path: ctx based per path bw vote
- * @bw_included: Whether bw of this context is included in overal voting
  */
 struct cam_ctx_clk_info {
 	uint32_t curr_fc;
@@ -209,9 +194,6 @@ struct cam_ctx_clk_info {
 	uint64_t uncompressed_bw;
 	uint64_t compressed_bw;
 	int32_t clk_rate[CAM_MAX_VOTE];
-	uint32_t num_paths;
-	struct cam_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
-	bool bw_included;
 };
 /**
  * struct cam_icp_hw_ctx_data
@@ -229,12 +211,10 @@ struct cam_ctx_clk_info {
  * @wait_complete: Completion info
  * @temp_payload: Payload for destroy handle data
  * @ctx_id: Context Id
- * @bw_config_version: BW config version indicator
  * @clk_info: Current clock info of a context
  * @watch_dog: watchdog timer handle
  * @watch_dog_reset_counter: Counter for watch dog reset
  * @icp_dev_io_info: io config resource
- * @last_flush_req: last flush req for this ctx
  */
 struct cam_icp_hw_ctx_data {
 	void *context_priv;
@@ -251,12 +231,10 @@ struct cam_icp_hw_ctx_data {
 	struct completion wait_complete;
 	struct ipe_bps_destroy temp_payload;
 	uint32_t ctx_id;
-	uint32_t bw_config_version;
 	struct cam_ctx_clk_info clk_info;
 	struct cam_req_mgr_timer *watch_dog;
 	uint32_t watch_dog_reset_counter;
 	struct cam_icp_acquire_dev_info icp_dev_io_info;
-	uint64_t last_flush_req;
 };
 
 /**
@@ -268,7 +246,7 @@ struct cam_icp_hw_ctx_data {
 struct icp_cmd_generic_blob {
 	struct cam_icp_hw_ctx_data *ctx;
 	uint32_t frame_info_idx;
-	dma_addr_t *io_buf_addr;
+	uint64_t *io_buf_addr;
 };
 
 /**
@@ -279,8 +257,6 @@ struct icp_cmd_generic_blob {
  * @over_clked: Over clock count
  * @uncompressed_bw: Current bandwidth voting
  * @compressed_bw: Current compressed bandwidth voting
- * @num_paths: Number of AXI vote paths
- * @axi_path: Current per path bw vote info
  * @hw_type: IPE/BPS device type
  * @watch_dog: watchdog timer handle
  * @watch_dog_reset_counter: Counter for watch dog reset
@@ -292,8 +268,6 @@ struct cam_icp_clk_info {
 	uint32_t over_clked;
 	uint64_t uncompressed_bw;
 	uint64_t compressed_bw;
-	uint32_t num_paths;
-	struct cam_axi_per_path_bw_vote axi_path[CAM_ICP_MAX_PER_PATH_VOTES];
 	uint32_t hw_type;
 	struct cam_req_mgr_timer *watch_dog;
 	uint32_t watch_dog_reset_counter;

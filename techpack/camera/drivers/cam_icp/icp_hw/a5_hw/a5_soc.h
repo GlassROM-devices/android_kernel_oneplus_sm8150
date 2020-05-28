@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef CAM_A5_SOC_H
@@ -10,21 +17,9 @@
 
 #define ICP_UBWC_MAX 2
 
-struct a5_ubwc_cfg_ext {
-	uint32_t ubwc_ipe_fetch_cfg[ICP_UBWC_MAX];
-	uint32_t ubwc_ipe_write_cfg[ICP_UBWC_MAX];
-	uint32_t ubwc_bps_fetch_cfg[ICP_UBWC_MAX];
-	uint32_t ubwc_bps_write_cfg[ICP_UBWC_MAX];
-};
-
 struct a5_soc_info {
 	char *fw_name;
-	bool ubwc_config_ext;
-	uint32_t a5_qos_val;
-	union {
-		uint32_t ubwc_cfg[ICP_UBWC_MAX];
-		struct a5_ubwc_cfg_ext ubwc_cfg_ext;
-	} uconfig;
+	uint32_t ubwc_cfg[ICP_UBWC_MAX];
 };
 
 int cam_a5_init_soc_resources(struct cam_hw_soc_info *soc_info,
@@ -34,6 +29,4 @@ int cam_a5_enable_soc_resources(struct cam_hw_soc_info *soc_info);
 
 int cam_a5_disable_soc_resources(struct cam_hw_soc_info *soc_info);
 
-int cam_a5_update_clk_rate(struct cam_hw_soc_info *soc_info,
-	int32_t clk_level);
 #endif

@@ -1,16 +1,25 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_CSIPHY_SOC_H_
 #define _CAM_CSIPHY_SOC_H_
 
 #include <linux/delay.h>
+#include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/module.h>
 #include <linux/irqreturn.h>
+#include <linux/ion.h>
 #include <linux/iommu.h>
 #include <linux/timer.h>
 #include <linux/kernel.h>
@@ -29,7 +38,6 @@
 #define CSIPHY_VERSION_V10                        0x10
 #define CSIPHY_VERSION_V11                        0x11
 #define CSIPHY_VERSION_V12                        0x12
-#define CSIPHY_VERSION_V121                       0x121
 #define CSIPHY_VERSION_V20                        0x20
 
 /**

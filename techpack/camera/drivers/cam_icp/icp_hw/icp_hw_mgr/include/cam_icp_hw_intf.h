@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef CAM_ICP_HW_INTF_H
@@ -8,10 +15,6 @@
 
 #define CAM_ICP_CMD_BUF_MAX_SIZE     128
 #define CAM_ICP_MSG_BUF_MAX_SIZE     CAM_ICP_CMD_BUF_MAX_SIZE
-
-#define CAM_ICP_BW_CONFIG_UNKNOWN 0
-#define CAM_ICP_BW_CONFIG_V1      1
-#define CAM_ICP_BW_CONFIG_V2      2
 
 enum cam_a5_hw_type {
 	CAM_ICP_DEV_A5,
@@ -25,14 +28,9 @@ enum cam_a5_hw_type {
  *
  * @curr_clk_rate:        clk rate to HW
  * @ipe_bps_pc_enable     power collpase enable flag
- * @clk_level:            clk level corresponding to the clk rate
- *                        populated as output while the clk is being
- *                        updated to the given rate
  */
 struct cam_a5_clk_update_cmd {
 	uint32_t  curr_clk_rate;
 	bool  ipe_bps_pc_enable;
-	int32_t clk_level;
 };
-
 #endif

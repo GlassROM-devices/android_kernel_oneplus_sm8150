@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include "cam_cci_dev.h"
@@ -14,16 +21,9 @@ static struct v4l2_subdev *g_cci_subdev[MAX_CCI];
 
 struct v4l2_subdev *cam_cci_get_subdev(int cci_dev_index)
 {
-	struct v4l2_subdev *sub_device = NULL;
-
 	if (cci_dev_index < MAX_CCI)
-		sub_device = g_cci_subdev[cci_dev_index];
-	else
-		CAM_WARN(CAM_CCI, "Index: %u is beyond max num CCI allowed: %u",
-			cci_dev_index,
-			MAX_CCI);
-
-	return sub_device;
+		return g_cci_subdev[cci_dev_index];
+	return NULL;
 }
 
 static long cam_cci_subdev_ioctl(struct v4l2_subdev *sd,
@@ -76,25 +76,21 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 
 	if (irq_status0 & CCI_IRQ_STATUS_0_RST_DONE_ACK_BMSK) {
 		struct cam_cci_master_info *cci_master_info;
-		if (cci_dev->cci_master_info[MASTER_0].reset_pending == true) {
+		if (cci_dev->cci_master_info[MASTER_0].reset_pending == TRUE) {
 			cci_master_info = &cci_dev->cci_master_info[MASTER_0];
 			cci_dev->cci_master_info[MASTER_0].reset_pending =
-				false;
+				FALSE;
 			if (!cci_master_info->status)
 				complete(&cci_master_info->reset_complete);
-
-			complete_all(&cci_master_info->rd_done);
-			complete_all(&cci_master_info->th_complete);
+			cci_master_info->status = 0;
 		}
-		if (cci_dev->cci_master_info[MASTER_1].reset_pending == true) {
+		if (cci_dev->cci_master_info[MASTER_1].reset_pending == TRUE) {
 			cci_master_info = &cci_dev->cci_master_info[MASTER_1];
 			cci_dev->cci_master_info[MASTER_1].reset_pending =
-				false;
+				FALSE;
 			if (!cci_master_info->status)
 				complete(&cci_master_info->reset_complete);
-
-			complete_all(&cci_master_info->rd_done);
-			complete_all(&cci_master_info->th_complete);
+			cci_master_info->status = 0;
 		}
 	}
 
@@ -216,33 +212,20 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 		CAM_DBG(CAM_CCI, "RD_PAUSE ON MASTER_1");
 
 	if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_Q0Q1_HALT_ACK_BMSK) {
-		cci_dev->cci_master_info[MASTER_0].reset_pending = true;
+		cci_dev->cci_master_info[MASTER_0].reset_pending = TRUE;
 		cam_io_w_mb(CCI_M0_RESET_RMSK,
 			base + CCI_RESET_CMD_ADDR);
 	}
 	if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_Q0Q1_HALT_ACK_BMSK) {
-		cci_dev->cci_master_info[MASTER_1].reset_pending = true;
+		cci_dev->cci_master_info[MASTER_1].reset_pending = TRUE;
 		cam_io_w_mb(CCI_M1_RESET_RMSK,
 			base + CCI_RESET_CMD_ADDR);
 	}
 	if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_ERROR_BMSK) {
 		cci_dev->cci_master_info[MASTER_0].status = -EINVAL;
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_Q0_NACK_ERROR_BMSK) {
-			CAM_ERR(CAM_CCI, "Base:%pK, M0_Q0 NACK ERROR: 0x%x",
+		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_NACK_ERROR_BMSK)
+			CAM_ERR(CAM_CCI, "Base:%pK, M0 NACK ERROR: 0x%x",
 				base, irq_status0);
-			complete_all(&cci_dev->cci_master_info[MASTER_0]
-				.report_q[QUEUE_0]);
-			reinit_completion(&cci_dev->cci_master_info[MASTER_0]
-				.report_q[QUEUE_0]);
-		}
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_Q1_NACK_ERROR_BMSK) {
-			CAM_ERR(CAM_CCI, "Base:%pK, M0_Q1 NACK ERROR: 0x%x",
-				base, irq_status0);
-			complete_all(&cci_dev->cci_master_info[MASTER_0]
-			.report_q[QUEUE_1]);
-			reinit_completion(&cci_dev->cci_master_info[MASTER_0]
-			.report_q[QUEUE_1]);
-		}
 		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_Q0Q1_ERROR_BMSK)
 			CAM_ERR(CAM_CCI,
 			"Base:%pK, M0 QUEUE_OVER/UNDER_FLOW OR CMD ERR: 0x%x",
@@ -255,31 +238,17 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 	}
 	if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_ERROR_BMSK) {
 		cci_dev->cci_master_info[MASTER_1].status = -EINVAL;
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_Q0_NACK_ERROR_BMSK) {
-			CAM_ERR(CAM_CCI, "Base:%pK, M1_Q0 NACK ERROR: 0x%x",
+		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_NACK_ERROR_BMSK)
+			CAM_ERR(CAM_CCI, "Base:%pK, M1 NACK ERROR: 0x%x",
 				base, irq_status0);
-			complete_all(&cci_dev->cci_master_info[MASTER_1]
-			.report_q[QUEUE_0]);
-			reinit_completion(&cci_dev->cci_master_info[MASTER_1]
-			.report_q[QUEUE_0]);
-		}
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_Q1_NACK_ERROR_BMSK) {
-			CAM_ERR(CAM_CCI, "Base:%pK, M1_Q1 NACK ERROR: 0x%x",
-				base, irq_status0);
-			complete_all(&cci_dev->cci_master_info[MASTER_1]
-			.report_q[QUEUE_1]);
-			reinit_completion(&cci_dev->cci_master_info[MASTER_1]
-			.report_q[QUEUE_1]);
-		}
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_Q0Q1_ERROR_BMSK)
+		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_Q0Q1_ERROR_BMSK)
 			CAM_ERR(CAM_CCI,
 			"Base:%pK, M1 QUEUE_OVER_UNDER_FLOW OR CMD ERROR:0x%x",
 				base, irq_status0);
-		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_ERROR_BMSK)
+		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_ERROR_BMSK)
 			CAM_ERR(CAM_CCI,
 				"Base:%pK, M1 RD_OVER/UNDER_FLOW ERROR: 0x%x",
 				base, irq_status0);
-
 		cam_io_w_mb(CCI_M1_HALT_REQ_RMSK, base + CCI_HALT_REQ_ADDR);
 	}
 
@@ -354,7 +323,7 @@ static int cam_cci_irq_routine(struct v4l2_subdev *sd, u32 status,
 		&cci_dev->soc_info;
 
 	ret = cam_cci_irq(soc_info->irq_line->start, cci_dev);
-	*handled = true;
+	*handled = TRUE;
 	return 0;
 }
 
@@ -457,7 +426,7 @@ static int cam_cci_platform_probe(struct platform_device *pdev)
 
 	g_cci_subdev[soc_info->index] = &new_cci_dev->v4l2_dev_str.sd;
 	mutex_init(&(new_cci_dev->init_mutex));
-	CAM_INFO(CAM_CCI, "Device Type :%d", soc_info->index);
+	CAM_ERR(CAM_CCI, "Device Type :%d", soc_info->index);
 
 	cam_register_subdev_fops(&cci_v4l2_subdev_fops);
 	cci_v4l2_subdev_fops.unlocked_ioctl = cam_cci_subdev_fops_ioctl;
@@ -479,7 +448,6 @@ static int cam_cci_platform_probe(struct platform_device *pdev)
 	CAM_DBG(CAM_CCI, "CPAS registration successful handle=%d",
 		cpas_parms.client_handle);
 	new_cci_dev->cpas_handle = cpas_parms.client_handle;
-
 	return rc;
 cci_no_resource:
 	kfree(new_cci_dev);

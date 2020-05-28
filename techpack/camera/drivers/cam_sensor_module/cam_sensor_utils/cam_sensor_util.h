@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_SENSOR_UTIL_H_
@@ -11,9 +18,9 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/of.h>
-#include "cam_sensor_cmn_header.h"
-#include "cam_req_mgr_util.h"
-#include "cam_req_mgr_interface.h"
+#include <cam_sensor_cmn_header.h>
+#include <cam_req_mgr_util.h>
+#include <cam_req_mgr_interface.h>
 #include <cam_mem_mgr.h>
 #include "cam_soc_util.h"
 #include "cam_debug_util.h"
@@ -53,8 +60,7 @@ int msm_camera_fill_vreg_params(struct cam_hw_soc_info *soc_info,
 	uint16_t power_setting_size);
 
 int32_t cam_sensor_update_power_settings(void *cmd_buf,
-	uint32_t cmd_length, struct cam_sensor_power_ctrl_t *power_info,
-	size_t cmd_buf_len);
+	int cmd_length, struct cam_sensor_power_ctrl_t *power_info);
 
 int cam_sensor_bob_pwm_mode_switch(struct cam_hw_soc_info *soc_info,
 	int bob_reg_idx, bool flag);

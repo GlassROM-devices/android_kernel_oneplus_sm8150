@@ -1,45 +1,45 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_SOC_UTIL_H_
 #define _CAM_SOC_UTIL_H_
 
-#include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
+#include <linux/spi/spi.h>
 #include <linux/regulator/consumer.h>
+#include <linux/clk/qcom.h>
 #include <linux/debugfs.h>
-#include <linux/of_fdt.h>
 
 #include "cam_io_util.h"
-#include <uapi/media/cam_defs.h>
 
 #define NO_SET_RATE  -1
 #define INIT_RATE    -2
 
 /* maximum number of device block */
-#define CAM_SOC_MAX_BLOCK           7
+#define CAM_SOC_MAX_BLOCK           4
 
 /* maximum number of device base */
 #define CAM_SOC_MAX_BASE            CAM_SOC_MAX_BLOCK
 
 /* maximum number of device regulator */
-#define CAM_SOC_MAX_REGULATOR       10 /*sensor max regulator + af*/
+#define CAM_SOC_MAX_REGULATOR       5
 
 /* maximum number of device clock */
 #define CAM_SOC_MAX_CLK             32
-
-/* DDR device types */
-#define DDR_TYPE_LPDDR4        6
-#define DDR_TYPE_LPDDR4X       7
-#define DDR_TYPE_LPDDR5        8
-#define DDR_TYPE_LPDDR5X       9
 
 /**
  * enum cam_vote_level - Enum for voting level
@@ -125,7 +125,6 @@ struct cam_soc_gpio_data {
  * @irq_name:               Name of the irq associated with the device
  * @irq_line:               Irq resource
  * @irq_data:               Private data that is passed when IRQ is requested
- * @compatible:             Compatible string associated with the device
  * @num_mem_block:          Number of entry in the "reg-names"
  * @mem_block_name:         Array of the reg block name
  * @mem_block_cam_base:     Array of offset of this register space compared
@@ -153,8 +152,6 @@ struct cam_soc_gpio_data {
  * @prev_clk_level          Last vote level
  * @src_clk_idx:            Source clock index that is rate-controllable
  * @clk_level_valid:        Indicates whether corresponding level is valid
- * @scl_clk_count:          Number of scalable clocks present
- * @scl_clk_idx:            Index of scalable clocks
  * @gpio_data:              Pointer to gpio info
  * @pinctrl_info:           Pointer to pinctrl info
  * @dentry:                 Debugfs entry
@@ -173,7 +170,6 @@ struct cam_hw_soc_info {
 	const char                     *irq_name;
 	struct resource                *irq_line;
 	void                           *irq_data;
-	const char                     *compatible;
 
 	uint32_t                        num_mem_block;
 	const char                     *mem_block_name[CAM_SOC_MAX_BLOCK];
@@ -201,8 +197,6 @@ struct cam_hw_soc_info {
 	int32_t                         prev_clk_level;
 	int32_t                         src_clk_idx;
 	bool                            clk_level_valid[CAM_MAX_VOTE];
-	int32_t                         scl_clk_count;
-	int32_t                         scl_clk_idx[CAM_SOC_MAX_CLK];
 
 	struct cam_soc_gpio_data       *gpio_data;
 	struct cam_soc_pinctrl_info     pinctrl_info;
@@ -372,6 +366,20 @@ long cam_soc_util_get_clk_round_rate(struct cam_hw_soc_info *soc_info,
 	uint32_t clk_index, unsigned long clk_rate);
 
 /**
+ * cam_soc_util_set_clk_flags()
+ *
+ * @brief:              Camera SOC util to set the flags for a specified clock
+ *
+ * @soc_info:           Device soc information
+ * @clk_index:          Clock index in soc_info for which flags are to be set
+ * @flags:              Flags to set
+ *
+ * @return:             Success or Failure
+ */
+int cam_soc_util_set_clk_flags(struct cam_hw_soc_info *soc_info,
+	 uint32_t clk_index, unsigned long flags);
+
+/**
  * cam_soc_util_set_src_clk_rate()
  *
  * @brief:              Set the rate on the source clock.
@@ -382,7 +390,7 @@ long cam_soc_util_get_clk_round_rate(struct cam_hw_soc_info *soc_info,
  * @return:             success or failure
  */
 int cam_soc_util_set_src_clk_rate(struct cam_hw_soc_info *soc_info,
-	int64_t clk_rate);
+	int32_t clk_rate);
 
 /**
  * cam_soc_util_get_option_clk_by_name()
@@ -623,30 +631,7 @@ void cam_soc_util_clk_disable_default(struct cam_hw_soc_info *soc_info);
 int cam_soc_util_clk_enable_default(struct cam_hw_soc_info *soc_info,
 	enum cam_vote_level clk_level);
 
-int cam_soc_util_get_clk_level(struct cam_hw_soc_info *soc_info,
-	int64_t clk_rate, int clk_idx, int32_t *clk_lvl);
-
-/* Callback to get reg space data for specific HW */
-typedef int (*cam_soc_util_regspace_data_cb)(uint32_t reg_base_type,
-	void *ctx, struct cam_hw_soc_info **soc_info_ptr,
-	uint32_t *reg_base_idx);
-
-/**
- * cam_soc_util_reg_dump_to_cmd_buf()
- *
- * @brief:              Camera SOC util for dumping sets of register ranges to
- *                      to command buffer
- *
- * @ctx:                Context info from specific hardware manager
- * @cmd_desc:           Command buffer descriptor
- * @req_id:             Last applied req id for which reg dump is required
- * @reg_data_cb:        Callback function to get reg space info based on type
- *                      in command buffer
- *
- * @return:             Success or Failure
- */
-int cam_soc_util_reg_dump_to_cmd_buf(void *ctx,
-	struct cam_cmd_buf_desc *cmd_desc, uint64_t req_id,
-	cam_soc_util_regspace_data_cb reg_data_cb);
+uint32_t cam_soc_util_get_vote_level(struct cam_hw_soc_info *soc_info,
+	uint64_t clock_rate);
 
 #endif /* _CAM_SOC_UTIL_H_ */

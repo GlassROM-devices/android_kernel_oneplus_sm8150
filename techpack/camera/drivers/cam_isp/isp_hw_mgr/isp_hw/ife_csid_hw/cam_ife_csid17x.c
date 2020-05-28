@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 
@@ -9,13 +16,11 @@
 #include "cam_ife_csid170.h"
 #include "cam_ife_csid175.h"
 #include "cam_ife_csid175_200.h"
-#include "cam_ife_csid480.h"
 #include "cam_ife_csid_dev.h"
 
 #define CAM_CSID_DRV_NAME                    "csid_17x"
 #define CAM_CSID_VERSION_V170                 0x10070000
 #define CAM_CSID_VERSION_V175                 0x10070050
-#define CAM_CSID_VERSION_V480                 0x40080000
 
 static struct cam_ife_csid_hw_info cam_ife_csid170_hw_info = {
 	.csid_reg = &cam_ife_csid_170_reg_offset,
@@ -32,11 +37,6 @@ static struct cam_ife_csid_hw_info cam_ife_csid175_200_hw_info = {
 	.hw_dts_version = CAM_CSID_VERSION_V175,
 };
 
-static struct cam_ife_csid_hw_info cam_ife_csid480_hw_info = {
-	.csid_reg = &cam_ife_csid_480_reg_offset,
-	.hw_dts_version = CAM_CSID_VERSION_V480,
-};
-
 static const struct of_device_id cam_ife_csid17x_dt_match[] = {
 	{
 		.compatible = "qcom,csid170",
@@ -49,10 +49,6 @@ static const struct of_device_id cam_ife_csid17x_dt_match[] = {
 	{
 		.compatible = "qcom,csid175_200",
 		.data = &cam_ife_csid175_200_hw_info,
-	},
-	{
-		.compatible = "qcom,csid480",
-		.data = &cam_ife_csid480_hw_info,
 	},
 	{}
 };

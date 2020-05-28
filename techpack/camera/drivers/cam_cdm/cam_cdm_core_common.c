@@ -1,12 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/module.h>
+#include <linux/ion.h>
+#include <linux/iommu.h>
 #include <linux/timer.h>
 #include <linux/kernel.h>
 
@@ -47,7 +56,6 @@ bool cam_cdm_set_cam_hw_version(
 	switch (ver) {
 	case CAM_CDM170_VERSION:
 	case CAM_CDM175_VERSION:
-	case CAM_CDM480_VERSION:
 		cam_version->major    = (ver & 0xF0000000);
 		cam_version->minor    = (ver & 0xFFF0000);
 		cam_version->incr     = (ver & 0xFFFF);
@@ -78,7 +86,6 @@ struct cam_cdm_utils_ops *cam_cdm_get_ops(
 		switch (ver) {
 		case CAM_CDM170_VERSION:
 		case CAM_CDM175_VERSION:
-		case CAM_CDM480_VERSION:
 			return &CDM170_ops;
 		default:
 			CAM_ERR(CAM_CDM, "CDM Version=%x not supported in util",
@@ -90,9 +97,6 @@ struct cam_cdm_utils_ops *cam_cdm_get_ops(
 			(cam_version->incr == 0)) ||
 			((cam_version->major == 1) &&
 			(cam_version->minor == 1) &&
-			(cam_version->incr == 0)) ||
-			((cam_version->major == 1) &&
-			(cam_version->minor == 2) &&
 			(cam_version->incr == 0))) {
 
 			CAM_DBG(CAM_CDM,
@@ -271,21 +275,12 @@ int cam_cdm_stream_ops_internal(void *hw_priv,
 	if (operation == true) {
 		if (!cdm_hw->open_count) {
 			struct cam_ahb_vote ahb_vote;
-			struct cam_axi_vote axi_vote = {0};
+			struct cam_axi_vote axi_vote;
 
 			ahb_vote.type = CAM_VOTE_ABSOLUTE;
-			ahb_vote.vote.level = CAM_LOWSVS_VOTE;
-			axi_vote.num_paths = 1;
-			axi_vote.axi_path[0].path_data_type =
-				CAM_AXI_PATH_DATA_ALL;
-			axi_vote.axi_path[0].transac_type =
-				CAM_AXI_TRANSACTION_READ;
-			axi_vote.axi_path[0].camnoc_bw =
-				CAM_CPAS_DEFAULT_AXI_BW;
-			axi_vote.axi_path[0].mnoc_ab_bw =
-				CAM_CPAS_DEFAULT_AXI_BW;
-			axi_vote.axi_path[0].mnoc_ib_bw =
-				CAM_CPAS_DEFAULT_AXI_BW;
+			ahb_vote.vote.level = CAM_SVS_VOTE;
+			axi_vote.compressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
+			axi_vote.uncompressed_bw = CAM_CPAS_DEFAULT_AXI_BW;
 
 			rc = cam_cpas_start(core->cpas_handle,
 				&ahb_vote, &axi_vote);

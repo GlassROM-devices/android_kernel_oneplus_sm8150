@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_SENSOR_CMN_HEADER_
@@ -162,8 +169,7 @@ enum cam_actuator_packet_opcodes {
 };
 
 enum cam_eeprom_packet_opcodes {
-	CAM_EEPROM_PACKET_OPCODE_INIT,
-	CAM_EEPROM_WRITE
+	CAM_EEPROM_PACKET_OPCODE_INIT
 };
 
 enum cam_ois_packet_opcodes {
@@ -223,10 +229,9 @@ enum cam_sensor_i2c_cmd_type {
 };
 
 struct common_header {
-	uint32_t    first_word;
-	uint8_t     fifth_byte;
+	uint16_t    first_word;
+	uint8_t     third_byte;
 	uint8_t     cmd_type;
-	uint16_t    reserved;
 };
 
 struct camera_vreg_t {
@@ -266,22 +271,14 @@ struct cam_sensor_i2c_reg_array {
 
 struct cam_sensor_i2c_reg_setting {
 	struct cam_sensor_i2c_reg_array *reg_setting;
-	uint32_t size;
+	unsigned short size;
 	enum camera_sensor_i2c_type addr_type;
 	enum camera_sensor_i2c_type data_type;
 	unsigned short delay;
 };
 
-struct cam_sensor_i2c_seq_reg {
-	uint32_t reg_addr;
-	uint8_t  *reg_data;
-	uint32_t size;
-	enum camera_sensor_i2c_type addr_type;
-};
-
 struct i2c_settings_list {
 	struct cam_sensor_i2c_reg_setting i2c_settings;
-	struct cam_sensor_i2c_seq_reg seq_settings;
 	enum cam_sensor_i2c_cmd_type op_code;
 	struct list_head list;
 };
@@ -316,7 +313,7 @@ struct cam_camera_slave_info {
 	uint16_t sensor_id_reg_addr;
 	uint16_t sensor_id;
 	uint16_t sensor_id_mask;
-        uint8_t  addr_type;
+	uint8_t  addr_type;
 	uint8_t  data_type;
 };
 
@@ -367,7 +364,7 @@ struct cam_sensor_power_setting {
 
 struct cam_sensor_board_info {
 	struct cam_camera_slave_info slave_info;
-        struct cam_camera_id_info id_info;
+	struct cam_camera_id_info id_info;
 	int32_t sensor_mount_angle;
 	int32_t secure_mode;
 	int modes_supported;

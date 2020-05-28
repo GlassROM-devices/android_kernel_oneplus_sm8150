@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/slab.h>
@@ -24,7 +31,6 @@ static void cam_tasklet_action(unsigned long data);
  * @list:                   list_head member for each entry in queue
  * @payload:                Payload structure for the event. This will be
  *                          passed to the handler function
- * @handler_priv:           Private data passed at event subscribe
  * @bottom_half_handler:    Function pointer for event handler in bottom
  *                          half context
  *
@@ -32,7 +38,6 @@ static void cam_tasklet_action(unsigned long data);
 struct cam_tasklet_queue_cmd {
 	struct list_head                   list;
 	void                              *payload;
-	void                              *handler_priv;
 	CAM_IRQ_HANDLER_BOTTOM_HALF        bottom_half_handler;
 };
 
@@ -88,16 +93,14 @@ int cam_tasklet_get_cmd(
 	}
 
 	if (!atomic_read(&tasklet->tasklet_active)) {
-		CAM_ERR_RATE_LIMIT(CAM_ISP, "Tasklet idx:%d is not active",
-			tasklet->index);
+		CAM_ERR_RATE_LIMIT(CAM_ISP, "Tasklet is not active");
 		rc = -EPIPE;
 		return rc;
 	}
 
 	spin_lock_irqsave(&tasklet->tasklet_lock, flags);
 	if (list_empty(&tasklet->free_cmd_list)) {
-		CAM_ERR_RATE_LIMIT(CAM_ISP, "No more free tasklet cmd idx:%d",
-			tasklet->index);
+		CAM_ERR_RATE_LIMIT(CAM_ISP, "No more free tasklet cmd");
 		rc = -ENODEV;
 		goto spin_unlock;
 	} else {
@@ -160,7 +163,7 @@ static int cam_tasklet_dequeue_cmd(
 
 	*tasklet_cmd = NULL;
 
-	CAM_DBG(CAM_ISP, "Dequeue before lock tasklet idx:%d", tasklet->index);
+	CAM_DBG(CAM_ISP, "Dequeue before lock.");
 	spin_lock_irqsave(&tasklet->tasklet_lock, flags);
 	if (list_empty(&tasklet->used_cmd_list)) {
 		CAM_DBG(CAM_ISP, "End of list reached. Exit");
@@ -200,15 +203,13 @@ void cam_tasklet_enqueue_cmd(
 	}
 
 	if (!atomic_read(&tasklet->tasklet_active)) {
-		CAM_ERR_RATE_LIMIT(CAM_ISP, "Tasklet is not active idx:%d",
-			tasklet->index);
+		CAM_ERR_RATE_LIMIT(CAM_ISP, "Tasklet is not active\n");
 		return;
 	}
 
-	CAM_DBG(CAM_ISP, "Enqueue tasklet cmd idx:%d", tasklet->index);
+	CAM_DBG(CAM_ISP, "Enqueue tasklet cmd");
 	tasklet_cmd->bottom_half_handler = bottom_half_handler;
 	tasklet_cmd->payload = evt_payload_priv;
-	tasklet_cmd->handler_priv = handler_priv;
 	spin_lock_irqsave(&tasklet->tasklet_lock, flags);
 	list_add_tail(&tasklet_cmd->list,
 		&tasklet->used_cmd_list);
@@ -276,7 +277,7 @@ int cam_tasklet_start(void  *tasklet_info)
 	int i = 0;
 
 	if (atomic_read(&tasklet->tasklet_active)) {
-		CAM_ERR(CAM_ISP, "Tasklet already active idx:%d",
+		CAM_ERR(CAM_ISP, "Tasklet already active. idx = %d",
 			tasklet->index);
 		return -EBUSY;
 	}
@@ -326,8 +327,9 @@ static void cam_tasklet_action(unsigned long data)
 	tasklet_info = (struct cam_tasklet_info *)data;
 
 	while (!cam_tasklet_dequeue_cmd(tasklet_info, &tasklet_cmd)) {
-		tasklet_cmd->bottom_half_handler(tasklet_cmd->handler_priv,
+		tasklet_cmd->bottom_half_handler(tasklet_info->ctx_priv,
 			tasklet_cmd->payload);
 		cam_tasklet_put_cmd(tasklet_info, (void **)(&tasklet_cmd));
 	}
 }
+

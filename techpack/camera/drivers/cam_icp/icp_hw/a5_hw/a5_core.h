@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef CAM_A5_CORE_H
@@ -10,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/dma-buf.h>
 #include "cam_a5_hw_intf.h"
 
 #define A5_QGIC_BASE            0
@@ -19,8 +27,6 @@
 #define A5_HOST_INT             0x1
 #define A5_WDT_0                0x2
 #define A5_WDT_1                0x4
-
-#define ICP_SIERRA_A5_CSR_ACCESS 0x3C
 
 #define ELF_GUARD_PAGE          (2 * 1024 * 1024)
 

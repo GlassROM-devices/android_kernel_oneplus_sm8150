@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_VFE_CORE_H_
@@ -51,8 +58,13 @@ struct cam_vfe_hw_core_info {
 	struct cam_vfe_bus                 *vfe_bus;
 	struct cam_vfe_bus                 *vfe_rd_bus;
 	void                               *tasklet_info;
+	struct cam_vfe_top_irq_evt_payload  evt_payload[CAM_VFE_EVT_MAX];
+	struct list_head                    free_payload_list;
+	struct cam_vfe_irq_handler_priv     irq_payload;
+	uint32_t                            cpas_handle;
+	int                                 irq_handle;
+	int                                 irq_err_handle;
 	spinlock_t                          spin_lock;
-	int                                 reset_irq_handle;
 };
 
 int cam_vfe_get_hw_caps(void *device_priv,

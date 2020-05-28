@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #ifndef _CAM_IFE_CSID_HW_H_
@@ -9,7 +16,10 @@
 #include "cam_hw.h"
 #include "cam_ife_csid_hw_intf.h"
 #include "cam_ife_csid_soc.h"
-#include "cam_ife_csid_core.h"
+
+#define CAM_IFE_CSID_HW_RES_MAX      4
+#define CAM_IFE_CSID_CID_RES_MAX     4
+#define CAM_IFE_CSID_RDI_MAX         4
 
 #define CSID_CSI2_RX_INFO_PHY_DL0_EOT_CAPTURED    BIT(0)
 #define CSID_CSI2_RX_INFO_PHY_DL1_EOT_CAPTURED    BIT(1)
@@ -40,7 +50,6 @@
 #define CSID_CSI2_RX_ERROR_TG_FIFO_OVERFLOW       BIT(26)
 #define CSID_CSI2_RX_INFO_RST_DONE                BIT(27)
 
-#define CSID_TOP_IRQ_DONE                         BIT(0)
 #define CSID_PATH_INFO_RST_DONE                   BIT(1)
 #define CSID_PATH_ERROR_FIFO_OVERFLOW             BIT(2)
 #define CSID_PATH_INFO_SUBSAMPLED_EOF             BIT(3)
@@ -56,7 +65,6 @@
 #define CSID_PATH_ERROR_PIX_COUNT                 BIT(13)
 #define CSID_PATH_ERROR_LINE_COUNT                BIT(14)
 #define CSID_PATH_ERROR_CCIF_VIOLATION            BIT(15)
-#define CSID_PATH_OVERFLOW_RECOVERY               BIT(17)
 
 /*
  * Debug values enable the corresponding interrupts and debug logs provide
@@ -127,18 +135,12 @@ struct cam_ife_csid_pxl_reg_offset {
 	uint32_t csid_pxl_timestamp_curr1_eof_addr;
 	uint32_t csid_pxl_timestamp_perv0_eof_addr;
 	uint32_t csid_pxl_timestamp_perv1_eof_addr;
-	uint32_t csid_pxl_err_recovery_cfg0_addr;
-	uint32_t csid_pxl_err_recovery_cfg1_addr;
-	uint32_t csid_pxl_err_recovery_cfg2_addr;
-	uint32_t csid_pxl_multi_vcdt_cfg0_addr;
 
 	/* configuration */
-	uint32_t pix_store_en_shift_val;
-	uint32_t early_eof_en_shift_val;
-	uint32_t horizontal_bin_en_shift_val;
-	uint32_t quad_cfa_bin_en_shift_val;
-	uint32_t ccif_violation_en;
-	uint32_t overflow_ctrl_en;
+	uint32_t  pix_store_en_shift_val;
+	uint32_t  early_eof_en_shift_val;
+	uint32_t  quad_cfa_bin_en_shift_val;
+	uint32_t  ccif_violation_en;
 };
 
 struct cam_ife_csid_rdi_reg_offset {
@@ -181,70 +183,12 @@ struct cam_ife_csid_rdi_reg_offset {
 	uint32_t csid_rdi_timestamp_curr1_eof_addr;
 	uint32_t csid_rdi_timestamp_prev0_eof_addr;
 	uint32_t csid_rdi_timestamp_prev1_eof_addr;
-	uint32_t csid_rdi_err_recovery_cfg0_addr;
-	uint32_t csid_rdi_err_recovery_cfg1_addr;
-	uint32_t csid_rdi_err_recovery_cfg2_addr;
-	uint32_t csid_rdi_multi_vcdt_cfg0_addr;
 	uint32_t csid_rdi_byte_cntr_ping_addr;
 	uint32_t csid_rdi_byte_cntr_pong_addr;
 
 	/* configuration */
 	uint32_t packing_format;
 	uint32_t ccif_violation_en;
-	uint32_t overflow_ctrl_en;
-};
-
-struct cam_ife_csid_udi_reg_offset {
-	uint32_t csid_udi_irq_status_addr;
-	uint32_t csid_udi_irq_mask_addr;
-	uint32_t csid_udi_irq_clear_addr;
-	uint32_t csid_udi_irq_set_addr;
-
-	/* UDI N register address */
-	uint32_t csid_udi_cfg0_addr;
-	uint32_t csid_udi_cfg1_addr;
-	uint32_t csid_udi_ctrl_addr;
-	uint32_t csid_udi_frm_drop_pattern_addr;
-	uint32_t csid_udi_frm_drop_period_addr;
-	uint32_t csid_udi_irq_subsample_pattern_addr;
-	uint32_t csid_udi_irq_subsample_period_addr;
-	uint32_t csid_udi_rpp_hcrop_addr;
-	uint32_t csid_udi_rpp_vcrop_addr;
-	uint32_t csid_udi_rpp_pix_drop_pattern_addr;
-	uint32_t csid_udi_rpp_pix_drop_period_addr;
-	uint32_t csid_udi_rpp_line_drop_pattern_addr;
-	uint32_t csid_udi_rpp_line_drop_period_addr;
-	uint32_t csid_udi_yuv_chroma_conversion_addr;
-	uint32_t csid_udi_rst_strobes_addr;
-	uint32_t csid_udi_status_addr;
-	uint32_t csid_udi_misr_val0_addr;
-	uint32_t csid_udi_misr_val1_addr;
-	uint32_t csid_udi_misr_val2_addr;
-	uint32_t csid_udi_misr_val3_addr;
-	uint32_t csid_udi_format_measure_cfg0_addr;
-	uint32_t csid_udi_format_measure_cfg1_addr;
-	uint32_t csid_udi_format_measure0_addr;
-	uint32_t csid_udi_format_measure1_addr;
-	uint32_t csid_udi_format_measure2_addr;
-	uint32_t csid_udi_timestamp_curr0_sof_addr;
-	uint32_t csid_udi_timestamp_curr1_sof_addr;
-	uint32_t csid_udi_timestamp_prev0_sof_addr;
-	uint32_t csid_udi_timestamp_prev1_sof_addr;
-	uint32_t csid_udi_timestamp_curr0_eof_addr;
-	uint32_t csid_udi_timestamp_curr1_eof_addr;
-	uint32_t csid_udi_timestamp_prev0_eof_addr;
-	uint32_t csid_udi_timestamp_prev1_eof_addr;
-	uint32_t csid_udi_err_recovery_cfg0_addr;
-	uint32_t csid_udi_err_recovery_cfg1_addr;
-	uint32_t csid_udi_err_recovery_cfg2_addr;
-	uint32_t csid_udi_multi_vcdt_cfg0_addr;
-	uint32_t csid_udi_byte_cntr_ping_addr;
-	uint32_t csid_udi_byte_cntr_pong_addr;
-
-	/* configuration */
-	uint32_t packing_format;
-	uint32_t ccif_violation_en;
-	uint32_t overflow_ctrl_en;
 };
 
 struct cam_ife_csid_csi2_rx_reg_offset {
@@ -343,7 +287,6 @@ struct cam_ife_csid_common_reg_offset {
 	uint32_t major_version;
 	uint32_t minor_version;
 	uint32_t version_incr;
-	uint32_t num_udis;
 	uint32_t num_rdis;
 	uint32_t num_pix;
 	uint32_t num_ppp;
@@ -353,7 +296,6 @@ struct cam_ife_csid_common_reg_offset {
 	uint32_t path_rst_stb_all;
 	uint32_t path_rst_done_shift_val;
 	uint32_t path_en_shift_val;
-	uint32_t packing_fmt_shift_val;
 	uint32_t dt_id_shift_val;
 	uint32_t vc_shift_val;
 	uint32_t dt_shift_val;
@@ -361,16 +303,16 @@ struct cam_ife_csid_common_reg_offset {
 	uint32_t plain_fmt_shit_val;
 	uint32_t crop_v_en_shift_val;
 	uint32_t crop_h_en_shift_val;
-	uint32_t drop_v_en_shift_val;
-	uint32_t drop_h_en_shift_val;
 	uint32_t crop_shift;
 	uint32_t ipp_irq_mask_all;
 	uint32_t rdi_irq_mask_all;
 	uint32_t ppp_irq_mask_all;
-	uint32_t udi_irq_mask_all;
 	uint32_t measure_en_hbi_vbi_cnt_mask;
 	uint32_t format_measure_en_val;
-	uint32_t num_bytes_out_shift_val;
+	uint32_t format_measure_width_shift_val;
+	uint32_t format_measure_width_mask_val;
+	uint32_t format_measure_height_shift_val;
+	uint32_t format_measure_height_mask_val;
 };
 
 /**
@@ -379,9 +321,7 @@ struct cam_ife_csid_common_reg_offset {
  * @cmn_reg:  csid common registers info
  * @ipp_reg:  ipp register offset information
  * @ppp_reg:  ppp register offset information
- * @rdi_reg:  rdi register offset information
- * @udi_reg:  udi register offset information
- * @tpg_reg:  tpg register offset information
+ * @rdi_reg:  rdi register offser information
  *
  */
 struct cam_ife_csid_reg_offset {
@@ -390,7 +330,6 @@ struct cam_ife_csid_reg_offset {
 	const struct cam_ife_csid_pxl_reg_offset      *ipp_reg;
 	const struct cam_ife_csid_pxl_reg_offset      *ppp_reg;
 	const struct cam_ife_csid_rdi_reg_offset *rdi_reg[CAM_IFE_CSID_RDI_MAX];
-	const struct cam_ife_csid_udi_reg_offset *udi_reg[CAM_IFE_CSID_UDI_MAX];
 	const struct cam_ife_csid_csi2_tpg_reg_offset *tpg_reg;
 };
 
@@ -447,21 +386,17 @@ struct cam_ife_csid_tpg_cfg  {
 /**
  * struct cam_ife_csid_cid_data- cid configuration private data
  *
- * @vc:               Virtual channel
- * @dt:               Data type
- * @cnt:              Cid resource reference count.
- * @tpg_set:          Tpg used for this cid resource
- * @is_valid_vc1_dt1: Valid vc1 and dt1
+ * @vc:          Virtual channel
+ * @dt:          Data type
+ * @cnt:         Cid resource reference count.
+ * @tpg_set:     Tpg used for this cid resource
  *
  */
 struct cam_ife_csid_cid_data {
 	uint32_t                     vc;
 	uint32_t                     dt;
-	uint32_t                     vc1;
-	uint32_t                     dt1;
 	uint32_t                     cnt;
 	uint32_t                     tpg_set;
-	uint32_t                     is_valid_vc1_dt1;
 };
 
 
@@ -475,7 +410,6 @@ struct cam_ife_csid_cid_data {
  * @out_format:     output format
  * @crop_enable:    crop is enable or disabled, if enabled
  *                  then remaining parameters are valid.
- * @drop_enable:    flag to indicate pixel drop enable or disable
  * @start_pixel:    start pixel
  * @end_pixel:      end_pixel
  * @width:          width
@@ -489,20 +423,18 @@ struct cam_ife_csid_cid_data {
  * @master_idx:     For Slave reservation, Give master IFE instance Index.
  *                  Slave will synchronize with master Start and stop operations
  * @clk_rate        Clock rate
- * @num_bytes_out:  Number of output bytes per cycle
+ * @usage_type      Usage type ie dual or single ife usecase
+ * @init_frame_drop init frame drop value. In dual ife case rdi need to drop one
+ *                  more frame than pix.
  *
  */
 struct cam_ife_csid_path_cfg {
 	uint32_t                        vc;
 	uint32_t                        dt;
-	uint32_t                        vc1;
-	uint32_t                        dt1;
-	uint32_t                        is_valid_vc1_dt1;
 	uint32_t                        cid;
 	uint32_t                        in_format;
 	uint32_t                        out_format;
 	bool                            crop_enable;
-	bool                            drop_enable;
 	uint32_t                        start_pixel;
 	uint32_t                        end_pixel;
 	uint32_t                        width;
@@ -512,9 +444,8 @@ struct cam_ife_csid_path_cfg {
 	enum cam_isp_hw_sync_mode       sync_mode;
 	uint32_t                        master_idx;
 	uint64_t                        clk_rate;
-	uint32_t                        horizontal_bin;
-	uint32_t                        qcfa_bin;
-	uint32_t                        num_bytes_out;
+	uint32_t                        usage_type;
+	uint32_t                        init_frame_drop;
 };
 
 /**
@@ -532,27 +463,33 @@ struct cam_ife_csid_path_cfg {
  * @ipp_res:                  image pixel path resource
  * @ppp_res:                  phase pxl path resource
  * @rdi_res:                  raw dump image path resources
- * @udi_res:                  udi path resources
  * @cid_res:                  cid resources state
  * @csid_top_reset_complete:  csid top reset completion
  * @csid_csi2_reset_complete: csi2 reset completion
  * @csid_ipp_reset_complete:  ipp reset completion
  * @csid_ppp_complete:        ppp reset completion
  * @csid_rdin_reset_complete: rdi n completion
- * @csid_udin_reset_complete: udi n completion
  * @csid_debug:               csid debug information to enable the SOT, EOT,
  *                            SOF, EOF, measure etc in the csid hw
  * @clk_rate                  Clock rate
+ * @ipp_path                  ipp path configuration
+ * @ppp_path                  ppp path configuration
+ * @rdi_path                  RDI path configuration
+ * @hbi                       Horizontal blanking
+ * @vbi                       Vertical blanking
  * @sof_irq_triggered:        Flag is set on receiving event to enable sof irq
  *                            incase of SOF freeze.
  * @irq_debug_cnt:            Counter to track sof irq's when above flag is set.
  * @error_irq_count           Error IRQ count, if continuous error irq comes
  *                            need to stop the CSID and mask interrupts.
- * @binning_enable            Flag is set if hardware supports QCFA binning
- * @binning_supported         Flag is set if sensor supports QCFA binning
+ * @device_enabled            Device enabled will set once CSID powered on and
+ *                            initial configuration are done.
+ * @lock_state                csid spin lock
+ * @dual_usage                usage type, dual ife or single ife
+ * @init_frame_drop           Initial frame drop number
+ * @res_sof_cnt               path resource sof count value. it used for initial
+ *                            frame drop
  *
- * @first_sof_ts              first bootime stamp at the start
- * @prev_qtimer_ts            stores csid timestamp
  */
 struct cam_ife_csid_hw {
 	struct cam_hw_intf              *hw_intf;
@@ -567,36 +504,32 @@ struct cam_ife_csid_hw {
 	struct cam_isp_resource_node     ipp_res;
 	struct cam_isp_resource_node     ppp_res;
 	struct cam_isp_resource_node     rdi_res[CAM_IFE_CSID_RDI_MAX];
-	struct cam_isp_resource_node     udi_res[CAM_IFE_CSID_UDI_MAX];
-	struct cam_isp_resource_node     cid_res[CAM_IFE_CSID_CID_MAX];
+	struct cam_isp_resource_node     cid_res[CAM_IFE_CSID_CID_RES_MAX];
 	struct completion                csid_top_complete;
 	struct completion                csid_csi2_complete;
 	struct completion                csid_ipp_complete;
 	struct completion                csid_ppp_complete;
 	struct completion    csid_rdin_complete[CAM_IFE_CSID_RDI_MAX];
-	struct completion    csid_udin_complete[CAM_IFE_CSID_UDI_MAX];
 	uint64_t                         csid_debug;
 	uint64_t                         clk_rate;
+	struct cam_isp_sensor_dimension  ipp_path_config;
+	struct cam_isp_sensor_dimension  ppp_path_config;
+	struct cam_isp_sensor_dimension  rdi_path_config[4];
+	uint32_t                         hbi;
+	uint32_t                         vbi;
 	bool                             sof_irq_triggered;
 	uint32_t                         irq_debug_cnt;
 	uint32_t                         error_irq_count;
 	uint32_t                         device_enabled;
 	spinlock_t                       lock_state;
-	uint32_t                         binning_enable;
-	uint32_t                         binning_supported;
-	uint64_t                         prev_boot_timestamp;
-	uint64_t                         prev_qtimer_ts;
+	uint32_t                         dual_usage;
+	uint32_t                         init_frame_drop;
+	uint32_t                         res_sof_cnt[CAM_IFE_PIX_PATH_RES_MAX];
 };
 
 int cam_ife_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
-	uint32_t csid_idx, bool is_custom);
+	uint32_t csid_idx);
 
 int cam_ife_csid_hw_deinit(struct cam_ife_csid_hw *ife_csid_hw);
-
-int cam_ife_csid_cid_reserve(struct cam_ife_csid_hw *csid_hw,
-	struct cam_csid_hw_reserve_resource_args  *cid_reserv);
-
-int cam_ife_csid_path_reserve(struct cam_ife_csid_hw *csid_hw,
-	struct cam_csid_hw_reserve_resource_args  *reserve);
 
 #endif /* _CAM_IFE_CSID_HW_H_ */

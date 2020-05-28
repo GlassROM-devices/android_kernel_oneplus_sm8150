@@ -1,6 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 
 #include <linux/slab.h>
@@ -10,23 +17,34 @@
 #include "cam_vfe_top.h"
 #include "cam_vfe_top_ver2.h"
 #include "cam_debug_util.h"
+#include "cam_cpas_api.h"
 #include "cam_vfe_soc.h"
 
 #define CAM_VFE_HW_RESET_HW_AND_REG_VAL       0x00003F9F
 #define CAM_VFE_HW_RESET_HW_VAL               0x00003F87
+#define CAM_VFE_DELAY_BW_REDUCTION_NUM_FRAMES 3
 
 struct cam_vfe_top_ver2_common_data {
 	struct cam_hw_soc_info                     *soc_info;
 	struct cam_hw_intf                         *hw_intf;
 	struct cam_vfe_top_ver2_reg_offset_common  *common_reg;
+	struct cam_vfe_top_dump_data               *dump_data;
 };
 
 struct cam_vfe_top_ver2_priv {
 	struct cam_vfe_top_ver2_common_data common_data;
+	struct cam_isp_resource_node        mux_rsrc[CAM_VFE_TOP_VER2_MUX_MAX];
 	unsigned long                       hw_clk_rate;
-	unsigned long                       req_clk_rate[
-						CAM_VFE_TOP_MUX_MAX];
-	struct cam_vfe_top_priv_common      top_common;
+	struct cam_axi_vote                 applied_axi_vote;
+	struct cam_axi_vote             req_axi_vote[CAM_VFE_TOP_VER2_MUX_MAX];
+	unsigned long                   req_clk_rate[CAM_VFE_TOP_VER2_MUX_MAX];
+	struct cam_axi_vote             last_vote[CAM_CPAS_HANDLE_MAX]
+					[CAM_VFE_TOP_VER2_MUX_MAX *
+					CAM_VFE_DELAY_BW_REDUCTION_NUM_FRAMES];
+	uint32_t                        last_counter[CAM_CPAS_HANDLE_MAX];
+	enum cam_vfe_bw_control_action
+		axi_vote_control[CAM_VFE_TOP_VER2_MUX_MAX];
+	enum cam_cpas_handle_id cpashdl_type[CAM_VFE_TOP_VER2_MUX_MAX];
 };
 
 static int cam_vfe_top_mux_get_base(struct cam_vfe_top_ver2_priv *top_priv,
@@ -85,14 +103,14 @@ static int cam_vfe_top_set_hw_clk_rate(
 
 	soc_info = top_priv->common_data.soc_info;
 
-	for (i = 0; i < top_priv->top_common.num_mux; i++) {
+	for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
 		if (top_priv->req_clk_rate[i] > max_clk_rate)
 			max_clk_rate = top_priv->req_clk_rate[i];
 	}
 	if (max_clk_rate == top_priv->hw_clk_rate)
 		return 0;
 
-	CAM_DBG(CAM_PERF, "VFE: Clock name=%s idx=%d clk=%llu",
+	CAM_DBG(CAM_ISP, "VFE: Clock name=%s idx=%d clk=%llu",
 		soc_info->clk_name[soc_info->src_clk_idx],
 		soc_info->src_clk_idx, max_clk_rate);
 
@@ -101,8 +119,132 @@ static int cam_vfe_top_set_hw_clk_rate(
 	if (!rc)
 		top_priv->hw_clk_rate = max_clk_rate;
 	else
-		CAM_ERR(CAM_PERF, "Set Clock rate failed, rc=%d", rc);
+		CAM_ERR(CAM_ISP, "Set Clock rate failed, rc=%d", rc);
 
+	return rc;
+}
+
+static int cam_vfe_top_set_axi_bw_vote(
+	struct cam_vfe_top_ver2_priv *top_priv,
+	bool start_stop)
+{
+	struct cam_axi_vote sum = {0, 0};
+	struct cam_axi_vote to_be_applied_axi_vote = {0, 0};
+	int i, rc = 0;
+	struct cam_hw_soc_info   *soc_info =
+		top_priv->common_data.soc_info;
+	struct cam_vfe_soc_private *soc_private =
+		soc_info->soc_private;
+	bool apply_bw_update = false;
+	enum cam_cpas_handle_id cpashdl_type;
+	struct cam_axi_vote *last_vote = NULL;
+
+	if (!soc_private) {
+		CAM_ERR(CAM_ISP, "Error soc_private NULL");
+		return -EINVAL;
+	}
+
+	for (cpashdl_type = 0; cpashdl_type < CAM_CPAS_HANDLE_MAX;
+		cpashdl_type++) {
+
+		if ((soc_private->cpas_version != CAM_CPAS_TITAN_175_V120)
+			&& cpashdl_type)
+			continue;
+
+		sum.uncompressed_bw = sum.compressed_bw = 0;
+		to_be_applied_axi_vote.uncompressed_bw = 0;
+		to_be_applied_axi_vote.compressed_bw = 0;
+		apply_bw_update = false;
+
+		for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+			if (top_priv->axi_vote_control[i] ==
+				CAM_VFE_BW_CONTROL_INCLUDE &&
+				top_priv->cpashdl_type[i] ==
+				cpashdl_type) {
+				sum.uncompressed_bw +=
+				top_priv->req_axi_vote[i].uncompressed_bw;
+				sum.compressed_bw +=
+				top_priv->req_axi_vote[i].compressed_bw;
+			}
+		}
+
+		CAM_DBG(CAM_ISP, "Updating BW from (%llu %llu) to (%llu %llu)",
+			top_priv->applied_axi_vote.uncompressed_bw,
+			top_priv->applied_axi_vote.compressed_bw,
+			sum.uncompressed_bw,
+			sum.compressed_bw);
+
+		last_vote = top_priv->last_vote[cpashdl_type];
+
+		last_vote[top_priv->last_counter[cpashdl_type]] = sum;
+		top_priv->last_counter[cpashdl_type] =
+			(top_priv->last_counter[cpashdl_type] + 1) %
+			(CAM_VFE_TOP_VER2_MUX_MAX *
+			CAM_VFE_DELAY_BW_REDUCTION_NUM_FRAMES);
+
+		if ((top_priv->applied_axi_vote.uncompressed_bw ==
+			sum.uncompressed_bw) &&
+			(top_priv->applied_axi_vote.compressed_bw ==
+			sum.compressed_bw)) {
+			CAM_DBG(CAM_ISP, "BW config unchanged %llu %llu",
+				top_priv->applied_axi_vote.uncompressed_bw,
+				top_priv->applied_axi_vote.compressed_bw);
+			return 0;
+		}
+
+		if (start_stop == true) {
+			rc = cam_cpas_update_axi_vote(
+				soc_private->cpas_handle[cpashdl_type],
+				&to_be_applied_axi_vote);
+			if (!rc) {
+				top_priv->applied_axi_vote.uncompressed_bw =
+					to_be_applied_axi_vote.uncompressed_bw;
+				top_priv->applied_axi_vote.compressed_bw =
+					to_be_applied_axi_vote.compressed_bw;
+			}
+			return rc;
+		}
+
+		/*
+		 * Find max bw request in last few frames. This is the bw
+		 * that we want to vote to CPAS now.
+		 */
+		for (i = 0; i < (CAM_VFE_TOP_VER2_MUX_MAX *
+			CAM_VFE_DELAY_BW_REDUCTION_NUM_FRAMES); i++) {
+			if (to_be_applied_axi_vote.compressed_bw <
+				last_vote[i].compressed_bw)
+				to_be_applied_axi_vote.compressed_bw =
+					last_vote[i].compressed_bw;
+
+			if (to_be_applied_axi_vote.uncompressed_bw <
+					last_vote[i].uncompressed_bw)
+				to_be_applied_axi_vote.uncompressed_bw =
+					last_vote[i].uncompressed_bw;
+		}
+
+		if ((to_be_applied_axi_vote.uncompressed_bw !=
+			top_priv->applied_axi_vote.uncompressed_bw) ||
+			(to_be_applied_axi_vote.compressed_bw !=
+			top_priv->applied_axi_vote.compressed_bw))
+			apply_bw_update = true;
+
+		CAM_DBG(CAM_ISP, "apply_bw_update=%d", apply_bw_update);
+
+		if (apply_bw_update == true) {
+			rc = cam_cpas_update_axi_vote(
+				soc_private->cpas_handle[cpashdl_type],
+				&to_be_applied_axi_vote);
+			if (!rc) {
+				top_priv->applied_axi_vote.uncompressed_bw =
+				to_be_applied_axi_vote.uncompressed_bw;
+				top_priv->applied_axi_vote.compressed_bw =
+					to_be_applied_axi_vote.compressed_bw;
+			} else {
+				CAM_ERR(CAM_ISP, "BW request failed, rc=%d",
+					rc);
+			}
+		}
+	}
 	return rc;
 }
 
@@ -115,6 +257,22 @@ static int cam_vfe_top_fs_update(
 	if (cmd_update->node_res->process_cmd)
 		return cmd_update->node_res->process_cmd(cmd_update->node_res,
 			CAM_ISP_HW_CMD_FE_UPDATE_IN_RD, cmd_args, arg_size);
+
+	return 0;
+}
+
+static int cam_vfe_top_fps_config(
+	struct cam_vfe_top_ver2_priv *top_priv,
+	void *cmd_args, uint32_t arg_size)
+{
+	struct cam_vfe_fps_config_args *cmd_update = NULL;
+
+	cmd_update =
+		(struct cam_vfe_fps_config_args *)cmd_args;
+
+	if (cmd_update->node_res->process_cmd)
+		return cmd_update->node_res->process_cmd(cmd_update->node_res,
+			CAM_ISP_HW_CMD_FPS_CONFIG, cmd_args, arg_size);
 
 	return 0;
 }
@@ -133,7 +291,7 @@ static int cam_vfe_top_clock_update(
 	res = clk_update->node_res;
 
 	if (!res || !res->hw_intf->hw_priv) {
-		CAM_ERR(CAM_PERF, "Invalid input res %pK", res);
+		CAM_ERR(CAM_ISP, "Invalid input res %pK", res);
 		return -EINVAL;
 	}
 
@@ -141,26 +299,120 @@ static int cam_vfe_top_clock_update(
 
 	if (res->res_type != CAM_ISP_RESOURCE_VFE_IN ||
 		res->res_id >= CAM_ISP_HW_VFE_IN_MAX) {
-		CAM_ERR(CAM_PERF, "VFE:%d Invalid res_type:%d res id%d",
+		CAM_ERR(CAM_ISP, "VFE:%d Invalid res_type:%d res id%d",
 			res->hw_intf->hw_idx, res->res_type,
 			res->res_id);
 		return -EINVAL;
 	}
 
-	for (i = 0; i < top_priv->top_common.num_mux; i++) {
-		if (top_priv->top_common.mux_rsrc[i].res_id == res->res_id) {
+	for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+		if (top_priv->mux_rsrc[i].res_id == res->res_id) {
 			top_priv->req_clk_rate[i] = clk_update->clk_rate;
 			break;
 		}
 	}
 
 	if (hw_info->hw_state != CAM_HW_STATE_POWER_UP) {
-		CAM_DBG(CAM_PERF,
+		CAM_DBG(CAM_ISP,
 			"VFE:%d Not ready to set clocks yet :%d",
 			res->hw_intf->hw_idx,
 			hw_info->hw_state);
 	} else
 		rc = cam_vfe_top_set_hw_clk_rate(top_priv);
+
+	return rc;
+}
+
+static int cam_vfe_top_bw_update(
+	struct cam_vfe_top_ver2_priv *top_priv,
+	void *cmd_args, uint32_t arg_size)
+{
+	struct cam_vfe_bw_update_args        *bw_update = NULL;
+	struct cam_isp_resource_node         *res = NULL;
+	struct cam_hw_info                   *hw_info = NULL;
+	int                                   rc = 0;
+	int                                   i;
+
+	bw_update = (struct cam_vfe_bw_update_args *)cmd_args;
+	res = bw_update->node_res;
+
+	if (!res || !res->hw_intf->hw_priv)
+		return -EINVAL;
+
+	hw_info = res->hw_intf->hw_priv;
+
+	if (res->res_type != CAM_ISP_RESOURCE_VFE_IN ||
+		res->res_id >= CAM_ISP_HW_VFE_IN_MAX) {
+		CAM_ERR(CAM_ISP, "VFE:%d Invalid res_type:%d res id%d",
+			res->hw_intf->hw_idx, res->res_type,
+			res->res_id);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+		if (top_priv->mux_rsrc[i].res_id == res->res_id) {
+			top_priv->req_axi_vote[i].uncompressed_bw =
+				bw_update->camnoc_bw_bytes;
+			top_priv->req_axi_vote[i].compressed_bw =
+				bw_update->external_bw_bytes;
+			top_priv->axi_vote_control[i] =
+				CAM_VFE_BW_CONTROL_INCLUDE;
+			break;
+		}
+	}
+
+	if (hw_info->hw_state != CAM_HW_STATE_POWER_UP) {
+		CAM_ERR_RATE_LIMIT(CAM_ISP,
+			"VFE:%d Not ready to set BW yet :%d",
+			res->hw_intf->hw_idx,
+			hw_info->hw_state);
+	} else
+		rc = cam_vfe_top_set_axi_bw_vote(top_priv, false);
+
+	return rc;
+}
+
+static int cam_vfe_top_bw_control(
+	struct cam_vfe_top_ver2_priv *top_priv,
+	 void *cmd_args, uint32_t arg_size)
+{
+	struct cam_vfe_bw_control_args       *bw_ctrl = NULL;
+	struct cam_isp_resource_node         *res = NULL;
+	struct cam_hw_info                   *hw_info = NULL;
+	int                                   rc = 0;
+	int                                   i;
+
+	bw_ctrl = (struct cam_vfe_bw_control_args *)cmd_args;
+	res = bw_ctrl->node_res;
+
+	if (!res || !res->hw_intf->hw_priv)
+		return -EINVAL;
+
+	hw_info = res->hw_intf->hw_priv;
+
+	if (res->res_type != CAM_ISP_RESOURCE_VFE_IN ||
+		res->res_id >= CAM_ISP_HW_VFE_IN_MAX) {
+		CAM_ERR(CAM_ISP, "VFE:%d Invalid res_type:%d res id%d",
+			res->hw_intf->hw_idx, res->res_type,
+			res->res_id);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+		if (top_priv->mux_rsrc[i].res_id == res->res_id) {
+			top_priv->axi_vote_control[i] = bw_ctrl->action;
+			break;
+		}
+	}
+
+	if (hw_info->hw_state != CAM_HW_STATE_POWER_UP) {
+		CAM_ERR_RATE_LIMIT(CAM_ISP,
+			"VFE:%d Not ready to set BW yet :%d",
+			res->hw_intf->hw_idx,
+			hw_info->hw_state);
+	} else {
+		rc = cam_vfe_top_set_axi_bw_vote(top_priv, true);
+	}
 
 	return rc;
 }
@@ -176,6 +428,143 @@ static int cam_vfe_top_mux_get_reg_update(
 			CAM_ISP_HW_CMD_GET_REG_UPDATE, cmd_args, arg_size);
 
 	return -EINVAL;
+}
+
+static int cam_vfe_top_mux_get_rdi_irq_mask(
+	struct cam_vfe_top_ver2_priv *top_priv,
+	void *cmd_args, uint32_t arg_size)
+{
+	struct cam_isp_hw_get_cmd_update  *cmd_update = cmd_args;
+
+	if (cmd_update->res->process_cmd)
+		return cmd_update->res->process_cmd(cmd_update->res,
+			CAM_ISP_HW_CMD_GET_RDI_IRQ_MASK, cmd_args, arg_size);
+
+	return -EINVAL;
+}
+
+static int cam_vfe_get_irq_register_dump(
+	struct cam_vfe_top_ver2_priv *top_priv,
+	void *cmd_args, uint32_t arg_size)
+{
+	struct cam_isp_hw_get_cmd_update  *cmd_update = cmd_args;
+
+	if (cmd_update->res->process_cmd)
+		cmd_update->res->process_cmd(cmd_update->res,
+		CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP, cmd_args, arg_size);
+
+	return 0;
+}
+
+static int cam_vfe_hw_dump(
+	struct cam_vfe_top_ver2_priv *top_priv,
+	void *cmd_args,
+	uint32_t arg_size)
+{
+	struct cam_isp_hw_dump_args *dump_args =
+		(struct cam_isp_hw_dump_args *)cmd_args;
+	struct cam_hw_soc_info            *soc_info;
+	uint32_t i, j;
+	struct cam_vfe_top_dump_data *dump_data;
+	uint32_t reg_dump_size = 0, lut_dump_size = 0;
+	uint32_t reg_start_offset;
+	uint32_t val = 0;
+	uint32_t num_reg;
+	void __iomem *reg_base;
+	uint32_t *addr, *start;
+	struct cam_isp_hw_dump_header *hdr;
+	uint8_t *dst;
+
+	if (!dump_args->cpu_addr || !dump_args->buf_len) {
+		CAM_ERR(CAM_ISP,
+		    "lnvalid addr len %zu", dump_args->buf_len);
+		return -EINVAL;
+	}
+	dump_data = top_priv->common_data.dump_data;
+	soc_info = top_priv->common_data.soc_info;
+
+	/*Dump registers */
+	for (i = 0; i < dump_data->num_reg_dump_entries; i++)
+		reg_dump_size += (dump_data->reg_entry[i].reg_dump_end -
+			dump_data->reg_entry[i].reg_dump_start);
+	/*
+	 * We dump the offset as well, so the total size dumped becomes
+	 * multiplied by 2
+	 */
+	reg_dump_size *= 2;
+	for (i = 0; i < dump_data->num_lut_dump_entries; i++)
+		lut_dump_size += ((dump_data->lut_entry[i].lut_addr_size) *
+			(dump_data->lut_entry[i].lut_word_size/8));
+
+	if ((dump_args->buf_len - dump_args->offset) <
+		(lut_dump_size + reg_dump_size +
+		sizeof(struct cam_isp_hw_dump_header))) {
+		CAM_ERR(CAM_ISP, "Dump buffer exhaust");
+		return 0;
+	}
+	dst = (char *)dump_args->cpu_addr + dump_args->offset;
+	hdr = (struct cam_isp_hw_dump_header *)dst;
+	hdr->word_size = sizeof(uint32_t);
+	snprintf(hdr->tag, CAM_ISP_HW_DUMP_TAG_MAX_LEN, "VFE_REG:");
+	addr = (uint32_t *)(dst + sizeof(struct cam_isp_hw_dump_header));
+	start = addr;
+	*addr++ = soc_info->index;
+	for (i = 0; i < dump_data->num_reg_dump_entries; i++) {
+		num_reg  = (dump_data->reg_entry[i].reg_dump_end -
+			dump_data->reg_entry[i].reg_dump_start)/4;
+		reg_start_offset = dump_data->reg_entry[i].reg_dump_start;
+		reg_base = soc_info->reg_map[0].mem_base + reg_start_offset;
+		for (j = 0; j < num_reg; j++) {
+			addr[0] = soc_info->mem_block[0]->start +
+				reg_start_offset + (j*4);
+			addr[1] = cam_io_r(reg_base + (j*4));
+			addr += 2;
+		}
+	}
+	hdr->size = hdr->word_size * (addr - start);
+	dump_args->offset +=  hdr->size +
+		sizeof(struct cam_isp_hw_dump_header);
+
+	/*dump LUT*/
+	for (i = 0; i < dump_data->num_lut_dump_entries; i++) {
+
+		dst = (char *)dump_args->cpu_addr + dump_args->offset;
+		hdr = (struct cam_isp_hw_dump_header *)dst;
+		snprintf(hdr->tag, CAM_ISP_HW_DUMP_TAG_MAX_LEN, "LUT_REG:");
+		hdr->word_size = dump_data->lut_entry[i].lut_word_size/8;
+		addr = (uint32_t *)(dst +
+			sizeof(struct cam_isp_hw_dump_header));
+		start = addr;
+		*addr++ = dump_data->lut_entry[i].lut_bank_sel;
+		*addr++ = soc_info->index;
+		val = 0x100 |  dump_data->lut_entry[i].lut_bank_sel;
+		cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
+			dump_data->dmi_cfg);
+		cam_io_w_mb(0, soc_info->reg_map[0].mem_base +
+			dump_data->dmi_addr);
+		for (j = 0; j < dump_data->lut_entry[i].lut_addr_size;
+			j++) {
+			if (dump_data->lut_entry[i].lut_word_size == 64) {
+				addr[0] = cam_io_r(
+					soc_info->reg_map[0].mem_base +
+					dump_data->dmi_data_path_lo);
+				addr[1] = cam_io_r(
+					soc_info->reg_map[0].mem_base +
+					dump_data->dmi_data_path_hi);
+				addr += 2;
+			} else {
+				*addr = cam_io_r(
+					soc_info->reg_map[0].mem_base +
+					dump_data->dmi_data_path_lo);
+				addr++;
+			}
+		}
+		hdr->size = hdr->word_size * (addr - start);
+		dump_args->offset +=  hdr->size +
+			sizeof(struct cam_isp_hw_dump_header);
+	}
+	CAM_DBG(CAM_ISP, "offset %d", dump_args->offset);
+	return 0;
 }
 
 int cam_vfe_top_get_hw_caps(void *device_priv,
@@ -253,35 +642,23 @@ int cam_vfe_top_reserve(void *device_priv,
 	acquire_args = &args->vfe_in;
 
 
-	for (i = 0; i < top_priv->top_common.num_mux; i++) {
-		if (top_priv->top_common.mux_rsrc[i].res_id ==
-			acquire_args->res_id &&
-			top_priv->top_common.mux_rsrc[i].res_state ==
+	for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+		if (top_priv->mux_rsrc[i].res_id ==  acquire_args->res_id &&
+			top_priv->mux_rsrc[i].res_state ==
 			CAM_ISP_RESOURCE_STATE_AVAILABLE) {
 
 			if (acquire_args->res_id == CAM_ISP_HW_VFE_IN_CAMIF) {
 				rc = cam_vfe_camif_ver2_acquire_resource(
-					&top_priv->top_common.mux_rsrc[i],
+					&top_priv->mux_rsrc[i],
 					args);
 				if (rc)
 					break;
 			}
 
 			if (acquire_args->res_id ==
-				CAM_ISP_HW_VFE_IN_PDLIB) {
+				CAM_ISP_HW_VFE_IN_CAMIF_LITE) {
 				rc = cam_vfe_camif_lite_ver2_acquire_resource(
-					&top_priv->top_common.mux_rsrc[i],
-					args);
-				if (rc)
-					break;
-			}
-
-			if ((acquire_args->res_id >=
-				CAM_ISP_HW_VFE_IN_RDI0) &&
-				(acquire_args->res_id <=
-				CAM_ISP_HW_VFE_IN_RDI3)) {
-				rc = cam_vfe_rdi_ver2_acquire_resource(
-					&top_priv->top_common.mux_rsrc[i],
+					&top_priv->mux_rsrc[i],
 					args);
 				if (rc)
 					break;
@@ -289,20 +666,18 @@ int cam_vfe_top_reserve(void *device_priv,
 
 			if (acquire_args->res_id == CAM_ISP_HW_VFE_IN_RD) {
 				rc = cam_vfe_fe_ver1_acquire_resource(
-					&top_priv->top_common.mux_rsrc[i],
+					&top_priv->mux_rsrc[i],
 					args);
 				if (rc)
 					break;
 			}
 
-			top_priv->top_common.mux_rsrc[i].cdm_ops =
-				acquire_args->cdm_ops;
-			top_priv->top_common.mux_rsrc[i].tasklet_info =
-				args->tasklet;
-			top_priv->top_common.mux_rsrc[i].res_state =
+			top_priv->mux_rsrc[i].cdm_ops = acquire_args->cdm_ops;
+			top_priv->mux_rsrc[i].tasklet_info = args->tasklet;
+			top_priv->mux_rsrc[i].res_state =
 				CAM_ISP_RESOURCE_STATE_RESERVED;
 			acquire_args->rsrc_node =
-				&top_priv->top_common.mux_rsrc[i];
+				&top_priv->mux_rsrc[i];
 
 			rc = 0;
 			break;
@@ -344,8 +719,6 @@ int cam_vfe_top_start(void *device_priv,
 	struct cam_vfe_top_ver2_priv            *top_priv;
 	struct cam_isp_resource_node            *mux_res;
 	struct cam_hw_info                      *hw_info = NULL;
-	struct cam_hw_soc_info                  *soc_info = NULL;
-	struct cam_vfe_soc_private              *soc_private = NULL;
 	int rc = 0;
 
 	if (!device_priv || !start_args) {
@@ -354,13 +727,6 @@ int cam_vfe_top_start(void *device_priv,
 	}
 
 	top_priv = (struct cam_vfe_top_ver2_priv *)device_priv;
-	soc_info = top_priv->common_data.soc_info;
-	soc_private = soc_info->soc_private;
-	if (!soc_private) {
-		CAM_ERR(CAM_ISP, "Error soc_private NULL");
-		return -EINVAL;
-	}
-
 	mux_res = (struct cam_isp_resource_node *)start_args;
 	hw_info = (struct cam_hw_info  *)mux_res->hw_intf->hw_priv;
 
@@ -372,8 +738,7 @@ int cam_vfe_top_start(void *device_priv,
 			return rc;
 		}
 
-		rc = cam_vfe_top_set_axi_bw_vote(soc_private,
-			&top_priv->top_common, true);
+		rc = cam_vfe_top_set_axi_bw_vote(top_priv, true);
 		if (rc) {
 			CAM_ERR(CAM_ISP,
 				"set_axi_bw_vote failed, rc=%d", rc);
@@ -413,7 +778,7 @@ int cam_vfe_top_stop(void *device_priv,
 	hw_info = (struct cam_hw_info  *)mux_res->hw_intf->hw_priv;
 
 	if ((mux_res->res_id == CAM_ISP_HW_VFE_IN_CAMIF) ||
-		(mux_res->res_id == CAM_ISP_HW_VFE_IN_PDLIB) ||
+		(mux_res->res_id == CAM_ISP_HW_VFE_IN_CAMIF_LITE) ||
 		(mux_res->res_id == CAM_ISP_HW_VFE_IN_RD) ||
 		((mux_res->res_id >= CAM_ISP_HW_VFE_IN_RDI0) &&
 		(mux_res->res_id <= CAM_ISP_HW_VFE_IN_RDI3))) {
@@ -424,18 +789,12 @@ int cam_vfe_top_stop(void *device_priv,
 	}
 
 	if (!rc) {
-		for (i = 0; i < top_priv->top_common.num_mux; i++) {
-			if (top_priv->top_common.mux_rsrc[i].res_id ==
-				mux_res->res_id) {
+		for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+			if (top_priv->mux_rsrc[i].res_id == mux_res->res_id) {
 				top_priv->req_clk_rate[i] = 0;
-				top_priv->req_clk_rate[i] = 0;
-				top_priv->top_common.req_axi_vote[i]
-					.axi_path[0].camnoc_bw = 0;
-				top_priv->top_common.req_axi_vote[i]
-					.axi_path[0].mnoc_ab_bw = 0;
-				top_priv->top_common.req_axi_vote[i]
-					.axi_path[0].mnoc_ib_bw = 0;
-				top_priv->top_common.axi_vote_control[i] =
+				top_priv->req_axi_vote[i].compressed_bw = 0;
+				top_priv->req_axi_vote[i].uncompressed_bw = 0;
+				top_priv->axi_vote_control[i] =
 					CAM_VFE_BW_CONTROL_EXCLUDE;
 				break;
 			}
@@ -462,20 +821,12 @@ int cam_vfe_top_process_cmd(void *device_priv, uint32_t cmd_type,
 {
 	int rc = 0;
 	struct cam_vfe_top_ver2_priv            *top_priv;
-	struct cam_hw_soc_info                  *soc_info = NULL;
-	struct cam_vfe_soc_private              *soc_private = NULL;
 
 	if (!device_priv || !cmd_args) {
 		CAM_ERR(CAM_ISP, "Error! Invalid arguments");
 		return -EINVAL;
 	}
 	top_priv = (struct cam_vfe_top_ver2_priv *)device_priv;
-	soc_info = top_priv->common_data.soc_info;
-	soc_private = soc_info->soc_private;
-	if (!soc_private) {
-		CAM_ERR(CAM_ISP, "Error soc_private NULL");
-		return -EINVAL;
-	}
 
 	switch (cmd_type) {
 	case CAM_ISP_HW_CMD_GET_CHANGE_BASE:
@@ -494,16 +845,27 @@ int cam_vfe_top_process_cmd(void *device_priv, uint32_t cmd_type,
 			arg_size);
 		break;
 	case CAM_ISP_HW_CMD_BW_UPDATE:
-		rc = cam_vfe_top_bw_update(soc_private, &top_priv->top_common,
-			cmd_args, arg_size);
-		break;
-	case CAM_ISP_HW_CMD_BW_UPDATE_V2:
-		rc = cam_vfe_top_bw_update_v2(soc_private,
-			&top_priv->top_common, cmd_args, arg_size);
+		rc = cam_vfe_top_bw_update(top_priv, cmd_args,
+			arg_size);
 		break;
 	case CAM_ISP_HW_CMD_BW_CONTROL:
-		rc = cam_vfe_top_bw_control(soc_private, &top_priv->top_common,
+		rc = cam_vfe_top_bw_control(top_priv, cmd_args, arg_size);
+		break;
+	case CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP:
+		rc = cam_vfe_get_irq_register_dump(top_priv,
+				cmd_args, arg_size);
+		break;
+	case CAM_ISP_HW_CMD_FPS_CONFIG:
+		rc = cam_vfe_top_fps_config(top_priv, cmd_args,
+			arg_size);
+		break;
+	case CAM_ISP_HW_CMD_DUMP_HW:
+		rc = cam_vfe_hw_dump(top_priv,
 			cmd_args, arg_size);
+		break;
+	case CAM_ISP_HW_CMD_GET_RDI_IRQ_MASK:
+		rc = cam_vfe_top_mux_get_rdi_irq_mask(top_priv, cmd_args,
+			arg_size);
 		break;
 	default:
 		rc = -EINVAL;
@@ -518,13 +880,13 @@ int cam_vfe_top_ver2_init(
 	struct cam_hw_soc_info                 *soc_info,
 	struct cam_hw_intf                     *hw_intf,
 	void                                   *top_hw_info,
-	void                                   *vfe_irq_controller,
 	struct cam_vfe_top                    **vfe_top_ptr)
 {
 	int i, j, rc = 0;
 	struct cam_vfe_top_ver2_priv           *top_priv = NULL;
 	struct cam_vfe_top_ver2_hw_info        *ver2_hw_info = top_hw_info;
 	struct cam_vfe_top                     *vfe_top;
+	struct cam_vfe_soc_private             *soc_private = NULL;
 
 	vfe_top = kzalloc(sizeof(struct cam_vfe_top), GFP_KERNEL);
 	if (!vfe_top) {
@@ -541,68 +903,88 @@ int cam_vfe_top_ver2_init(
 		goto free_vfe_top;
 	}
 
+	soc_private = soc_info->soc_private;
+	if (!soc_private) {
+		CAM_ERR(CAM_ISP, "Error! soc_private NULL");
+		rc = -ENODEV;
+		goto free_vfe_top_priv;
+	}
 	vfe_top->top_priv = top_priv;
 	top_priv->hw_clk_rate = 0;
-	if (ver2_hw_info->num_mux > CAM_VFE_TOP_MUX_MAX) {
-		CAM_ERR(CAM_ISP, "Invalid number of input rsrc: %d, max: %d",
-			ver2_hw_info->num_mux, CAM_VFE_TOP_MUX_MAX);
-		rc = -EINVAL;
-		goto free_top_priv;
-	}
+	top_priv->applied_axi_vote.compressed_bw = 0;
+	top_priv->applied_axi_vote.uncompressed_bw = 0;
+	memset(top_priv->last_vote, 0x0, sizeof(struct cam_axi_vote) *
+		(CAM_VFE_TOP_VER2_MUX_MAX * CAM_CPAS_HANDLE_MAX *
+		CAM_VFE_DELAY_BW_REDUCTION_NUM_FRAMES));
+	top_priv->last_counter[0] = 0;
+	top_priv->last_counter[1] = 0;
 
-	top_priv->top_common.num_mux = ver2_hw_info->num_mux;
-
-	for (i = 0, j = 0; i < top_priv->top_common.num_mux; i++) {
-		top_priv->top_common.mux_rsrc[i].res_type =
-			CAM_ISP_RESOURCE_VFE_IN;
-		top_priv->top_common.mux_rsrc[i].hw_intf = hw_intf;
-		top_priv->top_common.mux_rsrc[i].res_state =
+	for (i = 0, j = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+		top_priv->mux_rsrc[i].res_type = CAM_ISP_RESOURCE_VFE_IN;
+		top_priv->mux_rsrc[i].hw_intf = hw_intf;
+		top_priv->mux_rsrc[i].res_state =
 			CAM_ISP_RESOURCE_STATE_AVAILABLE;
 		top_priv->req_clk_rate[i] = 0;
+		top_priv->req_axi_vote[i].compressed_bw = 0;
+		top_priv->req_axi_vote[i].uncompressed_bw = 0;
+		top_priv->axi_vote_control[i] = CAM_VFE_BW_CONTROL_EXCLUDE;
+
 
 		if (ver2_hw_info->mux_type[i] == CAM_VFE_CAMIF_VER_2_0) {
-			top_priv->top_common.mux_rsrc[i].res_id =
+			top_priv->mux_rsrc[i].res_id =
 				CAM_ISP_HW_VFE_IN_CAMIF;
+			top_priv->cpashdl_type[i] = CAM_CPAS_HANDLE_CAMIF;
 
 			rc = cam_vfe_camif_ver2_init(hw_intf, soc_info,
 				&ver2_hw_info->camif_hw_info,
-				&top_priv->top_common.mux_rsrc[i],
-				vfe_irq_controller);
+				&top_priv->mux_rsrc[i]);
 			if (rc)
 				goto deinit_resources;
 		} else if (ver2_hw_info->mux_type[i] ==
 			CAM_VFE_CAMIF_LITE_VER_2_0) {
-			top_priv->top_common.mux_rsrc[i].res_id =
-				CAM_ISP_HW_VFE_IN_PDLIB;
+			top_priv->mux_rsrc[i].res_id =
+				CAM_ISP_HW_VFE_IN_CAMIF_LITE;
+			if (soc_private->cpas_version ==
+				CAM_CPAS_TITAN_175_V120)
+				top_priv->cpashdl_type[i] =
+					CAM_CPAS_HANDLE_RAW;
+			else
+				top_priv->cpashdl_type[i] =
+					CAM_CPAS_HANDLE_CAMIF;
 
 			rc = cam_vfe_camif_lite_ver2_init(hw_intf, soc_info,
 				&ver2_hw_info->camif_lite_hw_info,
-				&top_priv->top_common.mux_rsrc[i],
-				vfe_irq_controller);
+				&top_priv->mux_rsrc[i]);
 
 			if (rc)
 				goto deinit_resources;
 		} else if (ver2_hw_info->mux_type[i] ==
 			CAM_VFE_RDI_VER_1_0) {
 			/* set the RDI resource id */
-			top_priv->top_common.mux_rsrc[i].res_id =
+			top_priv->mux_rsrc[i].res_id =
 				CAM_ISP_HW_VFE_IN_RDI0 + j++;
+			if (soc_private->cpas_version ==
+				CAM_CPAS_TITAN_175_V120)
+				top_priv->cpashdl_type[i] =
+					CAM_CPAS_HANDLE_RAW;
+			else
+				top_priv->cpashdl_type[i] =
+					CAM_CPAS_HANDLE_CAMIF;
 
 			rc = cam_vfe_rdi_ver2_init(hw_intf, soc_info,
 				&ver2_hw_info->rdi_hw_info,
-				&top_priv->top_common.mux_rsrc[i],
-				vfe_irq_controller);
+				&top_priv->mux_rsrc[i]);
 			if (rc)
 				goto deinit_resources;
 		} else if (ver2_hw_info->mux_type[i] ==
 			CAM_VFE_IN_RD_VER_1_0) {
 			/* set the RD resource id */
-			top_priv->top_common.mux_rsrc[i].res_id =
+			top_priv->mux_rsrc[i].res_id =
 				CAM_ISP_HW_VFE_IN_RD;
 
 			rc = cam_vfe_fe_ver1_init(hw_intf, soc_info,
 				&ver2_hw_info->fe_hw_info,
-				&top_priv->top_common.mux_rsrc[i]);
+				&top_priv->mux_rsrc[i]);
 			if (rc)
 				goto deinit_resources;
 		} else {
@@ -625,37 +1007,35 @@ int cam_vfe_top_ver2_init(
 
 	top_priv->common_data.soc_info     = soc_info;
 	top_priv->common_data.hw_intf      = hw_intf;
-	top_priv->top_common.hw_idx        = hw_intf->hw_idx;
 	top_priv->common_data.common_reg   = ver2_hw_info->common_reg;
+	top_priv->common_data.dump_data    = &ver2_hw_info->dump_data;
 
 	return rc;
 
 deinit_resources:
 	for (--i; i >= 0; i--) {
 		if (ver2_hw_info->mux_type[i] == CAM_VFE_CAMIF_VER_2_0) {
-			if (cam_vfe_camif_ver2_deinit(
-				&top_priv->top_common.mux_rsrc[i]))
+			if (cam_vfe_camif_ver2_deinit(&top_priv->mux_rsrc[i]))
 				CAM_ERR(CAM_ISP, "Camif Deinit failed");
 		} else if (ver2_hw_info->mux_type[i] ==
 			CAM_VFE_CAMIF_LITE_VER_2_0) {
 			if (cam_vfe_camif_lite_ver2_deinit(
-				&top_priv->top_common.mux_rsrc[i]))
+				&top_priv->mux_rsrc[i]))
 				CAM_ERR(CAM_ISP, "Camif lite deinit failed");
 		} else if (ver2_hw_info->mux_type[i] ==
-			CAM_VFE_IN_RD_VER_1_0) {
-			if (cam_vfe_fe_ver1_deinit(
-				&top_priv->top_common.mux_rsrc[i]))
-				CAM_ERR(CAM_ISP, "VFE FE deinit failed");
+			CAM_ISP_HW_VFE_IN_RDI0) {
+			if (cam_vfe_rdi_ver2_init(hw_intf, soc_info,
+				&ver2_hw_info->rdi_hw_info,
+				&top_priv->mux_rsrc[i]))
+				CAM_ERR(CAM_ISP, "RDI deinit failed");
 		} else {
-			if (cam_vfe_rdi_ver2_deinit(
-				&top_priv->top_common.mux_rsrc[i]))
+			if (cam_vfe_rdi_ver2_deinit(&top_priv->mux_rsrc[i]))
 				CAM_ERR(CAM_ISP, "RDI Deinit failed");
 		}
-		top_priv->top_common.mux_rsrc[i].res_state =
+		top_priv->mux_rsrc[i].res_state =
 			CAM_ISP_RESOURCE_STATE_UNAVAILABLE;
 	}
-
-free_top_priv:
+free_vfe_top_priv:
 	kfree(vfe_top->top_priv);
 free_vfe_top:
 	kfree(vfe_top);
@@ -687,33 +1067,30 @@ int cam_vfe_top_ver2_deinit(struct cam_vfe_top  **vfe_top_ptr)
 		goto free_vfe_top;
 	}
 
-	for (i = 0; i < top_priv->top_common.num_mux; i++) {
-		top_priv->top_common.mux_rsrc[i].res_state =
+	for (i = 0; i < CAM_VFE_TOP_VER2_MUX_MAX; i++) {
+		top_priv->mux_rsrc[i].res_state =
 			CAM_ISP_RESOURCE_STATE_UNAVAILABLE;
-		if (top_priv->top_common.mux_rsrc[i].res_type ==
+		if (top_priv->mux_rsrc[i].res_type ==
 			CAM_VFE_CAMIF_VER_2_0) {
-			rc = cam_vfe_camif_ver2_deinit(
-				&top_priv->top_common.mux_rsrc[i]);
+			rc = cam_vfe_camif_ver2_deinit(&top_priv->mux_rsrc[i]);
 			if (rc)
 				CAM_ERR(CAM_ISP, "Camif deinit failed rc=%d",
 					rc);
-		} else if (top_priv->top_common.mux_rsrc[i].res_type ==
+		} else if (top_priv->mux_rsrc[i].res_type ==
 			CAM_VFE_CAMIF_LITE_VER_2_0) {
 			rc = cam_vfe_camif_lite_ver2_deinit(
-				&top_priv->top_common.mux_rsrc[i]);
+				&top_priv->mux_rsrc[i]);
 			if (rc)
 				CAM_ERR(CAM_ISP,
 					"Camif lite deinit failed rc=%d", rc);
-		} else if (top_priv->top_common.mux_rsrc[i].res_type ==
+		} else if (top_priv->mux_rsrc[i].res_type ==
 			CAM_VFE_RDI_VER_1_0) {
-			rc = cam_vfe_rdi_ver2_deinit(
-				&top_priv->top_common.mux_rsrc[i]);
+			rc = cam_vfe_rdi_ver2_deinit(&top_priv->mux_rsrc[i]);
 			if (rc)
 				CAM_ERR(CAM_ISP, "RDI deinit failed rc=%d", rc);
-		} else if (top_priv->top_common.mux_rsrc[i].res_type ==
+		} else if (top_priv->mux_rsrc[i].res_type ==
 			CAM_VFE_IN_RD_VER_1_0) {
-			rc = cam_vfe_fe_ver1_deinit(
-				&top_priv->top_common.mux_rsrc[i]);
+			rc = cam_vfe_fe_ver1_deinit(&top_priv->mux_rsrc[i]);
 			if (rc)
 				CAM_ERR(CAM_ISP, "Camif deinit failed rc=%d",
 					rc);
@@ -728,3 +1105,4 @@ free_vfe_top:
 
 	return rc;
 }
+
