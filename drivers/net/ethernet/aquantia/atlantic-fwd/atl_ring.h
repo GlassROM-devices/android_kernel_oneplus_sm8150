@@ -141,6 +141,10 @@ static inline struct atl_hw *ring_hw(struct atl_desc_ring *ring)
 }
 
 void atl_init_qvec(struct atl_nic *nic, struct atl_queue_vec *qvec, int idx);
+int atl_alloc_qvec(struct atl_queue_vec *qvec);
+void atl_free_qvec(struct atl_queue_vec *qvec);
+int atl_start_qvec(struct atl_queue_vec *qvec);
+void atl_stop_qvec(struct atl_queue_vec *qvec);
 
 static inline int atl_qvec_intr(struct atl_queue_vec *qvec)
 {

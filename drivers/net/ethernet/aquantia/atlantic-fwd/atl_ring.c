@@ -1542,7 +1542,7 @@ static void atl_free_qvec_intr(struct atl_queue_vec *qvec)
 	free_irq(vector, &qvec->napi);
 }
 
-static int atl_alloc_qvec(struct atl_queue_vec *qvec)
+int atl_alloc_qvec(struct atl_queue_vec *qvec)
 {
 	struct atl_txbuf *txbuf;
 	int count = qvec->tx.hw.size;
@@ -1573,7 +1573,7 @@ free_irq:
 	return ret;
 }
 
-static void atl_free_qvec(struct atl_queue_vec *qvec)
+void atl_free_qvec(struct atl_queue_vec *qvec)
 {
 	struct atl_desc_ring *rx = &qvec->rx;
 	struct atl_desc_ring *tx = &qvec->tx;
@@ -1732,7 +1732,7 @@ static void atl_start_tx_ring(struct atl_desc_ring *ring)
 	atl_write(hw, ATL_TX_RING_CTL(ring), BIT(31) | ring->hw.size);
 }
 
-static int atl_start_qvec(struct atl_queue_vec *qvec)
+int atl_start_qvec(struct atl_queue_vec *qvec)
 {
 	struct atl_desc_ring *rx = &qvec->rx;
 	struct atl_desc_ring *tx = &qvec->tx;
@@ -1761,7 +1761,7 @@ static int atl_start_qvec(struct atl_queue_vec *qvec)
 	return 0;
 }
 
-static void atl_stop_qvec(struct atl_queue_vec *qvec)
+void atl_stop_qvec(struct atl_queue_vec *qvec)
 {
 	struct atl_desc_ring *rx = &qvec->rx;
 	struct atl_desc_ring *tx = &qvec->tx;
