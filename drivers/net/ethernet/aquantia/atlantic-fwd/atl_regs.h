@@ -74,6 +74,8 @@ enum mcp_scratchpad {
 	FW2_LINK_RES_LOW = 29,	/* 0x370 */
 	FW1_EFUSE_SHADOW = 30,
 	FW2_LINK_RES_HIGH = 30,	/* 0x374 */
+	FW3_EXT_REQ = 31,	/* 0x378 */
+	FW3_EXT_RES = 32,	/* 0x37c */
 	RBL_STS = 35,		/* 0x388 */
 };
 

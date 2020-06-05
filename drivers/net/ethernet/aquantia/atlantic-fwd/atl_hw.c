@@ -14,6 +14,7 @@
 
 #include "atl_common.h"
 #include "atl_hw.h"
+#include "atl_ptp.h"
 #include "atl_ring.h"
 #include "atl2_fw.h"
 
@@ -491,6 +492,9 @@ void atl_refresh_link(struct atl_nic *nic)
 			pm_runtime_put_sync(&nic->hw.pdev->dev);
 		}
 	}
+	if (nic->ptp)
+		atl_ptp_clock_init(nic);
+
 	atl_rx_xoff_set(hw, !!(hw->link_state.fc.cur & atl_fc_rx));
 
 	atl_intr_enable_non_ring(nic);

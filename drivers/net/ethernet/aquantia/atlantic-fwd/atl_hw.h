@@ -129,6 +129,7 @@ enum atl_nic_state {
 
 #define ATL_WAKE_SUPPORTED (WAKE_MAGIC | WAKE_PHY)
 struct atl_hw {
+	atomic_t flags;
 	uint8_t __iomem *regs;
 	struct pci_dev *pdev;
 	unsigned long state;
@@ -148,6 +149,7 @@ struct atl_hw {
 #if IS_ENABLED(CONFIG_MACSEC) && defined(NETIF_F_HW_MACSEC)
 	struct atl_macsec_cfg macsec_cfg;
 #endif
+	s64 ptp_clk_offset;
 };
 
 struct atl_hw_ring {

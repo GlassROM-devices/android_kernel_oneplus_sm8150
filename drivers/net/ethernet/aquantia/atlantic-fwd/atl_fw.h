@@ -96,6 +96,7 @@ enum atl_fw2_opts {
 
 enum atl_fw2_ex_caps {
 	atl_define_bit(atl_fw2_ex_caps_phy_ptp_en, 16)
+	atl_define_bit(atl_fw2_ex_caps_ptp_gpio_en, 20)
 	atl_define_bit(atl_fw2_ex_caps_wol_ex, 23)
 	atl_define_bit(atl_fw2_ex_caps_mac_heartbeat, 25)
 	atl_define_bit(atl_fw2_ex_caps_msm_settings_apply, 26)
@@ -173,6 +174,7 @@ struct atl_link_state{
 	bool autoneg;
 	bool eee;
 	bool eee_enabled;
+	bool ptp_available;
 	struct atl_link_type *link;
 	struct atl_fc_state fc;
 };
@@ -204,6 +206,34 @@ struct __packed macsec_msg_fw_response {
 	u32 result;
 };
 
+enum ptp_msg_type {
+	ptp_adj_freq_msg = 0x12,
+	ptp_adj_clock_msg = 0x13,
+};
+
+struct __packed ptp_adj_freq {
+	u32 ns_mac;
+	u32 fns_mac;
+	u32 ns_phy;
+	u32 fns_phy;
+	u32 mac_ns_adj;
+	u32 mac_fns_adj;
+};
+
+struct __packed ptp_adj_clock {
+	u32 ns;
+	u32 sec;
+	int sign;
+};
+
+struct __packed ptp_msg_fw_request {
+	u32 msg_id;
+	union {
+		struct ptp_adj_freq adj_freq;
+		struct ptp_adj_clock adj_clock;
+	};
+};
+
 struct atl_fw_ops {
 	void (*set_link)(struct atl_hw *hw, bool force);
 	struct atl_link_type *(*check_link)(struct atl_hw *hw);
@@ -224,6 +254,8 @@ struct atl_fw_ops {
 	int (*__get_hbeat)(struct atl_hw *hw, uint16_t *hbeat);
 	int (*get_mac_addr)(struct atl_hw *hw, uint8_t *buf);
 	int (*update_thermal)(struct atl_hw *hw);
+	int (*send_ptp_req)(struct atl_hw *hw, struct ptp_msg_fw_request *msg);
+	void (*set_ptp)(struct atl_hw *hw, bool on);
 	int (*deinit)(struct atl_hw *hw);
 };
 

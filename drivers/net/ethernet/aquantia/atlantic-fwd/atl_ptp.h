@@ -23,6 +23,7 @@ int atl_ptp_init(struct atl_nic *nic);
 
 void atl_ptp_unregister(struct atl_nic *nic);
 void atl_ptp_free(struct atl_nic *nic);
+void atl_ptp_clock_init(struct atl_nic *nic);
 
 #else
 
@@ -33,6 +34,7 @@ static inline int atl_ptp_init(struct atl_nic *nic)
 
 static inline void atl_ptp_unregister(struct atl_nic *nic) {}
 static inline void atl_ptp_free(struct atl_nic *nic) {}
+static inline void atl_ptp_clock_init(struct atl_nic *nic) {}
 
 #endif
 
