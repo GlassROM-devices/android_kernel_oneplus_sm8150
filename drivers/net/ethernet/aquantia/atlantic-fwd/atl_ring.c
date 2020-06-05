@@ -1306,6 +1306,27 @@ static void atl_calc_affinities(struct atl_nic *nic)
 	put_online_cpus();
 }
 
+void atl_init_qvec(struct atl_nic *nic, struct atl_queue_vec *qvec, int idx)
+{
+	qvec->nic = nic;
+	qvec->idx = idx;
+
+	qvec->rx.hw.reg_base = ATL_RX_RING(idx);
+	qvec->rx.hw.size = nic->requested_rx_size;
+	qvec->rx.nic = nic;
+	qvec->rx.qvec = qvec;
+
+	qvec->tx.hw.reg_base = ATL_TX_RING(idx);
+	qvec->tx.hw.size = nic->requested_tx_size;
+	qvec->tx.nic = nic;
+	qvec->tx.qvec = qvec;
+
+	u64_stats_init(&qvec->rx.syncp);
+	u64_stats_init(&qvec->tx.syncp);
+
+	netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
+}
+
 int atl_setup_datapath(struct atl_nic *nic)
 {
 	struct legacy_irq_work *irq_work = NULL;
@@ -1338,23 +1359,7 @@ int atl_setup_datapath(struct atl_nic *nic)
 		goto err_link_intr;
 
 	for (i = 0; i < nvecs; i++, qvec++) {
-		qvec->nic = nic;
-		qvec->idx = i;
-
-		qvec->rx.hw.reg_base = ATL_RX_RING(i);
-		qvec->rx.hw.size = nic->requested_rx_size;
-		qvec->rx.nic = nic;
-		qvec->rx.qvec = qvec;
-
-		qvec->tx.hw.reg_base = ATL_TX_RING(i);
-		qvec->tx.hw.size = nic->requested_tx_size;
-		qvec->tx.nic = nic;
-		qvec->tx.qvec = qvec;
-
-		u64_stats_init(&qvec->rx.syncp);
-		u64_stats_init(&qvec->tx.syncp);
-
-		netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
+		atl_init_qvec(nic, qvec, i);
 
 		if (unlikely(irq_work)) {
 			INIT_WORK(&irq_work[i].work, atl_ring_work);

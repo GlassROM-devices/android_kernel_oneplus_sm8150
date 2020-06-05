@@ -140,6 +140,8 @@ static inline struct atl_hw *ring_hw(struct atl_desc_ring *ring)
 	return &ring->nic->hw;
 }
 
+void atl_init_qvec(struct atl_nic *nic, struct atl_queue_vec *qvec, int idx);
+
 static inline int atl_qvec_intr(struct atl_queue_vec *qvec)
 {
 	return qvec->idx + ATL_NUM_NON_RING_IRQS;
