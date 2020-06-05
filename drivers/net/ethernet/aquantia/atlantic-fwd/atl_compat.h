@@ -17,6 +17,8 @@
 
 #include <linux/pci.h>
 #include <linux/msi.h>
+#include <linux/skbuff.h>
+#include <linux/netdevice.h>
 
 /* If the kernel is not RHEL / CentOS, then the 2 identifiers below will be
  * undefined. Define them this way to simplify the checks below.
