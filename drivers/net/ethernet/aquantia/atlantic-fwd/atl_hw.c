@@ -657,6 +657,9 @@ int atl_set_rss_tbl(struct atl_hw *hw)
 	return 0;
 }
 
+static unsigned int atl_ptp_rx_buf_reserve = 16;
+static unsigned int atl_ptp_tx_buf_reserve = 8;
+
 unsigned int atl_fwd_rx_buf_reserve =
 #ifdef CONFIG_ATLFWD_FWD_RXBUF
 	CONFIG_ATLFWD_FWD_RXBUF;
@@ -697,16 +700,20 @@ void atl_start_hw_global(struct atl_nic *nic)
 		tpb_size = 128;
 	}
 	/* Alloc TPB */
+	/* TC2: space for PTP */
+	tpb_size -= atl_ptp_tx_buf_reserve;
+	atl_write(hw, ATL_TX_PBUF_REG1(2), atl_ptp_tx_buf_reserve);
 	/* TC1: space for offload engine iface */
+	tpb_size -= atl_fwd_tx_buf_reserve;
 	atl_write(hw, ATL_TX_PBUF_REG1(1), atl_fwd_tx_buf_reserve);
 	atl_write(hw, ATL_TX_PBUF_REG2(1),
 		(atl_fwd_tx_buf_reserve * 32 * 66 / 100) << 16 |
 		(atl_fwd_tx_buf_reserve * 32 * 50 / 100));
 	/* TC0: 160k minus TC1 size */
-	atl_write(hw, ATL_TX_PBUF_REG1(0), tpb_size - atl_fwd_tx_buf_reserve);
+	atl_write(hw, ATL_TX_PBUF_REG1(0), tpb_size);
 	atl_write(hw, ATL_TX_PBUF_REG2(0),
-		((tpb_size - atl_fwd_tx_buf_reserve) * 32 * 66 / 100) << 16 |
-		((tpb_size - atl_fwd_tx_buf_reserve) * 32 * 50 / 100));
+		(tpb_size * 32 * 66 / 100) << 16 |
+		(tpb_size * 32 * 50 / 100));
 	/* 4-TC | Enable TPB */
 	atl_set_bits(hw, ATL_TX_PBUF_CTRL1, BIT(8) | BIT(0));
 	/* TX Buffer clk gate  off */
@@ -714,16 +721,22 @@ void atl_start_hw_global(struct atl_nic *nic)
 		atl_clear_bits(hw, ATL_TX_PBUF_CTRL1, BIT(5));
 
 	/* Alloc RPB */
+	/* TC2: space for PTP */
+	rpb_size -= atl_ptp_rx_buf_reserve;
+	atl_write(hw, ATL_RX_PBUF_REG1(2), atl_ptp_rx_buf_reserve);
+	/* No flow control for PTP */
+	atl_write_bit(hw, ATL_RX_PBUF_REG2(2), 31, 0);
 	/* TC1: space for offload engine iface */
+	rpb_size -= atl_fwd_rx_buf_reserve;
 	atl_write(hw, ATL_RX_PBUF_REG1(1), atl_fwd_rx_buf_reserve);
 	atl_write(hw, ATL_RX_PBUF_REG2(1), BIT(31) |
 		(atl_fwd_rx_buf_reserve * 32 * 66 / 100) << 16 |
 		(atl_fwd_rx_buf_reserve * 32 * 50 / 100));
 	/* TC1: 320k minus TC1 size */
-	atl_write(hw, ATL_RX_PBUF_REG1(0), rpb_size - atl_fwd_rx_buf_reserve);
+	atl_write(hw, ATL_RX_PBUF_REG1(0), rpb_size);
 	atl_write(hw, ATL_RX_PBUF_REG2(0), BIT(31) |
-		((rpb_size - atl_fwd_rx_buf_reserve) * 32 * 66 / 100) << 16 |
-		((rpb_size - atl_fwd_rx_buf_reserve) * 32 * 50 / 100));
+		(rpb_size * 32 * 66 / 100) << 16 |
+		(rpb_size * 32 * 50 / 100));
 	/* 4-TC | Enable RPB */
 	atl_set_bits(hw, ATL_RX_PBUF_CTRL1, BIT(8) | BIT(4) | BIT(0));
 

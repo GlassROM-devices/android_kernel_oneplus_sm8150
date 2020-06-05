@@ -15,15 +15,63 @@
 #include "atl_ptp.h"
 #include "atl_common.h"
 #include "atl_hw_ptp.h"
+#include "atl_ring.h"
+#include "atl_ring_desc.h"
+
+struct ptp_skb_ring {
+	struct sk_buff **buff;
+	spinlock_t lock;
+	unsigned int size;
+	unsigned int head;
+	unsigned int tail;
+};
+
+enum atl_ptp_queue {
+	ATL_PTPQ_PTP = 0,
+	ATL_PTPQ_HWTS = 1,
+	ATL_PTPQ_NUM,
+};
 
 #if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 
 struct atl_ptp {
 	struct atl_nic *nic;
 	spinlock_t ptp_lock;
+	spinlock_t ptp_ring_lock;
 	struct ptp_clock *ptp_clock;
 	struct ptp_clock_info ptp_info;
+
+	struct atl_queue_vec qvec[ATL_PTPQ_NUM];
+
+	struct ptp_skb_ring skb_ring;
 };
+
+#define atl_for_each_ptp_qvec(ptp, qvec)			\
+	for (qvec = &ptp->qvec[0];				\
+	     qvec < &ptp->qvec[ATL_PTPQ_NUM]; qvec++)
+
+static int atl_ptp_skb_ring_init(struct ptp_skb_ring *ring, unsigned int size)
+{
+	struct sk_buff **buff = kmalloc(sizeof(*buff) * size, GFP_KERNEL);
+
+	if (!buff)
+		return -ENOMEM;
+
+	spin_lock_init(&ring->lock);
+
+	ring->buff = buff;
+	ring->size = size;
+	ring->head = 0;
+	ring->tail = 0;
+
+	return 0;
+}
+
+static void atl_ptp_skb_ring_release(struct ptp_skb_ring *ring)
+{
+	kfree(ring->buff);
+	ring->buff = NULL;
+}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
 /* atl_ptp_adjfine
@@ -111,6 +159,126 @@ static int atl_ptp_settime(struct ptp_clock_info *ptp_info,
 	return 0;
 }
 
+#define PTP_8TC_RING_IDX             8
+#define PTP_4TC_RING_IDX            16
+#define PTP_HWTS_RING_IDX           31
+
+int atl_ptp_ring_index(enum atl_ptp_queue ptp_queue)
+{
+	switch (ptp_queue) {
+	case ATL_PTPQ_PTP:
+		/* multi-TC is not supported in FWD driver, so tc mode is
+		 * always set to 4 TCs (each with 8 queues) for now
+		 */
+		return PTP_4TC_RING_IDX;
+	case ATL_PTPQ_HWTS:
+		return PTP_HWTS_RING_IDX;
+	default:
+		break;
+	}
+
+	WARN_ONCE(1, "Invalid ptp_queue");
+	return 0;
+}
+
+int atl_ptp_qvec_intr(struct atl_queue_vec *qvec)
+{
+	int i;
+
+	for (i = 0; i != ATL_PTPQ_NUM; i++) {
+		if (qvec->idx == atl_ptp_ring_index(i))
+			return i + qvec->nic->nvecs + ATL_NUM_NON_RING_IRQS;
+	}
+
+	WARN_ONCE(1, "Not a PTP queue vector");
+	return ATL_NUM_NON_RING_IRQS;
+}
+
+int atl_ptp_ring_alloc(struct atl_nic *nic)
+{
+	struct atl_ptp *ptp = nic->ptp;
+	struct atl_queue_vec *qvec;
+	int err = 0;
+	int i;
+
+	if (!ptp)
+		return 0;
+
+	for (i = 0; i != ATL_PTPQ_NUM; i++) {
+		qvec = &ptp->qvec[i];
+
+		atl_init_qvec(nic, qvec, atl_ptp_ring_index(i));
+	}
+
+	atl_for_each_ptp_qvec(ptp, qvec) {
+		err = atl_alloc_qvec(qvec);
+		if (err)
+			goto free;
+	}
+
+	err = atl_ptp_skb_ring_init(&ptp->skb_ring, nic->requested_rx_size);
+	if (err != 0) {
+		err = -ENOMEM;
+		goto free;
+	}
+
+	return 0;
+
+free:
+	while (--qvec >= &ptp->qvec[0])
+		atl_free_qvec(qvec);
+
+	return err;
+}
+
+int atl_ptp_ring_start(struct atl_nic *nic)
+{
+	struct atl_ptp *ptp = nic->ptp;
+	struct atl_queue_vec *qvec;
+	int err = 0;
+
+	if (!ptp)
+		return 0;
+
+	atl_for_each_ptp_qvec(ptp, qvec) {
+		err = atl_start_qvec(qvec);
+		if (err)
+			goto stop;
+	}
+
+	return 0;
+
+stop:
+	while (--qvec >= &ptp->qvec[0])
+		atl_stop_qvec(qvec);
+
+	return err;
+}
+
+void atl_ptp_ring_stop(struct atl_nic *nic)
+{
+	struct atl_ptp *ptp = nic->ptp;
+	struct atl_queue_vec *qvec;
+
+	if (!ptp)
+		return;
+
+	atl_for_each_ptp_qvec(ptp, qvec)
+		atl_stop_qvec(qvec);
+}
+
+void atl_ptp_ring_free(struct atl_nic *nic)
+{
+	struct atl_ptp *ptp = nic->ptp;
+
+	if (!ptp)
+		return;
+
+	atl_free_qvec(&ptp->qvec[ATL_PTPQ_PTP]);
+
+	atl_ptp_skb_ring_release(&ptp->skb_ring);
+}
+
 static struct ptp_clock_info atl_ptp_clock = {
 	.owner		= THIS_MODULE,
 	.name		= "atlantic ptp",
@@ -167,7 +335,10 @@ int atl_ptp_init(struct atl_nic *nic)
 
 	ptp->nic = nic;
 
+	ptp->qvec[ATL_PTPQ_HWTS].is_hwts = true;
+
 	spin_lock_init(&ptp->ptp_lock);
+	spin_lock_init(&ptp->ptp_ring_lock);
 
 	ptp->ptp_info = atl_ptp_clock;
 	clock = ptp_clock_register(&ptp->ptp_info, &nic->ndev->dev);

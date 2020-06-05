@@ -726,6 +726,26 @@ static int atl_fill_rx(struct atl_desc_ring *ring, uint32_t count, bool atomic)
 	return ret;
 }
 
+static int atl_fill_hwts_rx(struct atl_desc_ring *ring, uint32_t count, bool atomic)
+{
+	struct atl_rx_desc *desc;
+
+	while (count) {
+		DECLARE_SCRATCH_DESC(scratch);
+
+		desc  = &DESC_PTR(ring, ring->tail, scratch)->rx;
+		desc->daddr = ring->hw.daddr + ring->hw.size * sizeof(*ring->hw.descs);
+		desc->haddr = 0;
+
+		COMMIT_DESC(ring, ring->tail, scratch);
+
+		bump_tail(ring, 1);
+		count--;
+	}
+
+	return 0;
+}
+
 static inline void atl_get_rxpage(struct atl_pgref *pgref)
 {
 	pgref->rxpage->mapcount++;
@@ -1276,6 +1296,8 @@ void atl_clear_datapath(struct atl_nic *nic)
 		netif_napi_del(&qvecs[i].napi);
 	}
 
+	atl_ptp_ring_stop(nic);
+
 	kfree(to_irq_work(qvecs[0].work));
 	kfree(qvecs);
 	nic->qvecs = NULL;
@@ -1324,7 +1346,8 @@ void atl_init_qvec(struct atl_nic *nic, struct atl_queue_vec *qvec, int idx)
 	u64_stats_init(&qvec->rx.syncp);
 	u64_stats_init(&qvec->tx.syncp);
 
-	netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
+	if (likely(!qvec->is_ptp))
+		netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
 }
 
 int atl_setup_datapath(struct atl_nic *nic)
@@ -1354,6 +1377,10 @@ int atl_setup_datapath(struct atl_nic *nic)
 		}
 	}
 
+	ret = atl_ptp_ring_start(nic);
+	if (ret < 0)
+		goto err_ptp_ring;
+
 	ret = atl_alloc_link_intr(nic);
 	if (ret)
 		goto err_link_intr;
@@ -1375,6 +1402,7 @@ int atl_setup_datapath(struct atl_nic *nic)
 	set_bit(ATL_ST_CONFIGURED, &nic->hw.state);
 	return 0;
 
+err_ptp_ring:
 err_link_intr:
 	kfree(irq_work);
 
@@ -1481,11 +1509,13 @@ static int atl_alloc_ring(struct atl_desc_ring *ring, size_t buf_size,
 		return ret;
 	}
 
-	ring->bufs = vzalloc(ring->hw.size * buf_size);
-	if (!ring->bufs) {
-		atl_nic_err("Couldn't alloc %s[%d] %sbufs\n", type, idx, type);
-		ret = -ENOMEM;
-		goto free;
+	if (likely(!ring->qvec->is_hwts)) {
+		ring->bufs = vzalloc(ring->hw.size * buf_size);
+		if (!ring->bufs) {
+			atl_nic_err("Couldn't alloc %s[%d] %sbufs\n", type, idx, type);
+			ret = -ENOMEM;
+			goto free;
+		}
 	}
 
 	ring->head = ring->tail =
@@ -1534,6 +1564,9 @@ static void atl_free_qvec_intr(struct atl_queue_vec *qvec)
 	struct atl_nic *nic = qvec->nic;
 	int vector;
 
+	if (unlikely(!nic))
+		return;
+
 	if (!(nic->flags & ATL_FL_MULTIPLE_VECTORS))
 		return;
 
@@ -1552,21 +1585,26 @@ int atl_alloc_qvec(struct atl_queue_vec *qvec)
 	if (ret)
 		return ret;
 
-	ret = atl_alloc_ring(&qvec->tx, sizeof(struct atl_txbuf), "tx");
-	if (ret)
-		goto free_irq;
+	if (likely(!qvec->is_hwts)) {
+		ret = atl_alloc_ring(&qvec->tx, sizeof(struct atl_txbuf), "tx");
+		if (ret)
+			goto free_irq;
+	}
 
 	ret = atl_alloc_ring(&qvec->rx, sizeof(struct atl_rxbuf), "rx");
 	if (ret)
 		goto free_tx;
 
-	for (txbuf = qvec->tx.txbufs; count; count--)
-		(txbuf++)->last = -1;
+	if (likely(!qvec->is_hwts)) {
+		for (txbuf = qvec->tx.txbufs; count; count--)
+			(txbuf++)->last = -1;
+	}
 
 	return 0;
 
 free_tx:
-	atl_free_ring(&qvec->tx);
+	if (likely(!qvec->is_hwts))
+		atl_free_ring(&qvec->tx);
 free_irq:
 	atl_free_qvec_intr(qvec);
 
@@ -1581,7 +1619,8 @@ void atl_free_qvec(struct atl_queue_vec *qvec)
 	atl_free_rx_bufs(rx);
 	atl_free_ring(rx);
 
-	atl_free_ring(tx);
+	if (likely(!qvec->is_hwts))
+		atl_free_ring(tx);
 	atl_free_qvec_intr(qvec);
 }
 
@@ -1660,22 +1699,28 @@ int atl_init_rx_ring(struct atl_desc_ring *rx)
 	if (rx->head > 0x1FFF)
 		return -EIO;
 
-	ret = atl_fill_rx(rx, ring_space(rx), false);
+	if (unlikely(rx->qvec->is_hwts))
+		ret = atl_fill_hwts_rx(rx, ring_space(rx), false);
+	else
+		ret = atl_fill_rx(rx, ring_space(rx), false);
+
 	if (ret)
 		return ret;
 
-	rx->next_to_recycle = rx->tail;
-	/* rxbuf at ->next_to_recycle is always kept empty so that
-	 * atl_maybe_recycle_rxbuf() always have a spot to recycle into
-	 * without overwriting a pgref to an already allocated page,
-	 * leaking memory. It's also the guard element in the ring
-	 * that keeps ->tail from overrunning ->head. If it's nonempty
-	 * on ring init (e.g. after a sleep-wake cycle) just release
-	 * the pages.
-	 */
-	rxbuf = &rx->rxbufs[rx->next_to_recycle];
-	atl_put_rxpage(&rxbuf->head, &hw->pdev->dev);
-	atl_put_rxpage(&rxbuf->data, &hw->pdev->dev);
+	if (likely(!rx->qvec->is_hwts)) {
+		rx->next_to_recycle = rx->tail;
+		/* rxbuf at ->next_to_recycle is always kept empty so that
+		 * atl_maybe_recycle_rxbuf() always have a spot to recycle into
+		 * without overwriting a pgref to an already allocated page,
+		 * leaking memory. It's also the guard element in the ring
+		 * that keeps ->tail from overrunning ->head. If it's nonempty
+		 * on ring init (e.g. after a sleep-wake cycle) just release
+		 * the pages.
+		 */
+		rxbuf = &rx->rxbufs[rx->next_to_recycle];
+		atl_put_rxpage(&rxbuf->head, &hw->pdev->dev);
+		atl_put_rxpage(&rxbuf->data, &hw->pdev->dev);
+	}
 
 	return 0;
 }
@@ -1743,19 +1788,23 @@ int atl_start_qvec(struct atl_queue_vec *qvec)
 	ret = atl_init_rx_ring(rx);
 	if (ret)
 		return ret;
-	ret = atl_init_tx_ring(tx);
-	if (ret)
-		return ret;
+	if (likely(!qvec->is_hwts)) {
+		ret = atl_init_tx_ring(tx);
+		if (ret)
+			return ret;
+	}
 
 	/* Map ring interrups into corresponding cause bit*/
 	atl_set_intr_bits(hw, qvec->idx, intr, intr);
 	atl_set_intr_throttle(qvec);
 
-	napi_enable(&qvec->napi);
+	if (likely(!qvec->is_ptp))
+		napi_enable(&qvec->napi);
 	atl_set_intr_mod_qvec(qvec);
-	atl_intr_enable(hw, BIT(atl_qvec_intr(qvec)));
+	atl_intr_enable(hw, BIT(intr));
 
-	atl_start_tx_ring(tx);
+	if (likely(!qvec->is_hwts))
+		atl_start_tx_ring(tx);
 	atl_start_rx_ring(rx);
 
 	return 0;
@@ -1769,16 +1818,21 @@ void atl_stop_qvec(struct atl_queue_vec *qvec)
 
 	/* Disable and reset rings */
 	atl_write(hw, ATL_RING_CTL(rx), BIT(25));
-	atl_write(hw, ATL_RING_CTL(tx), BIT(25));
+	if (likely(!qvec->is_hwts))
+		atl_write(hw, ATL_RING_CTL(tx), BIT(25));
 	udelay(10);
 	atl_write(hw, ATL_RING_CTL(rx), 0);
-	atl_write(hw, ATL_RING_CTL(tx), 0);
+	if (likely(!qvec->is_hwts))
+		atl_write(hw, ATL_RING_CTL(tx), 0);
 
 	atl_intr_disable(hw, BIT(atl_qvec_intr(qvec)));
-	napi_disable(&qvec->napi);
+	if (likely(!qvec->is_ptp))
+		napi_disable(&qvec->napi);
 
-	atl_clear_rx_bufs(rx);
-	atl_free_tx_bufs(tx);
+	if (likely(!qvec->is_hwts)) {
+		atl_clear_rx_bufs(rx);
+		atl_free_tx_bufs(tx);
+	}
 }
 
 static void atl_set_lro(struct atl_nic *nic)

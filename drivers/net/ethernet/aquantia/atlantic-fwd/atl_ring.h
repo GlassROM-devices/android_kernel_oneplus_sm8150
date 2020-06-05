@@ -17,6 +17,7 @@
 #include "atl_common.h"
 #include "atl_desc.h"
 #include "atl_ring_desc.h"
+#include "atl_ptp.h"
 
 //#define ATL_RINGS_IN_UC_MEM
 
@@ -128,6 +129,7 @@ struct ____cacheline_aligned atl_queue_vec {
 	unsigned idx;
 	char name[IFNAMSIZ + 10];
 	cpumask_t affinity_hint;
+	bool is_hwts;
 	struct work_struct *work;
 };
 
@@ -148,6 +150,11 @@ void atl_stop_qvec(struct atl_queue_vec *qvec);
 
 static inline int atl_qvec_intr(struct atl_queue_vec *qvec)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
+	if (unlikely(qvec->idx >= qvec->nic->nvecs))
+		return atl_ptp_qvec_intr(qvec);
+#endif
+
 	return qvec->idx + ATL_NUM_NON_RING_IRQS;
 }
 

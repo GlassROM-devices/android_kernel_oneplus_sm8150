@@ -603,6 +603,20 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_ptp_init;
 
+	ret = atl_ptp_ring_alloc(nic);
+	if (ret)
+		goto err_ptp_init;
+
+	if (test_bit(ATL_ST_CONFIGURED, &nic->hw.state)) {
+		/* Very first setup_datapath() is invoked a bit too early,
+		 * way before ptp rings are ready to be started,
+		 * make sure rings are started as they should here.
+		 */
+		ret = atl_ptp_ring_start(nic);
+		if (ret)
+			goto err_ptp_init;
+	}
+
 	if (hw->mcp.caps_low & atl_fw2_wake_on_link_force)
 		pm_runtime_put_noidle(&pdev->dev);
 
@@ -650,7 +664,14 @@ static void atl_remove(struct pci_dev *pdev)
 	atlfwd_nl_on_remove(nic->ndev);
 #endif
 
+	if (test_bit(ATL_ST_CONFIGURED, &nic->hw.state))
+		/* Last clear_datapath() is invoked a bit too late,
+		 * after ptp rings are already freed.
+		 * Make sure rings are stopped as they should here.
+		 */
+		atl_ptp_ring_stop(nic);
 	atl_ptp_unregister(nic);
+	atl_ptp_ring_free(nic);
 	atl_ptp_free(nic);
 
 	atl_stop(nic, true);
