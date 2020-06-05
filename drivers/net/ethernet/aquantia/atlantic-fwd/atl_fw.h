@@ -186,23 +186,23 @@ enum macsec_msg_type {
 	macsec_get_stats_msg,
 };
 
-struct macsec_cfg_request {
+struct __packed macsec_cfg_request {
 	u32 enabled;
 	u32 egress_threshold;
 	u32 ingress_threshold;
 	u32 interrupts_enabled;
-} __attribute__((__packed__));
+};
 
-struct macsec_msg_fw_request {
+struct __packed macsec_msg_fw_request {
 	u32 msg_id; /* not used */
 	u32 msg_type;
 
 	struct macsec_cfg_request cfg;
-} __attribute__((__packed__));
+};
 
-struct macsec_msg_fw_response {
+struct __packed macsec_msg_fw_response {
 	u32 result;
-} __attribute__((__packed__));
+};
 
 struct atl_fw_ops {
 	void (*set_link)(struct atl_hw *hw, bool force);
