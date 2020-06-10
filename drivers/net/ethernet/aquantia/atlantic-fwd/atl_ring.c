@@ -1512,7 +1512,8 @@ static int atl_alloc_qvec_intr(struct atl_queue_vec *qvec)
 		return 0;
 
 	vector = pci_irq_vector(nic->hw.pdev, atl_qvec_intr(qvec));
-	ret = request_irq(vector, atl_ring_irq, 0, qvec->name, &qvec->napi);
+	ret = request_irq(vector, atl_ring_irq, IRQF_NO_SUSPEND,
+			  qvec->name, &qvec->napi);
 	if (ret) {
 		atl_nic_err("request MSI ring vector failed: %d\n", -ret);
 		return ret;

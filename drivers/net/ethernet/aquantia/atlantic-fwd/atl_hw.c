@@ -557,8 +557,8 @@ int atl_alloc_link_intr(struct atl_nic *nic)
 	int ret;
 
 	if (nic->flags & ATL_FL_MULTIPLE_VECTORS) {
-		ret = request_irq(pci_irq_vector(pdev, 0), atl_link_irq, 0,
-				  nic->ndev->name, nic);
+		ret = request_irq(pci_irq_vector(pdev, 0), atl_link_irq,
+				  IRQF_NO_SUSPEND, nic->ndev->name, nic);
 		if (ret)
 			atl_nic_err("request MSI link vector failed: %d\n",
 				-ret);
