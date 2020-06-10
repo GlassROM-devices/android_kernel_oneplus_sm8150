@@ -2395,6 +2395,11 @@ static int dwc3_gadget_vbus_session(struct usb_gadget *_gadget, int is_active)
 	is_active = !!is_active;
 
 	dbg_event(0xFF, "VbusSess", is_active);
+
+	disable_irq(dwc->irq);
+
+	flush_work(&dwc->bh_work);
+
 	spin_lock_irqsave(&dwc->lock, flags);
 
 	/* Mark that the vbus was powered */
@@ -2431,6 +2436,7 @@ static int dwc3_gadget_vbus_session(struct usb_gadget *_gadget, int is_active)
 		dwc3_device_core_soft_reset(dwc);
 	}
 
+	enable_irq(dwc->irq);
 	return 0;
 }
 
