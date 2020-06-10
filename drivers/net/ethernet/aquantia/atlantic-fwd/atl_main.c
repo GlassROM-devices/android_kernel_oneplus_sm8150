@@ -682,6 +682,8 @@ static int atl_suspend_common(struct device *dev, unsigned int wol_mode)
 
 	atl_stop(nic, true);
 
+	atl_intr_disable_non_ring(nic);
+
 	atl_clear_rdm_cache(nic);
 	atl_clear_tdm_cache(nic);
 
