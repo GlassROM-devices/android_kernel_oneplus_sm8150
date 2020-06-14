@@ -182,6 +182,7 @@ do {								\
 int atl_init_rx_ring(struct atl_desc_ring *rx);
 int atl_init_tx_ring(struct atl_desc_ring *tx);
 
+netdev_tx_t atl_map_skb(struct sk_buff *skb, struct atl_desc_ring *ring);
 int atl_tx_full(struct atl_desc_ring *ring, int needed);
 
 typedef int (*rx_skb_handler_t)(struct atl_desc_ring *ring,

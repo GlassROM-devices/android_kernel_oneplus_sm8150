@@ -247,10 +247,6 @@ netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_desc_ring *ring = &nic->qvecs[skb->queue_mapping].tx;
-	unsigned int len = skb->len;
-	struct atl_tx_desc *desc;
-	struct atl_txbuf *txbuf;
-	uint32_t cmd_from_ctx;
 
 	if (nic->priv_flags & ATL_PF_BIT(LPB_NET_DMA))
 		return NETDEV_TX_BUSY;
@@ -267,6 +263,16 @@ netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		atl_update_ring_stat(ring, tx.tx_busy, 1);
 		return NETDEV_TX_BUSY;
 	}
+
+	return atl_map_skb(skb, ring);
+}
+
+netdev_tx_t atl_map_skb(struct sk_buff *skb, struct atl_desc_ring *ring)
+{
+	unsigned int len = skb->len;
+	struct atl_tx_desc *desc;
+	struct atl_txbuf *txbuf;
+	uint32_t cmd_from_ctx;
 
 	txbuf = &ring->txbufs[ring->tail];
 
