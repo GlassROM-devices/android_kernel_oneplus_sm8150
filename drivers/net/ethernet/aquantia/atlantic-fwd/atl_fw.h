@@ -110,6 +110,7 @@ enum atl_fw2_wol_ex {
 enum atl_fw2_stat_offt {
 	atl_fw2_stat_phy_hbeat = 0x4c,
 	atl_fw2_stat_temp = 0x50,
+	atl_fw2_stat_ptp_offset = 0x64,
 	atl_fw2_stat_lcaps = 0x84,
 	atl_fw2_stat_settings_addr = 0x10c,
 	atl_fw2_stat_settings_len = 0x110,
@@ -175,6 +176,7 @@ struct atl_link_state{
 	bool eee;
 	bool eee_enabled;
 	bool ptp_available;
+	bool ptp_datapath_up;
 	struct atl_link_type *link;
 	struct atl_fc_state fc;
 };
@@ -204,6 +206,19 @@ struct __packed macsec_msg_fw_request {
 
 struct __packed macsec_msg_fw_response {
 	u32 result;
+};
+
+struct __packed atl_ptp_offset_info {
+	u16 ingress_100;
+	u16 egress_100;
+	u16 ingress_1000;
+	u16 egress_1000;
+	u16 ingress_2500;
+	u16 egress_2500;
+	u16 ingress_5000;
+	u16 egress_5000;
+	u16 ingress_10000;
+	u16 egress_10000;
 };
 
 enum ptp_msg_type {

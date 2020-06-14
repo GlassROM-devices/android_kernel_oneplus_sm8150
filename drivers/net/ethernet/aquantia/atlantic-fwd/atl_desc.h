@@ -95,6 +95,15 @@ struct __packed atl_rx_desc_wb {
 	unsigned vlan_tag:16;   //112
 };
 
+struct __packed atl_rx_desc_hwts_wb {
+	u32 sec_hw;
+	u32 ns;
+	u32 dd:1;
+	u32 rsvd:1;
+	u32 sec_lw0:30;
+	u32 sec_lw1;
+};
+
 enum atl_rx_stat {
 	atl_rx_stat_mac_err = 1,
 	atl_rx_stat_ipv4_err = 2,
@@ -137,7 +146,10 @@ enum atl_rx_pkt_type {
 
 union __packed atl_desc {
 	struct atl_rx_desc rx;
-	struct atl_rx_desc_wb wb;
+	union {
+		struct atl_rx_desc_wb wb;
+		struct atl_rx_desc_hwts_wb hwts_wb;
+	};
 	struct atl_tx_ctx ctx;
 	struct atl_tx_desc tx;
 	uint8_t raw[16];

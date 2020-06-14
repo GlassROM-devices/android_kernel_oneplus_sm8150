@@ -24,6 +24,7 @@
 
 #include "atl_trace.h"
 #include "atl_fwdnl.h"
+#include "atl_hw_ptp.h"
 
 static inline uint32_t fetch_tx_head(struct atl_desc_ring *ring)
 {
@@ -248,6 +249,24 @@ netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_desc_ring *ring = &nic->qvecs[skb->queue_mapping].tx;
 
+	if (unlikely(nic->hw.link_state.ptp_datapath_up)) {
+		/* Hardware adds the Timestamp for PTPv2 802.AS1
+		 * and PTPv2 IPv4 UDP.
+		 * We have to push even general 320 port messages to the ptp
+		 * queue explicitly. This is a limitation of current firmware
+		 * and hardware PTP design of the chip. Otherwise ptp stream
+		 * will fail to sync
+		 */
+		if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) ||
+		    unlikely((ip_hdr(skb)->version == 4) &&
+			     (ip_hdr(skb)->protocol == IPPROTO_UDP) &&
+			     ((udp_hdr(skb)->dest == htons(319)) ||
+			      (udp_hdr(skb)->dest == htons(320)))) ||
+		    unlikely(eth_hdr(skb)->h_proto == htons(ETH_P_1588)))
+			return atl_ptp_start_xmit(nic, skb);
+	}
+
+	skb_tx_timestamp(skb);
 	if (nic->priv_flags & ATL_PF_BIT(LPB_NET_DMA))
 		return NETDEV_TX_BUSY;
 
@@ -384,14 +403,17 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 		}
 	} while (--budget);
 
-	u64_stats_update_begin(&ring->syncp);
-	ring->stats.tx.bytes += bytes;
-	ring->stats.tx.packets += packets;
-	u64_stats_update_end(&ring->syncp);
+	if (likely(!ring->qvec->is_ptp)) {
+		u64_stats_update_begin(&ring->syncp);
+		ring->stats.tx.bytes += bytes;
+		ring->stats.tx.packets += packets;
+		u64_stats_update_end(&ring->syncp);
+	}
 
 	WRITE_ONCE(ring->head, first);
 
-	if (ring_space(ring) > atl_tx_free_high) {
+	if (likely(!ring->qvec->is_ptp) &&
+	    ring_space(ring) > atl_tx_free_high) {
 		struct net_device *ndev = nic->ndev;
 
 		smp_mb();
@@ -558,10 +580,12 @@ void atl_rx_hash(struct sk_buff *skb, struct atl_rx_desc_wb *desc,
 
 static int atl_napi_receive_skb(struct atl_desc_ring *ring, struct sk_buff *skb)
 {
+	bool is_ptp_ring = atl_is_ptp_ring(ring->nic, ring);
 	struct net_device *ndev = ring->nic->ndev;
 	struct napi_struct *napi = &ring->qvec->napi;
 
-	skb_record_rx_queue(skb, ring->qvec->idx);
+	/* Send all PTP traffic to 0 queue */
+	skb_record_rx_queue(skb, is_ptp_ring ? 0 : ring->qvec->idx);
 	skb->protocol = eth_type_trans(skb, ndev);
 	napi_gro_receive(napi, skb);
 
@@ -971,6 +995,7 @@ static struct sk_buff *atl_process_rx_frag(struct atl_desc_ring *ring,
 	struct atl_cb *atl_cb;
 	struct atl_pgref *headref = &rxbuf->head, *dataref = &rxbuf->data;
 	struct device *dev = &ring->nic->hw.pdev->dev;
+	bool is_ptp_ring = atl_is_ptp_ring(ring->nic, ring);
 
 	if (unlikely(wb->rdm_err)) {
 		if (skb && skb != (void *)-1l)
@@ -991,6 +1016,10 @@ static struct sk_buff *atl_process_rx_frag(struct atl_desc_ring *ring,
 
 	hdr_len = wb->hdr_len;
 	data_len = atl_data_len(wb);
+	if (is_ptp_ring) {
+		data_len -= atl_ptp_extract_ts(ring->nic, skb, atl_buf_vaddr(dataref),
+					       data_len);
+	}
 
 	if (atl_rx_linear) {
 		/* Linear skb mode. The entire packet was DMA'd into
@@ -1164,6 +1193,42 @@ int atl_clean_rx(struct atl_desc_ring *ring, int budget,
 	ring->stats.rx.bytes += bytes;
 	ring->stats.rx.packets += packets;
 	u64_stats_update_end(&ring->syncp);
+
+	return packets;
+}
+
+int atl_clean_hwts_rx(struct atl_desc_ring *ring, int budget)
+{
+	unsigned int refill_batch =
+		min_t(typeof(atl_rx_refill_batch), atl_rx_refill_batch,
+		      ring->hw.size - 1);
+	unsigned int packets = 0;
+
+	while (packets < budget) {
+		uint32_t space = ring_space(ring);
+		struct atl_rx_desc_hwts_wb *wb;
+		struct atl_rxbuf *rxbuf;
+		u64 ns;
+		DECLARE_SCRATCH_DESC(scratch);
+
+		if (space >= refill_batch)
+			atl_fill_hwts_rx(ring, space, true);
+
+		rxbuf = &ring->rxbufs[ring->head];
+
+		wb = &DESC_PTR(ring, ring->head, scratch)->hwts_wb;
+		FETCH_DESC(ring, ring->head, scratch);
+
+		if (!wb->dd)
+			break;
+		DESC_RMB();
+
+		hw_atl_extract_hwts(&ring->nic->hw, wb, &ns);
+		atl_ptp_tx_hwtstamp(ring->nic, ns);
+
+		bump_head(ring, 1);
+		packets++;
+	}
 
 	return packets;
 }
@@ -1528,7 +1593,6 @@ static int atl_alloc_ring(struct atl_desc_ring *ring, size_t buf_size,
 	if (likely(!ring->qvec->is_hwts)) {
 		ring->bufs = vzalloc(ring->hw.size * buf_size);
 		if (!ring->bufs) {
-			atl_nic_err("Couldn't alloc %s[%d] %sbufs\n", type, idx, type);
 			ret = -ENOMEM;
 			goto free;
 		}
@@ -1597,9 +1661,15 @@ int atl_alloc_qvec(struct atl_queue_vec *qvec)
 	int count = qvec->tx.hw.size;
 	int ret;
 
-	ret = atl_alloc_qvec_intr(qvec);
-	if (ret)
-		return ret;
+	if (likely(!qvec->is_ptp)) {
+		ret = atl_alloc_qvec_intr(qvec);
+		if (ret)
+			return ret;
+	} else if (!qvec->is_hwts) {
+		ret = atl_ptp_irq_alloc(qvec->nic);
+		if (ret)
+			return ret;
+	}
 
 	if (likely(!qvec->is_hwts)) {
 		ret = atl_alloc_ring(&qvec->tx, sizeof(struct atl_txbuf), "tx");
@@ -1622,7 +1692,10 @@ free_tx:
 	if (likely(!qvec->is_hwts))
 		atl_free_ring(&qvec->tx);
 free_irq:
-	atl_free_qvec_intr(qvec);
+	if (likely(!qvec->is_ptp))
+		atl_free_qvec_intr(qvec);
+	else if (!qvec->is_hwts)
+		atl_ptp_irq_free(qvec->nic);
 
 	return ret;
 }
@@ -1637,7 +1710,11 @@ void atl_free_qvec(struct atl_queue_vec *qvec)
 
 	if (likely(!qvec->is_hwts))
 		atl_free_ring(tx);
-	atl_free_qvec_intr(qvec);
+
+	if (likely(!qvec->is_ptp))
+		atl_free_qvec_intr(qvec);
+	else if (!qvec->is_hwts)
+		atl_ptp_irq_free(qvec->nic);
 }
 
 int atl_alloc_rings(struct atl_nic *nic)

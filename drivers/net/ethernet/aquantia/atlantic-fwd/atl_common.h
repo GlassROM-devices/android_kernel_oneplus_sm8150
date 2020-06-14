@@ -194,7 +194,11 @@ struct atl_queue_vec;
 #define ATL_FWD_RING_BASE ATL_MAX_QUEUES /* Use TC 1 for offload
 					  * engine rings */
 #define ATL_NUM_MSI_VECS 32
-#define ATL_NUM_NON_RING_IRQS 1
+enum {
+	ATL_IRQ_LINK = 0,
+	ATL_IRQ_PTP,
+	ATL_NUM_NON_RING_IRQS,
+};
 
 #define ATL_RXF_RING_ANY 32
 

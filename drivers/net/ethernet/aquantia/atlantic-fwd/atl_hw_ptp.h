@@ -14,9 +14,15 @@
 
 #include "atl_hw.h"
 
+struct atl_rx_desc_hwts_wb;
+
 void hw_atl_get_ptp_ts(struct atl_hw *hw, u64 *stamp);
 int hw_atl_adj_sys_clock(struct atl_hw *hw, s64 delta);
 int hw_atl_set_sys_clock(struct atl_hw *hw, u64 time, u64 ts);
 int hw_atl_adj_clock_freq(struct atl_hw *hw, s32 ppb);
+u16 hw_atl_rx_extract_ts(struct atl_hw *hw, u8 *p, unsigned int len,
+			 u64 *timestamp);
+int hw_atl_extract_hwts(struct atl_hw *hw, struct atl_rx_desc_hwts_wb *hwts_wb,
+			u64 *timestamp);
 
 #endif

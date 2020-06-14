@@ -129,6 +129,7 @@ struct ____cacheline_aligned atl_queue_vec {
 	unsigned idx;
 	char name[IFNAMSIZ + 10];
 	cpumask_t affinity_hint;
+	bool is_ptp;
 	bool is_hwts;
 	struct work_struct *work;
 };
@@ -190,6 +191,7 @@ typedef int (*rx_skb_handler_t)(struct atl_desc_ring *ring,
 				struct sk_buff *skb);
 int atl_clean_rx(struct atl_desc_ring *ring, int budget,
 		 rx_skb_handler_t rx_skb_func);
+int atl_clean_hwts_rx(struct atl_desc_ring *ring, int budget);
 void atl_clear_rx_bufs(struct atl_desc_ring *ring);
 
 #ifdef ATL_RINGS_IN_UC_MEM

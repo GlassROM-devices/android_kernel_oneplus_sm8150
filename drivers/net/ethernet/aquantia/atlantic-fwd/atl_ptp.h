@@ -25,15 +25,31 @@ int atl_ptp_init(struct atl_nic *nic);
 void atl_ptp_unregister(struct atl_nic *nic);
 void atl_ptp_free(struct atl_nic *nic);
 
+int atl_ptp_irq_alloc(struct atl_nic *nic);
+void atl_ptp_irq_free(struct atl_nic *nic);
+
 int atl_ptp_ring_alloc(struct atl_nic *nic);
 void atl_ptp_ring_free(struct atl_nic *nic);
 
 int atl_ptp_ring_start(struct atl_nic *nic);
 void atl_ptp_ring_stop(struct atl_nic *nic);
 
+void atl_ptp_work(struct atl_nic *nic);
+
+void atl_ptp_tm_offset_set(struct atl_nic *nic, unsigned int mbps);
+
 void atl_ptp_clock_init(struct atl_nic *nic);
 
 int atl_ptp_qvec_intr(struct atl_queue_vec *qvec);
+
+/* Traffic processing functions */
+netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff *skb);
+void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp);
+
+/* Return whether ring belongs to PTP or not*/
+bool atl_is_ptp_ring(struct atl_nic *nic, struct atl_desc_ring *ring);
+u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb, u8 *p,
+		       unsigned int len);
 
 #else
 
@@ -44,6 +60,13 @@ static inline int atl_ptp_init(struct atl_nic *nic)
 
 static inline void atl_ptp_unregister(struct atl_nic *nic) {}
 static inline void atl_ptp_free(struct atl_nic *nic) {}
+
+static inline int atl_ptp_irq_alloc(struct atl_nic *nic)
+{
+	return 0;
+}
+
+static inline void atl_ptp_irq_free(struct atl_nic *nic) {}
 
 static inline int atl_ptp_ring_alloc(struct atl_nic *nic)
 {
@@ -59,7 +82,29 @@ static inline int atl_ptp_ring_start(struct atl_nic *nic)
 
 static inline void atl_ptp_ring_stop(struct atl_nic *nic) {}
 
+static inline void atl_ptp_work(struct atl_nic *nic) {}
+
+static inline void atl_ptp_tm_offset_set(struct atl_nic *nic, unsigned int mbps) {}
+
 static inline void atl_ptp_clock_init(struct atl_nic *nic) {}
+
+static inline netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff *skb)
+{
+	return NETDEV_TX_OK;
+}
+
+static inline void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp) {}
+
+static inline bool atl_is_ptp_ring(struct atl_nic *nic, struct atl_desc_ring *ring)
+{
+	return false;
+}
+
+static inline u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb,
+				     u8 *p, unsigned int len)
+{
+	return 0;
+}
 
 #endif
 

@@ -373,6 +373,8 @@ static void atl_work(struct work_struct *work)
 	struct atl_hw *hw = &nic->hw;
 	int ret;
 
+	atl_ptp_work(nic);
+
 	clear_bit(ATL_ST_WORK_SCHED, &hw->state);
 
 	atl_fw_watchdog(hw);

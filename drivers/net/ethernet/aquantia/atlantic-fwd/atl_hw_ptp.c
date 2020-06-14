@@ -10,6 +10,7 @@
  */
 
 #include "atl_hw_ptp.h"
+#include "atl_desc.h"
 
 #define FRAC_PER_NS 0x100000000LL
 
@@ -135,4 +136,58 @@ int hw_atl_adj_clock_freq(struct atl_hw *hw, s32 ppb)
 				     ATL_HW_MAC_COUNTER_HZ);
 
 	return mcp->ops->send_ptp_req(hw, &fwreq);
+}
+
+u16 hw_atl_rx_extract_ts(struct atl_hw *hw, u8 *p, unsigned int len,
+			 u64 *timestamp)
+{
+	unsigned int offset = 14;
+	struct ethhdr *eth;
+	u64 sec;
+	u8 *ptr;
+	u32 ns;
+
+	if (len <= offset || !timestamp)
+		return 0;
+
+	/* The TIMESTAMP in the end of package has following format:
+	 * (big-endian)
+	 *   struct {
+	 *     uint64_t sec;
+	 *     uint32_t ns;
+	 *     uint16_t stream_id;
+	 *   };
+	 */
+	ptr = p + (len - offset);
+	memcpy(&sec, ptr, sizeof(sec));
+	ptr += sizeof(sec);
+	memcpy(&ns, ptr, sizeof(ns));
+
+	sec = be64_to_cpu(sec) & 0xffffffffffffllu;
+	ns = be32_to_cpu(ns);
+	*timestamp = sec * NSEC_PER_SEC + ns + hw->ptp_clk_offset;
+
+	eth = (struct ethhdr *)p;
+
+	return (eth->h_proto == htons(ETH_P_1588)) ? 12 : 14;
+}
+
+int hw_atl_extract_hwts(struct atl_hw *hw, struct atl_rx_desc_hwts_wb *hwts_wb,
+			u64 *timestamp)
+{
+	u64 tmp, sec, ns;
+
+	sec = 0;
+	tmp = hwts_wb->sec_lw0 & 0x3ff;
+	sec += tmp;
+	tmp = (u64)((hwts_wb->sec_lw1 >> 16) & 0xffff) << 10;
+	sec += tmp;
+	tmp = (u64)(hwts_wb->sec_hw & 0xfff) << 26;
+	sec += tmp;
+	tmp = (u64)((hwts_wb->sec_hw >> 22) & 0x3ff) << 38;
+	sec += tmp;
+	ns = sec * NSEC_PER_SEC + hwts_wb->ns;
+	if (timestamp)
+		*timestamp = ns + hw->ptp_clk_offset;
+	return 0;
 }
