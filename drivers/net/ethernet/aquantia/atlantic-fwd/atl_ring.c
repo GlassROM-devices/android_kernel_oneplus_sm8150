@@ -1181,11 +1181,18 @@ static void atl_set_intr_throttle(struct atl_queue_vec *qvec)
 static int atl_poll(struct napi_struct *napi, int budget)
 {
 	struct atl_queue_vec *qvec;
+
+	qvec = container_of(napi, struct atl_queue_vec, napi);
+
+	return atl_poll_qvec(qvec, budget);
+}
+
+int atl_poll_qvec(struct atl_queue_vec *qvec, int budget)
+{
 	struct atl_nic *nic;
 	bool clean_done;
 	int rx_cleaned;
 
-	qvec = container_of(napi, struct atl_queue_vec, napi);
 	nic = qvec->nic;
 
 	clean_done = atl_clean_tx(&qvec->tx);
@@ -1196,7 +1203,7 @@ static int atl_poll(struct napi_struct *napi, int budget)
 	if (!clean_done)
 		return budget;
 
-	napi_complete_done(napi, rx_cleaned);
+	napi_complete_done(&qvec->napi, rx_cleaned);
 	atl_intr_enable(&nic->hw, BIT(atl_qvec_intr(qvec)));
 	/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
 	return rx_cleaned;

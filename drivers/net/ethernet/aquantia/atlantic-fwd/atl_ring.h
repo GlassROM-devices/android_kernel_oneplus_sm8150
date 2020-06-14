@@ -147,6 +147,7 @@ int atl_alloc_qvec(struct atl_queue_vec *qvec);
 void atl_free_qvec(struct atl_queue_vec *qvec);
 int atl_start_qvec(struct atl_queue_vec *qvec);
 void atl_stop_qvec(struct atl_queue_vec *qvec);
+int atl_poll_qvec(struct atl_queue_vec *qvec, int budget);
 
 static inline int atl_qvec_intr(struct atl_queue_vec *qvec)
 {
