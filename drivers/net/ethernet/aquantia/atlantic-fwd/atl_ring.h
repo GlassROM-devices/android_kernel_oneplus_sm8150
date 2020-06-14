@@ -182,6 +182,8 @@ do {								\
 int atl_init_rx_ring(struct atl_desc_ring *rx);
 int atl_init_tx_ring(struct atl_desc_ring *tx);
 
+int atl_tx_full(struct atl_desc_ring *ring, int needed);
+
 typedef int (*rx_skb_handler_t)(struct atl_desc_ring *ring,
 				struct sk_buff *skb);
 int atl_clean_rx(struct atl_desc_ring *ring, int budget,

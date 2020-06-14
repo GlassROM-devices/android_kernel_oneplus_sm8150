@@ -34,7 +34,7 @@ static inline uint32_t fetch_tx_head(struct atl_desc_ring *ring)
 #endif
 }
 
-static int tx_full(struct atl_desc_ring *ring, int needed)
+int atl_tx_full(struct atl_desc_ring *ring, int needed)
 {
 	struct atl_nic *nic = ring->nic;
 
@@ -160,7 +160,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 	ring->tail = idx;
 
 	/* Stop queue if no space for another packet */
-	tx_full(ring, atl_tx_free_low);
+	atl_tx_full(ring, atl_tx_free_low);
 
 	/* Delay bumping the HW tail if another packet is pending and
 	 * there's space for it.
@@ -263,7 +263,7 @@ netdev_tx_t atl_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		return atlfwd_nl_xmit(skb, ndev);
 #endif
 
-	if (tx_full(ring, skb_shinfo(skb)->nr_frags + 4)) {
+	if (atl_tx_full(ring, skb_shinfo(skb)->nr_frags + 4)) {
 		atl_update_ring_stat(ring, tx.tx_busy, 1);
 		return NETDEV_TX_BUSY;
 	}
