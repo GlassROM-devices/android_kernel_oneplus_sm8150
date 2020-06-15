@@ -12,6 +12,8 @@
 #ifndef ATL_PTP_H
 #define ATL_PTP_H
 
+#include <linux/net_tstamp.h>
+
 #include "atl_compat.h"
 
 struct atl_nic;
@@ -45,6 +47,12 @@ int atl_ptp_qvec_intr(struct atl_queue_vec *qvec);
 /* Traffic processing functions */
 netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff *skb);
 void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp);
+
+/* Check for PTP availability before calling! */
+void atl_ptp_hwtstamp_config_get(struct atl_nic *nic,
+				 struct hwtstamp_config *config);
+int atl_ptp_hwtstamp_config_set(struct atl_nic *nic,
+				struct hwtstamp_config *config);
 
 /* Return whether ring belongs to PTP or not*/
 bool atl_is_ptp_ring(struct atl_nic *nic, struct atl_desc_ring *ring);
@@ -94,6 +102,15 @@ static inline netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff
 }
 
 static inline void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp) {}
+
+static inline void atl_ptp_hwtstamp_config_get(struct atl_ptp *ptp,
+					       struct hwtstamp_config *config) {}
+
+static inline int atl_ptp_hwtstamp_config_set(struct atl_ptp *ptp,
+					      struct hwtstamp_config *config)
+{
+	return 0;
+}
 
 static inline bool atl_is_ptp_ring(struct atl_nic *nic, struct atl_desc_ring *ring)
 {

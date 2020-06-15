@@ -187,6 +187,86 @@ static int atl_change_mtu(struct net_device *ndev, int mtu)
 
 #endif
 
+static int atl_hwtstamp_config(struct atl_nic *nic, struct hwtstamp_config *config)
+{
+	if (config->flags)
+		return -EINVAL;
+
+	switch (config->tx_type) {
+	case HWTSTAMP_TX_OFF:
+	case HWTSTAMP_TX_ON:
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	switch (config->rx_filter) {
+	case HWTSTAMP_FILTER_PTP_V2_L4_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_L4_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_L2_EVENT:
+	case HWTSTAMP_FILTER_PTP_V2_L2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ:
+	case HWTSTAMP_FILTER_PTP_V2_SYNC:
+	case HWTSTAMP_FILTER_PTP_V2_DELAY_REQ:
+		config->rx_filter = HWTSTAMP_FILTER_PTP_V2_EVENT;
+		break;
+	case HWTSTAMP_FILTER_PTP_V2_EVENT:
+	case HWTSTAMP_FILTER_NONE:
+		break;
+	default:
+		return -ERANGE;
+	}
+
+	return atl_ptp_hwtstamp_config_set(nic, config);
+}
+
+static int atl_hwtstamp_set(struct atl_nic *nic, struct ifreq *ifr)
+{
+	struct hwtstamp_config config;
+	int err;
+
+	if (!nic->ptp)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&config, ifr->ifr_data, sizeof(config)))
+		return -EFAULT;
+
+	err = atl_hwtstamp_config(nic, &config);
+	if (err)
+		return err;
+
+	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
+	       -EFAULT : 0;
+}
+
+static int atl_hwtstamp_get(struct atl_nic *nic, struct ifreq *ifr)
+{
+	struct hwtstamp_config config;
+
+	if (!nic->ptp)
+		return -EOPNOTSUPP;
+
+	atl_ptp_hwtstamp_config_get(nic, &config);
+	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
+	       -EFAULT : 0;
+}
+
+static int atl_ndo_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
+{
+	struct atl_nic *nic = netdev_priv(ndev);
+
+	switch (cmd) {
+	case SIOCSHWTSTAMP:
+		return atl_hwtstamp_set(nic, ifr);
+
+	case SIOCGHWTSTAMP:
+		return atl_hwtstamp_get(nic, ifr);
+	}
+
+	return -EOPNOTSUPP;
+}
+
 static int atl_set_mac_address(struct net_device *ndev, void *priv)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
@@ -219,6 +299,7 @@ static const struct net_device_ops atl_ndev_ops = {
 	.ndo_change_mtu = atl_change_mtu,
 #endif
 	.ndo_set_features = atl_set_features,
+	.ndo_do_ioctl = atl_ndo_ioctl,
 	.ndo_set_mac_address = atl_set_mac_address,
 #ifdef ATL_COMPAT_CAST_NDO_GET_STATS64
 	.ndo_get_stats64 = (void *)atl_get_stats64,

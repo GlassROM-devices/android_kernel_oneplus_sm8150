@@ -10,6 +10,7 @@
  */
 
 #include <linux/ptp_clock_kernel.h>
+#include <linux/ptp_classify.h>
 #include <linux/clocksource.h>
 
 #include "atl_ptp.h"
@@ -54,6 +55,7 @@ enum atl_ptp_queue {
 
 struct atl_ptp {
 	struct atl_nic *nic;
+	struct hwtstamp_config hwtstamp_config;
 	spinlock_t ptp_lock;
 	spinlock_t ptp_ring_lock;
 	struct ptp_clock *ptp_clock;
@@ -392,6 +394,57 @@ static void atl_ptp_rx_hwtstamp(struct atl_ptp *ptp, struct sk_buff *skb,
 {
 	timestamp -= atomic_read(&ptp->offset_ingress);
 	atl_ptp_convert_to_hwtstamp(skb_hwtstamps(skb), timestamp);
+}
+
+void atl_ptp_hwtstamp_config_get(struct atl_nic *nic,
+				 struct hwtstamp_config *config)
+{
+	struct atl_ptp *ptp = nic->ptp;
+
+	*config = ptp->hwtstamp_config;
+}
+
+int atl_ptp_hwtstamp_config_set(struct atl_nic *nic,
+				struct hwtstamp_config *config)
+{
+	struct atl_ptp *ptp = nic->ptp;
+	static u32 ntuple_cmd =
+		ATL_NTC_PROTO |
+		ATL_NTC_L4_UDP |
+		ATL_NTC_DP |
+		ATL_RXF_ACT_TOHOST |
+		ATL_NTC_RXQ;
+	u32 ntuple_vec_idx =
+		((ptp->qvec[ATL_PTPQ_PTP].idx << ATL_NTC_RXQ_SHIFT) & ATL_NTC_RXQ_MASK);
+	static u32 etype_cmd =
+		ETH_P_1588 |
+		ATL_RXF_ACT_TOHOST |
+		ATL_ETYPE_RXQ;
+	u32 etype_vec_idx =
+		((ptp->qvec[ATL_PTPQ_PTP].idx << ATL_ETYPE_RXQ_SHIFT) & ATL_ETYPE_RXQ_MASK);
+
+	if (config->tx_type == HWTSTAMP_TX_ON ||
+	    config->rx_filter == HWTSTAMP_FILTER_PTP_V2_EVENT) {
+		atl_write(&nic->hw, ATL_NTUPLE_DPORT(ptp->udp_filter_idx),
+			  PTP_EV_PORT);
+		atl_write(&nic->hw, ATL_NTUPLE_CTRL(ptp->udp_filter_idx),
+			  ATL_NTC_EN | ntuple_cmd | ntuple_vec_idx);
+
+		atl_write(&nic->hw, ATL_RX_ETYPE_FLT(ptp->eth_type_filter_idx),
+			  ATL_ETYPE_EN | etype_cmd | etype_vec_idx);
+
+		nic->hw.link_state.ptp_datapath_up = true;
+	} else {
+		atl_write(&nic->hw, ATL_NTUPLE_CTRL(ptp->udp_filter_idx), ntuple_cmd);
+
+		atl_write(&nic->hw, ATL_RX_ETYPE_FLT(ptp->eth_type_filter_idx), 0);
+
+		nic->hw.link_state.ptp_datapath_up = false;
+	}
+
+	ptp->hwtstamp_config = *config;
+
+	return 0;
 }
 
 #define PTP_8TC_RING_IDX             8
