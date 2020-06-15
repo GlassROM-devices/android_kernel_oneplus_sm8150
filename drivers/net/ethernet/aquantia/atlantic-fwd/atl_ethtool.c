@@ -12,6 +12,7 @@
 #include <linux/ethtool.h>
 #include <linux/pm_runtime.h>
 
+#include "atl_ethtool.h"
 #include "atl_common.h"
 #include "atl_mdio.h"
 #include "atl_ring.h"
@@ -2357,7 +2358,7 @@ static void atl_rxf_update_flex(struct atl_nic *nic, int idx)
 	}
 }
 
-static const struct atl_rxf_flt_desc atl_rxf_descs[] = {
+static struct atl_rxf_flt_desc atl_rxf_descs[] = {
 	{
 		.base = ATL_RXF_VLAN_BASE,
 		.max = ATL_RXF_VLAN_MAX,
@@ -2404,6 +2405,46 @@ static const struct atl_rxf_flt_desc atl_rxf_descs[] = {
 		.update_rxf = atl_rxf_update_flex,
 	},
 };
+
+s8 atl_reserve_filter(enum atl_rxf_type type)
+{
+	switch (type) {
+	case ATL_RXF_ETYPE:
+		WARN_ONCE(atl_rxf_descs[type].max != ATL_RXF_ETYPE_MAX,
+			  "already reserved");
+		atl_rxf_descs[type].max--;
+		return atl_rxf_descs[type].max;
+	case ATL_RXF_NTUPLE:
+		WARN_ONCE(atl_rxf_descs[type].max != ATL_RXF_NTUPLE_MAX,
+			  "already reserved");
+		atl_rxf_descs[type].max--;
+		return atl_rxf_descs[type].max;
+	default:
+		WARN_ONCE(true, "unexpected type");
+		break;
+	}
+
+	return -1;
+}
+
+void atl_release_filter(enum atl_rxf_type type)
+{
+	switch (type) {
+	case ATL_RXF_ETYPE:
+		WARN_ONCE(atl_rxf_descs[type].max == ATL_RXF_ETYPE_MAX,
+			  "already released");
+		atl_rxf_descs[type].max++;
+		break;
+	case ATL_RXF_NTUPLE:
+		WARN_ONCE(atl_rxf_descs[type].max == ATL_RXF_NTUPLE_MAX,
+			  "already released");
+		atl_rxf_descs[type].max++;
+		break;
+	default:
+		WARN_ONCE(true, "unexpected type");
+		break;
+	}
+}
 
 static uint32_t *atl_rxf_cmd(const struct atl_rxf_flt_desc *desc,
 	struct atl_nic *nic)

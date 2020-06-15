@@ -14,6 +14,7 @@
 
 #include "atl_ptp.h"
 #include "atl_common.h"
+#include "atl_ethtool.h"
 #include "atl_hw_ptp.h"
 #include "atl_ring.h"
 #include "atl_ring_desc.h"
@@ -69,6 +70,9 @@ struct atl_ptp {
 	struct atl_queue_vec qvec[ATL_PTPQ_NUM];
 
 	struct ptp_skb_ring skb_ring;
+
+	s8 udp_filter_idx;
+	s8 eth_type_filter_idx;
 };
 
 #define atl_for_each_ptp_qvec(ptp, qvec)			\
@@ -794,6 +798,9 @@ int atl_ptp_init(struct atl_nic *nic)
 	mcp->ops->set_ptp(&nic->hw, true);
 	atl_ptp_clock_init(nic);
 
+	ptp->eth_type_filter_idx = atl_reserve_filter(ATL_RXF_ETYPE);
+	ptp->udp_filter_idx = atl_reserve_filter(ATL_RXF_NTUPLE);
+
 	return 0;
 
 err_exit:
@@ -819,6 +826,9 @@ void atl_ptp_free(struct atl_nic *nic)
 
 	if (!ptp)
 		return;
+
+	atl_release_filter(ATL_RXF_ETYPE);
+	atl_release_filter(ATL_RXF_NTUPLE);
 
 	/* disable ptp */
 	mcp->ops->set_ptp(&nic->hw, false);
