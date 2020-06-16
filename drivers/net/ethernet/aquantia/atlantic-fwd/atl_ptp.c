@@ -890,4 +890,10 @@ void atl_ptp_free(struct atl_nic *nic)
 	kfree(ptp);
 	nic->ptp = NULL;
 }
+
+struct ptp_clock *atl_ptp_get_ptp_clock(struct atl_nic *nic)
+{
+	return nic->ptp->ptp_clock;
+}
+
 #endif

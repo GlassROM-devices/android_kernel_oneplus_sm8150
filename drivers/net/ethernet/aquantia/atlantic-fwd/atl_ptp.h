@@ -59,6 +59,8 @@ bool atl_is_ptp_ring(struct atl_nic *nic, struct atl_desc_ring *ring);
 u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb, u8 *p,
 		       unsigned int len);
 
+struct ptp_clock *atl_ptp_get_ptp_clock(struct atl_nic *nic);
+
 #else
 
 static inline int atl_ptp_init(struct atl_nic *nic)
@@ -121,6 +123,11 @@ static inline u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb,
 				     u8 *p, unsigned int len)
 {
 	return 0;
+}
+
+static inline struct ptp_clock *atl_ptp_get_ptp_clock(struct atl_nic *nic)
+{
+	return NULL;
 }
 
 #endif
