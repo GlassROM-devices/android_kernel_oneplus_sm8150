@@ -97,6 +97,7 @@ enum atl_fw2_opts {
 enum atl_fw2_ex_caps {
 	atl_define_bit(atl_fw2_ex_caps_phy_ptp_en, 16)
 	atl_define_bit(atl_fw2_ex_caps_ptp_gpio_en, 20)
+	atl_define_bit(atl_fw2_ex_caps_phy_ctrl_ts_pin, 22)
 	atl_define_bit(atl_fw2_ex_caps_wol_ex, 23)
 	atl_define_bit(atl_fw2_ex_caps_mac_heartbeat, 25)
 	atl_define_bit(atl_fw2_ex_caps_msm_settings_apply, 26)
@@ -115,6 +116,7 @@ enum atl_fw2_stat_offt {
 	atl_fw2_stat_settings_addr = 0x10c,
 	atl_fw2_stat_settings_len = 0x110,
 	atl_fw2_stat_caps_ex = 0x114,
+	atl_fw2_stat_gpio_pin = 0x118,
 };
 
 enum atl_fw2_settings_offt {
@@ -208,6 +210,21 @@ struct __packed macsec_msg_fw_response {
 	u32 result;
 };
 
+enum atl_gpio_pin_function {
+	GPIO_PIN_FUNCTION_NC,
+	GPIO_PIN_FUNCTION_VAUX_ENABLE,
+	GPIO_PIN_FUNCTION_EFUSE_BURN_ENABLE,
+	GPIO_PIN_FUNCTION_SFP_PLUS_DETECT,
+	GPIO_PIN_FUNCTION_TX_DISABLE,
+	GPIO_PIN_FUNCTION_RATE_SEL_0,
+	GPIO_PIN_FUNCTION_RATE_SEL_1,
+	GPIO_PIN_FUNCTION_TX_FAULT,
+	GPIO_PIN_FUNCTION_PTP0,
+	GPIO_PIN_FUNCTION_PTP1,
+	GPIO_PIN_FUNCTION_PTP2,
+	GPIO_PIN_FUNCTION_SIZE
+};
+
 struct __packed atl_ptp_offset_info {
 	u16 ingress_100;
 	u16 egress_100;
@@ -222,8 +239,15 @@ struct __packed atl_ptp_offset_info {
 };
 
 enum ptp_msg_type {
+	ptp_gpio_ctrl_msg = 0x11,
 	ptp_adj_freq_msg = 0x12,
 	ptp_adj_clock_msg = 0x13,
+};
+
+struct __packed ptp_gpio_ctrl {
+	u32 index;
+	u32 period;
+	u64 start;
 };
 
 struct __packed ptp_adj_freq {
@@ -244,6 +268,7 @@ struct __packed ptp_adj_clock {
 struct __packed ptp_msg_fw_request {
 	u32 msg_id;
 	union {
+		struct ptp_gpio_ctrl gpio_ctrl;
 		struct ptp_adj_freq adj_freq;
 		struct ptp_adj_clock adj_clock;
 	};

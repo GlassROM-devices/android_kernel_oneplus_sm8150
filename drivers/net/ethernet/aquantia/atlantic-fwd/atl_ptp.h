@@ -61,6 +61,8 @@ u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb, u8 *p,
 
 struct ptp_clock *atl_ptp_get_ptp_clock(struct atl_nic *nic);
 
+int atl_ptp_link_change(struct atl_nic *nic);
+
 #else
 
 static inline int atl_ptp_init(struct atl_nic *nic)
@@ -128,6 +130,11 @@ static inline u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb,
 static inline struct ptp_clock *atl_ptp_get_ptp_clock(struct atl_nic *nic)
 {
 	return NULL;
+}
+
+static inline int atl_ptp_link_change(struct atl_nic *nic)
+{
+	return 0;
 }
 
 #endif

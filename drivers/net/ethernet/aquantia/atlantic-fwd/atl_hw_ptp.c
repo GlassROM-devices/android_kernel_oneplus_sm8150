@@ -9,8 +9,11 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/mdio.h>
+
 #include "atl_hw_ptp.h"
 #include "atl_desc.h"
+#include "atl_mdio.h"
 
 #define FRAC_PER_NS 0x100000000LL
 
@@ -117,6 +120,12 @@ int hw_atl_set_sys_clock(struct atl_hw *hw, u64 time, u64 ts)
 	return hw_atl_adj_sys_clock(hw, delta);
 }
 
+int hw_atl_ts_to_sys_clock(struct atl_hw *hw, u64 ts, u64 *time)
+{
+	*time = hw->ptp_clk_offset + ts;
+	return 0;
+}
+
 int hw_atl_adj_clock_freq(struct atl_hw *hw, s32 ppb)
 {
 	struct ptp_msg_fw_request fwreq;
@@ -136,6 +145,58 @@ int hw_atl_adj_clock_freq(struct atl_hw *hw, s32 ppb)
 				     ATL_HW_MAC_COUNTER_HZ);
 
 	return mcp->ops->send_ptp_req(hw, &fwreq);
+}
+
+int hw_atl_gpio_pulse(struct atl_hw *hw, u32 index, u64 start, u32 period)
+{
+	struct ptp_msg_fw_request fwreq;
+	struct atl_mcp *mcp = &hw->mcp;
+
+	memset(&fwreq, 0, sizeof(fwreq));
+
+	fwreq.msg_id = ptp_gpio_ctrl_msg;
+	fwreq.gpio_ctrl.index = index;
+	fwreq.gpio_ctrl.period = period;
+	/* Apply time offset */
+	fwreq.gpio_ctrl.start = start - hw->ptp_clk_offset;
+
+	return mcp->ops->send_ptp_req(hw, &fwreq);
+}
+
+int hw_atl_extts_gpio_enable(struct atl_hw *hw, u32 index, u32 enable)
+{
+	/* Enable/disable Sync1588 GPIO Timestamping */
+	atl_mdio_write(hw, 0, MDIO_MMD_PCS, 0xc611, enable ? 0x71 : 0);
+
+	return 0;
+}
+
+int hw_atl_get_sync_ts(struct atl_hw *hw, u64 *ts)
+{
+	u16 nsec_l = 0;
+	u16 nsec_h = 0;
+	u16 sec_l = 0;
+	u16 sec_h = 0;
+	int ret;
+
+	if (!ts)
+		return -1;
+
+	/* PTP external GPIO clock seconds count 15:0 */
+	ret = atl_mdio_read(hw, 0, MDIO_MMD_PCS, 0xc914, &sec_l);
+	/* PTP external GPIO clock seconds count 31:16 */
+	if (!ret)
+		ret = atl_mdio_read(hw, 0, MDIO_MMD_PCS, 0xc915, &sec_h);
+	/* PTP external GPIO clock nanoseconds count 15:0 */
+	if (!ret)
+		ret = atl_mdio_read(hw, 0, MDIO_MMD_PCS, 0xc916, &nsec_l);
+	/* PTP external GPIO clock nanoseconds count 31:16 */
+	if (!ret)
+		ret = atl_mdio_read(hw, 0, MDIO_MMD_PCS, 0xc917, &nsec_h);
+
+	*ts = ((u64)nsec_h << 16) + nsec_l + (((u64)sec_h << 16) + sec_l) * NSEC_PER_SEC;
+
+	return ret;
 }
 
 u16 hw_atl_rx_extract_ts(struct atl_hw *hw, u8 *p, unsigned int len,

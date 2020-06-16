@@ -893,6 +893,9 @@ static int atl_fw2_send_ptp_request(struct atl_hw *hw,
 
 	size = sizeof(msg->msg_id);
 	switch (msg->msg_id) {
+	case ptp_gpio_ctrl_msg:
+		size += sizeof(msg->gpio_ctrl);
+		break;
 	case ptp_adj_freq_msg:
 		size += sizeof(msg->adj_freq);
 		break;

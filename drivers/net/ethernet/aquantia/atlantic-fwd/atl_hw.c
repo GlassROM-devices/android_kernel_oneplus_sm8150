@@ -495,6 +495,7 @@ void atl_refresh_link(struct atl_nic *nic)
 	if (nic->ptp) {
 		atl_ptp_clock_init(nic);
 		atl_ptp_tm_offset_set(nic, link ? link->speed : 0);
+		atl_ptp_link_change(nic);
 	}
 
 	atl_rx_xoff_set(hw, !!(hw->link_state.fc.cur & atl_fc_rx));
