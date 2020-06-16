@@ -110,6 +110,8 @@ int hw_atl_adj_sys_clock(struct atl_hw *hw, s64 delta)
 {
 	hw->ptp_clk_offset += delta;
 
+	hw->mcp.ops->adjust_ptp(hw, hw->ptp_clk_offset);
+
 	return 0;
 }
 
@@ -158,7 +160,7 @@ int hw_atl_gpio_pulse(struct atl_hw *hw, u32 index, u64 start, u32 period)
 	fwreq.gpio_ctrl.index = index;
 	fwreq.gpio_ctrl.period = period;
 	/* Apply time offset */
-	fwreq.gpio_ctrl.start = start - hw->ptp_clk_offset;
+	fwreq.gpio_ctrl.start = start;
 
 	return mcp->ops->send_ptp_req(hw, &fwreq);
 }

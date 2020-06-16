@@ -102,6 +102,8 @@ enum mcp_scratchpad {
 
 /* RX @ 0x5000 */
 #define ATL_RX_CTRL1 0x5000
+#define ATL_RX_SPARE_CTRL0 0x50A0
+#define ATL_RX_SPARE_CTRL1 0x50A4
 #define ATL2_RX_FLT_L2_BC_TAG 0x50F0
 #define ATL_RX_FLT_CTRL1 0x5100
 #define ATL_RX_FLT_CTRL2 0x5104
