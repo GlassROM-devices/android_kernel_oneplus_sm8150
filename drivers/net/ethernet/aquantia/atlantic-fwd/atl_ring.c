@@ -1779,8 +1779,11 @@ static void atl_start_tx_ring(struct atl_desc_ring *ring)
 	atl_write(hw, ATL_TX_LSO_CTRL, BIT(nic->nvecs) - 1);
 
 	atl_write(hw, ATL_TX_RING_TAIL(ring), ring->tail);
-	atl_write(hw, ATL_TX_RING_THRESH(ring), 8 << 8 | 8 << 0x10 |
-		24 << 0x18);
+	if (likely(!ring->qvec->is_ptp))
+		atl_write(hw, ATL_TX_RING_THRESH(ring), 8 << 8 | 8 << 0x10 |
+			24 << 0x18);
+	else
+		atl_write(hw, ATL_TX_RING_THRESH(ring), 0);
 	atl_write(hw, ATL_TX_RING_CTL(ring), BIT(31) | ring->hw.size);
 }
 
