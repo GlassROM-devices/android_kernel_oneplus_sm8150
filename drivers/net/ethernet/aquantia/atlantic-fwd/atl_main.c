@@ -34,6 +34,11 @@ module_param_named(keep_link, atl_keep_link, uint, 0644);
 static unsigned int atl_sleep_delay = 10000;
 module_param_named(sleep_delay, atl_sleep_delay, uint, 0644);
 
+static unsigned int atl_rx_ring_size = ATL_RING_SIZE;
+static unsigned int atl_tx_ring_size = ATL_RING_SIZE;
+module_param_named(rx_ring_size, atl_rx_ring_size, uint, 0444);
+module_param_named(tx_ring_size, atl_tx_ring_size, uint, 0444);
+
 static void atl_start_link(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
@@ -525,8 +530,8 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	atl_dev_dbg("got MAC address: %pM\n", hw->mac_addr);
 
 	nic->requested_nvecs = atl_max_queues;
-	nic->requested_tx_size = ATL_RING_SIZE;
-	nic->requested_rx_size = ATL_RING_SIZE;
+	nic->requested_tx_size = (atl_tx_ring_size & ~7);
+	nic->requested_rx_size = (atl_rx_ring_size & ~7);
 	nic->rx_intr_delay = atl_rx_mod;
 	nic->tx_intr_delay = atl_tx_mod;
 
@@ -860,6 +865,19 @@ static int __init atl_module_init(void)
 {
 	struct atl_hw *hw = NULL;
 	int ret;
+
+	if ((atl_tx_ring_size < 8) || (atl_tx_ring_size > ATL_MAX_RING_SIZE)) {
+		atl_dev_init_err(
+			"Bad atl_tx_ring_size value %d, must be between 8 and %d inclusive\n",
+			atl_tx_ring_size, ATL_MAX_RING_SIZE);
+		return -EINVAL;
+	}
+	if ((atl_rx_ring_size < 8) || (atl_rx_ring_size > ATL_MAX_RING_SIZE)) {
+		atl_dev_init_err(
+			"Bad atl_rx_ring_size value %d, must be between 8 and %d inclusive\n",
+			atl_rx_ring_size, ATL_MAX_RING_SIZE);
+		return -EINVAL;
+	}
 
 	atl_def_thermal.flags =
 		atl_def_thermal_monitor << atl_thermal_monitor_shift |
