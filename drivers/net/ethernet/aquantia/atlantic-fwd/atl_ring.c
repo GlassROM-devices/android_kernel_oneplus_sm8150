@@ -1749,8 +1749,12 @@ static void atl_start_rx_ring(struct atl_desc_ring *ring)
 	atl_write(hw, ATL_RING_BASE_MSW(ring), upper_32_bits(ring->hw.daddr));
 
 	atl_write(hw, ATL_RX_RING_TAIL(ring), ring->tail);
-	atl_write(hw, ATL_RX_RING_BUF_SIZE(ring),
-		(ATL_RX_HDR_SIZE / 64) << 8 | ATL_RX_BUF_SIZE / 1024);
+	if (likely(!ring->qvec->is_ptp))
+		atl_write(hw, ATL_RX_RING_BUF_SIZE(ring),
+			(ATL_RX_HDR_SIZE / 64) << 8 | ATL_RX_BUF_SIZE / 1024);
+	else
+		atl_write(hw, ATL_RX_RING_BUF_SIZE(ring),
+			ATL_RX_BUF_SIZE / 1024);
 	atl_write(hw, ATL_RX_RING_THRESH(ring), 8 << 0x10 | 24 << 0x18);
 
 	/* LRO */
@@ -1759,7 +1763,7 @@ static void atl_start_rx_ring(struct atl_desc_ring *ring)
 
 	/* Enable ring | VLAN offload | header split in non-linear mode */
 	rx_ctl = BIT(31) | BIT(29) | ring->hw.size |
-		(atl_rx_linear ? 0 : BIT(28));
+		(atl_rx_linear || unlikely(ring->qvec->is_ptp) ? 0 : BIT(28));
 	atl_write(hw, ATL_RX_RING_CTL(ring), rx_ctl);
 }
 
