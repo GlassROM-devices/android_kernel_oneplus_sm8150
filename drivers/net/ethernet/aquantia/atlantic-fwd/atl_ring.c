@@ -1488,22 +1488,25 @@ static void atl_free_tx_bufs(struct atl_desc_ring *ring)
 
 static void atl_free_ring(struct atl_desc_ring *ring)
 {
+	size_t extra = unlikely(ring->qvec->is_hwts) ? ATL_RX_BUF_SIZE : 0;
+
 	if (ring->bufs) {
 		vfree(ring->bufs);
 		ring->bufs = 0;
 	}
 
-	atl_free_descs(ring->nic, &ring->hw);
+	atl_free_descs(ring->nic, &ring->hw, extra);
 }
 
 static int atl_alloc_ring(struct atl_desc_ring *ring, size_t buf_size,
 	char *type)
 {
-	int ret;
 	struct atl_nic *nic = ring->nic;
 	int idx = ring->qvec->idx;
+	size_t extra = unlikely(ring->qvec->is_hwts) ? ATL_RX_BUF_SIZE : 0;
+	int ret;
 
-	ret = atl_alloc_descs(nic, &ring->hw);
+	ret = atl_alloc_descs(nic, &ring->hw, extra);
 	if (ret) {
 		atl_nic_err("Couldn't alloc %s[%d] descriptors\n", type, idx);
 		return ret;

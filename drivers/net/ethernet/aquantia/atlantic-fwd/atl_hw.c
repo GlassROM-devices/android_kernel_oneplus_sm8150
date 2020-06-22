@@ -904,11 +904,12 @@ void atl_set_rx_mode(struct net_device *ndev)
 		atl_disable_uc_flt(hw, i++);
 }
 
-int atl_alloc_descs(struct atl_nic *nic, struct atl_hw_ring *ring)
+int atl_alloc_descs(struct atl_nic *nic, struct atl_hw_ring *ring, size_t extra)
 {
 	struct device *dev = &nic->hw.pdev->dev;
 
-	ring->descs = dma_alloc_coherent(dev, ring->size * sizeof(*ring->descs),
+	ring->descs = dma_alloc_coherent(dev,
+					 ring->size * sizeof(*ring->descs) + extra,
 					 &ring->daddr, GFP_KERNEL);
 
 	if (!ring->descs)
@@ -917,14 +918,14 @@ int atl_alloc_descs(struct atl_nic *nic, struct atl_hw_ring *ring)
 	return 0;
 }
 
-void atl_free_descs(struct atl_nic *nic, struct atl_hw_ring *ring)
+void atl_free_descs(struct atl_nic *nic, struct atl_hw_ring *ring, size_t extra)
 {
 	struct device *dev = &nic->hw.pdev->dev;
 
 	if (!ring->descs)
 		return;
 
-	dma_free_coherent(dev, ring->size * sizeof(*ring->descs),
+	dma_free_coherent(dev, ring->size * sizeof(*ring->descs) + extra,
 		ring->descs, ring->daddr);
 	ring->descs = 0;
 }

@@ -328,8 +328,8 @@ void atl_set_rss_key(struct atl_hw *hw);
 int atl_set_rss_tbl(struct atl_hw *hw);
 void atl_set_uc_flt(struct atl_hw *hw, int idx, uint8_t mac_addr[ETH_ALEN]);
 
-int atl_alloc_descs(struct atl_nic *nic, struct atl_hw_ring *ring);
-void atl_free_descs(struct atl_nic *nic, struct atl_hw_ring *ring);
+int atl_alloc_descs(struct atl_nic *nic, struct atl_hw_ring *ring, size_t extra);
+void atl_free_descs(struct atl_nic *nic, struct atl_hw_ring *ring, size_t extra);
 void atl_set_intr_bits(struct atl_hw *hw, int idx, int rxbit, int txbit);
 int atl_alloc_link_intr(struct atl_nic *nic);
 void atl_free_link_intr(struct atl_nic *nic);
