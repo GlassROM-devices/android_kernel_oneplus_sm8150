@@ -63,8 +63,8 @@ struct atl_ptp {
 
 	struct ptp_tx_timeout ptp_tx_timeout;
 
+	struct napi_struct *napi;
 	unsigned int idx_vector;
-	struct napi_struct napi;
 
 	struct atl_queue_vec qvec[ATL_PTPQ_NUM];
 
@@ -452,7 +452,8 @@ u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb, u8 *p,
 
 static int atl_ptp_poll(struct napi_struct *napi, int budget)
 {
-	struct atl_ptp *ptp = container_of(napi, struct atl_ptp, napi);
+	struct atl_queue_vec *qvec = container_of(napi, struct atl_queue_vec, napi);
+	struct atl_ptp *ptp = qvec->nic->ptp;
 	int work_done = 0;
 
 	/* Processing PTP TX and RX traffic */
@@ -473,7 +474,7 @@ static irqreturn_t atl_ptp_irq(int irq, void *private)
 		err = -EINVAL;
 		goto err_exit;
 	}
-	napi_schedule(&ptp->napi);
+	napi_schedule_irqoff(ptp->napi);
 
 err_exit:
 	return err >= 0 ? IRQ_HANDLED : IRQ_NONE;
@@ -606,7 +607,7 @@ int atl_ptp_ring_start(struct atl_nic *nic)
 			goto stop;
 	}
 
-	napi_enable(&ptp->napi);
+	napi_enable(ptp->napi);
 
 	return 0;
 
@@ -625,7 +626,7 @@ void atl_ptp_ring_stop(struct atl_nic *nic)
 	if (!ptp)
 		return;
 
-	napi_disable(&ptp->napi);
+	napi_disable(ptp->napi);
 
 	atl_for_each_ptp_qvec(ptp, qvec)
 		atl_stop_qvec(qvec);
@@ -781,7 +782,8 @@ int atl_ptp_init(struct atl_nic *nic)
 	atomic_set(&ptp->offset_egress, 0);
 	atomic_set(&ptp->offset_ingress, 0);
 
-	netif_napi_add(nic->ndev, &ptp->napi, atl_ptp_poll, 64);
+	ptp->napi = &ptp->qvec[ATL_PTPQ_PTP].napi;
+	netif_napi_add(nic->ndev, ptp->napi, atl_ptp_poll, 64);
 
 	ptp->idx_vector = ATL_IRQ_PTP;
 
@@ -821,7 +823,7 @@ void atl_ptp_free(struct atl_nic *nic)
 	/* disable ptp */
 	mcp->ops->set_ptp(&nic->hw, false);
 
-	netif_napi_del(&ptp->napi);
+	netif_napi_del(ptp->napi);
 	kfree(ptp);
 	nic->ptp = NULL;
 }
