@@ -1907,15 +1907,15 @@ static void atl_start_rx_ring(struct atl_desc_ring *ring)
 	atl_write_bits(hw, ATL_RX_LRO_PKT_LIM(idx),
 		(idx & 7) * 4, 2, 3);
 
-	/* Enable ring | VLAN offload | header split in non-linear mode */
+	/* Enable ring | VLAN offload */
+	rx_ctl = BIT(31) | BIT(29) | ring->hw.size;
 	switch (ring->qvec->type) {
 	case ATL_QUEUE_REGULAR:
-		rx_ctl = BIT(31) | BIT(29) | ring->hw.size |
-			(atl_rx_linear ? 0 : BIT(28));
+		/* Enable header split in non-linear mode */
+		rx_ctl |= (atl_rx_linear ? 0 : BIT(28));
 		break;
 	case ATL_QUEUE_PTP:
 	case ATL_QUEUE_HWTS:
-		rx_ctl = BIT(31) | BIT(29) | ring->hw.size;
 		break;
 	default:
 		break;
