@@ -403,7 +403,7 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 		}
 	} while (--budget);
 
-	if (likely(!ring->qvec->is_ptp)) {
+	if (likely(ring->qvec->type != ATL_QUEUE_PTP)) {
 		u64_stats_update_begin(&ring->syncp);
 		ring->stats.tx.bytes += bytes;
 		ring->stats.tx.packets += packets;
@@ -412,7 +412,7 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 
 	WRITE_ONCE(ring->head, first);
 
-	if (likely(!ring->qvec->is_ptp) &&
+	if (likely(ring->qvec->type != ATL_QUEUE_PTP) &&
 	    ring_space(ring) > atl_tx_free_high) {
 		struct net_device *ndev = nic->ndev;
 
@@ -1268,7 +1268,7 @@ int atl_poll_qvec(struct atl_queue_vec *qvec, int budget)
 	if (!clean_done)
 		return budget;
 
-	if (likely(!qvec->is_ptp)) {
+	if (likely(qvec->type != ATL_QUEUE_PTP)) {
 		napi_complete_done(&qvec->napi, rx_cleaned);
 		atl_intr_enable(&nic->hw, BIT(atl_qvec_intr(qvec)));
 		/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
@@ -1426,7 +1426,7 @@ void atl_init_qvec(struct atl_nic *nic, struct atl_queue_vec *qvec, int idx)
 	u64_stats_init(&qvec->rx.syncp);
 	u64_stats_init(&qvec->tx.syncp);
 
-	if (likely(!qvec->is_ptp))
+	if (likely(qvec->type == ATL_QUEUE_REGULAR))
 		netif_napi_add(nic->ndev, &qvec->napi, atl_poll, 64);
 }
 
@@ -1566,9 +1566,25 @@ static void atl_free_tx_bufs(struct atl_desc_ring *ring)
 	}
 }
 
+static size_t atl_ring_extra_size(struct atl_desc_ring *ring)
+{
+	switch (ring->qvec->type) {
+	case ATL_QUEUE_REGULAR:
+	case ATL_QUEUE_PTP:
+		return 0;
+	case ATL_QUEUE_HWTS:
+		return ATL_RX_BUF_SIZE;
+	default:
+		WARN_ONCE(true, "Unknown queue type\n");
+		break;
+	}
+
+	return 0;
+}
+
 static void atl_free_ring(struct atl_desc_ring *ring)
 {
-	size_t extra = unlikely(ring->qvec->is_hwts) ? ATL_RX_BUF_SIZE : 0;
+	size_t extra = atl_ring_extra_size(ring);
 
 	if (ring->bufs) {
 		vfree(ring->bufs);
@@ -1581,9 +1597,9 @@ static void atl_free_ring(struct atl_desc_ring *ring)
 static int atl_alloc_ring(struct atl_desc_ring *ring, size_t buf_size,
 	char *type)
 {
+	size_t extra = atl_ring_extra_size(ring);
 	struct atl_nic *nic = ring->nic;
 	int idx = ring->qvec->idx;
-	size_t extra = unlikely(ring->qvec->is_hwts) ? ATL_RX_BUF_SIZE : 0;
 	int ret;
 
 	ret = atl_alloc_descs(nic, &ring->hw, extra);
@@ -1592,7 +1608,7 @@ static int atl_alloc_ring(struct atl_desc_ring *ring, size_t buf_size,
 		return ret;
 	}
 
-	if (likely(!ring->qvec->is_hwts)) {
+	if (likely(ring->qvec->type != ATL_QUEUE_HWTS)) {
 		ring->bufs = vzalloc(ring->hw.size * buf_size);
 		if (!ring->bufs) {
 			ret = -ENOMEM;
@@ -1661,19 +1677,26 @@ int atl_alloc_qvec(struct atl_queue_vec *qvec)
 {
 	struct atl_txbuf *txbuf;
 	int count = qvec->tx.hw.size;
-	int ret;
+	int ret = 0;
 
-	if (likely(!qvec->is_ptp)) {
+	switch (qvec->type) {
+	case ATL_QUEUE_REGULAR:
 		ret = atl_alloc_qvec_intr(qvec);
-		if (ret)
-			return ret;
-	} else if (!qvec->is_hwts) {
+		break;
+	case ATL_QUEUE_PTP:
 		ret = atl_ptp_irq_alloc(qvec->nic);
-		if (ret)
-			return ret;
+		break;
+	case ATL_QUEUE_HWTS:
+		break;
+	default:
+		WARN_ONCE(true, "Unknown queue type\n");
+		break;
 	}
 
-	if (likely(!qvec->is_hwts)) {
+	if (ret)
+		return ret;
+
+	if (likely(qvec->type != ATL_QUEUE_HWTS)) {
 		ret = atl_alloc_ring(&qvec->tx, sizeof(struct atl_txbuf), "tx");
 		if (ret)
 			goto free_irq;
@@ -1683,7 +1706,7 @@ int atl_alloc_qvec(struct atl_queue_vec *qvec)
 	if (ret)
 		goto free_tx;
 
-	if (likely(!qvec->is_hwts)) {
+	if (likely(qvec->type != ATL_QUEUE_HWTS)) {
 		for (txbuf = qvec->tx.txbufs; count; count--)
 			(txbuf++)->last = -1;
 	}
@@ -1691,13 +1714,19 @@ int atl_alloc_qvec(struct atl_queue_vec *qvec)
 	return 0;
 
 free_tx:
-	if (likely(!qvec->is_hwts))
+	if (likely(qvec->type != ATL_QUEUE_HWTS))
 		atl_free_ring(&qvec->tx);
 free_irq:
-	if (likely(!qvec->is_ptp))
+	switch (qvec->type) {
+	case ATL_QUEUE_REGULAR:
 		atl_free_qvec_intr(qvec);
-	else if (!qvec->is_hwts)
+		break;
+	case ATL_QUEUE_PTP:
 		atl_ptp_irq_free(qvec->nic);
+		break;
+	default:
+		break;
+	}
 
 	return ret;
 }
@@ -1710,13 +1739,22 @@ void atl_free_qvec(struct atl_queue_vec *qvec)
 	atl_free_rx_bufs(rx);
 	atl_free_ring(rx);
 
-	if (likely(!qvec->is_hwts))
+	if (likely(qvec->type != ATL_QUEUE_HWTS))
 		atl_free_ring(tx);
 
-	if (likely(!qvec->is_ptp))
+	switch (qvec->type) {
+	case ATL_QUEUE_REGULAR:
 		atl_free_qvec_intr(qvec);
-	else if (!qvec->is_hwts)
+		break;
+	case ATL_QUEUE_PTP:
 		atl_ptp_irq_free(qvec->nic);
+		break;
+	case ATL_QUEUE_HWTS:
+		break;
+	default:
+		WARN_ONCE(true, "Unknown queue type\n");
+		break;
+	}
 }
 
 int atl_alloc_rings(struct atl_nic *nic)
@@ -1794,15 +1832,23 @@ int atl_init_rx_ring(struct atl_desc_ring *rx)
 	if (rx->head > 0x1FFF)
 		return -EIO;
 
-	if (unlikely(rx->qvec->is_hwts))
+	switch (rx->qvec->type) {
+	case ATL_QUEUE_HWTS:
 		ret = atl_fill_hwts_rx(rx, ring_space(rx), false);
-	else
+		break;
+	case ATL_QUEUE_PTP:
+	case ATL_QUEUE_REGULAR:
 		ret = atl_fill_rx(rx, ring_space(rx), false);
+		break;
+	default:
+		WARN_ONCE(true, "Unknown queue type\n");
+		break;
+	}
 
 	if (ret)
 		return ret;
 
-	if (likely(!rx->qvec->is_hwts)) {
+	if (likely(rx->qvec->type != ATL_QUEUE_HWTS)) {
 		rx->next_to_recycle = rx->tail;
 		/* rxbuf at ->next_to_recycle is always kept empty so that
 		 * atl_maybe_recycle_rxbuf() always have a spot to recycle into
@@ -1841,12 +1887,20 @@ static void atl_start_rx_ring(struct atl_desc_ring *ring)
 	atl_write(hw, ATL_RING_BASE_MSW(ring), upper_32_bits(ring->hw.daddr));
 
 	atl_write(hw, ATL_RX_RING_TAIL(ring), ring->tail);
-	if (likely(!ring->qvec->is_ptp))
+	switch (ring->qvec->type) {
+	case ATL_QUEUE_REGULAR:
 		atl_write(hw, ATL_RX_RING_BUF_SIZE(ring),
 			(ATL_RX_HDR_SIZE / 64) << 8 | ATL_RX_BUF_SIZE / 1024);
-	else
+		break;
+	case ATL_QUEUE_PTP:
+	case ATL_QUEUE_HWTS:
 		atl_write(hw, ATL_RX_RING_BUF_SIZE(ring),
 			ATL_RX_BUF_SIZE / 1024);
+		break;
+	default:
+		WARN_ONCE(true, "Unknown queue type\n");
+		break;
+	}
 	atl_write(hw, ATL_RX_RING_THRESH(ring), 8 << 0x10 | 24 << 0x18);
 
 	/* LRO */
@@ -1854,8 +1908,18 @@ static void atl_start_rx_ring(struct atl_desc_ring *ring)
 		(idx & 7) * 4, 2, 3);
 
 	/* Enable ring | VLAN offload | header split in non-linear mode */
-	rx_ctl = BIT(31) | BIT(29) | ring->hw.size |
-		(atl_rx_linear || unlikely(ring->qvec->is_ptp) ? 0 : BIT(28));
+	switch (ring->qvec->type) {
+	case ATL_QUEUE_REGULAR:
+		rx_ctl = BIT(31) | BIT(29) | ring->hw.size |
+			(atl_rx_linear ? 0 : BIT(28));
+		break;
+	case ATL_QUEUE_PTP:
+	case ATL_QUEUE_HWTS:
+		rx_ctl = BIT(31) | BIT(29) | ring->hw.size;
+		break;
+	default:
+		break;
+	}
 	atl_write(hw, ATL_RX_RING_CTL(ring), rx_ctl);
 }
 
@@ -1871,11 +1935,19 @@ static void atl_start_tx_ring(struct atl_desc_ring *ring)
 	atl_write(hw, ATL_TX_LSO_CTRL, BIT(nic->nvecs) - 1);
 
 	atl_write(hw, ATL_TX_RING_TAIL(ring), ring->tail);
-	if (likely(!ring->qvec->is_ptp))
+	switch (ring->qvec->type) {
+	case ATL_QUEUE_REGULAR:
 		atl_write(hw, ATL_TX_RING_THRESH(ring), 8 << 8 | 8 << 0x10 |
 			24 << 0x18);
-	else
+		break;
+	case ATL_QUEUE_PTP:
+	case ATL_QUEUE_HWTS:
 		atl_write(hw, ATL_TX_RING_THRESH(ring), 0);
+		break;
+	default:
+		WARN_ONCE(true, "Unknown queue type\n");
+		break;
+	}
 	atl_write(hw, ATL_TX_RING_CTL(ring), BIT(31) | ring->hw.size);
 }
 
@@ -1890,7 +1962,7 @@ int atl_start_qvec(struct atl_queue_vec *qvec)
 	ret = atl_init_rx_ring(rx);
 	if (ret)
 		return ret;
-	if (likely(!qvec->is_hwts)) {
+	if (likely(qvec->type != ATL_QUEUE_HWTS)) {
 		ret = atl_init_tx_ring(tx);
 		if (ret)
 			return ret;
@@ -1900,12 +1972,12 @@ int atl_start_qvec(struct atl_queue_vec *qvec)
 	atl_set_intr_bits(hw, qvec->idx, intr, intr);
 	atl_set_intr_throttle(qvec);
 
-	if (likely(!qvec->is_ptp))
+	if (likely(qvec->type == ATL_QUEUE_REGULAR))
 		napi_enable(&qvec->napi);
 	atl_set_intr_mod_qvec(qvec);
 	atl_intr_enable(hw, BIT(intr));
 
-	if (likely(!qvec->is_hwts))
+	if (likely(qvec->type != ATL_QUEUE_HWTS))
 		atl_start_tx_ring(tx);
 	atl_start_rx_ring(rx);
 
@@ -1920,18 +1992,18 @@ void atl_stop_qvec(struct atl_queue_vec *qvec)
 
 	/* Disable and reset rings */
 	atl_write(hw, ATL_RING_CTL(rx), BIT(25));
-	if (likely(!qvec->is_hwts))
+	if (likely(qvec->type != ATL_QUEUE_HWTS))
 		atl_write(hw, ATL_RING_CTL(tx), BIT(25));
 	udelay(10);
 	atl_write(hw, ATL_RING_CTL(rx), 0);
-	if (likely(!qvec->is_hwts))
+	if (likely(qvec->type != ATL_QUEUE_HWTS))
 		atl_write(hw, ATL_RING_CTL(tx), 0);
 
 	atl_intr_disable(hw, BIT(atl_qvec_intr(qvec)));
-	if (likely(!qvec->is_ptp))
+	if (likely(qvec->type == ATL_QUEUE_REGULAR))
 		napi_disable(&qvec->napi);
 
-	if (likely(!qvec->is_hwts)) {
+	if (likely(qvec->type != ATL_QUEUE_HWTS)) {
 		atl_clear_rx_bufs(rx);
 		atl_free_tx_bufs(tx);
 	}

@@ -121,6 +121,12 @@ static inline struct legacy_irq_work *to_irq_work(struct work_struct *work)
 	return container_of(work, struct legacy_irq_work, work);
 };
 
+enum atl_queue_type {
+	ATL_QUEUE_REGULAR,
+	ATL_QUEUE_PTP,
+	ATL_QUEUE_HWTS,
+};
+
 struct ____cacheline_aligned atl_queue_vec {
 	struct atl_desc_ring tx;
 	struct atl_desc_ring rx;
@@ -129,8 +135,7 @@ struct ____cacheline_aligned atl_queue_vec {
 	unsigned idx;
 	char name[IFNAMSIZ + 10];
 	cpumask_t affinity_hint;
-	bool is_ptp;
-	bool is_hwts;
+	enum atl_queue_type type;
 	struct work_struct *work;
 };
 

@@ -1055,9 +1055,8 @@ int atl_ptp_init(struct atl_nic *nic)
 
 	ptp->nic = nic;
 
-	ptp->qvec[ATL_PTPQ_PTP].is_ptp = true;
-	ptp->qvec[ATL_PTPQ_HWTS].is_ptp = true;
-	ptp->qvec[ATL_PTPQ_HWTS].is_hwts = true;
+	ptp->qvec[ATL_PTPQ_PTP].type = ATL_QUEUE_PTP;
+	ptp->qvec[ATL_PTPQ_HWTS].type = ATL_QUEUE_HWTS;
 
 	spin_lock_init(&ptp->ptp_lock);
 	spin_lock_init(&ptp->ptp_ring_lock);
