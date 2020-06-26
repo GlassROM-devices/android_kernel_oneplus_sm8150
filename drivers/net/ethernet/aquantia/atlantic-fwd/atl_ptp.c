@@ -541,8 +541,11 @@ void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp)
 
 	timestamp += atomic_read(&ptp->offset_egress);
 	atl_ptp_convert_to_hwtstamp(&hwtstamp, timestamp);
-	skb_tstamp_tx(skb, &hwtstamp);
-	dev_kfree_skb_any(skb);
+	do {
+		skb_tstamp_tx(skb, &hwtstamp);
+		dev_kfree_skb_any(skb);
+		skb = atl_ptp_skb_get(&ptp->skb_ring);
+	} while (skb);
 
 	atl_ptp_tx_timeout_update(ptp);
 }
