@@ -1268,9 +1268,11 @@ int atl_poll_qvec(struct atl_queue_vec *qvec, int budget)
 	if (!clean_done)
 		return budget;
 
-	napi_complete_done(&qvec->napi, rx_cleaned);
-	atl_intr_enable(&nic->hw, BIT(atl_qvec_intr(qvec)));
-	/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
+	if (likely(!qvec->is_ptp)) {
+		napi_complete_done(&qvec->napi, rx_cleaned);
+		atl_intr_enable(&nic->hw, BIT(atl_qvec_intr(qvec)));
+		/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
+	}
 	return rx_cleaned;
 }
 

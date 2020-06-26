@@ -684,6 +684,12 @@ static int atl_ptp_poll(struct napi_struct *napi, int budget)
 	/* Processing HW_TIMESTAMP RX traffic */
 	atl_clean_hwts_rx(&ptp->qvec[ATL_PTPQ_HWTS].rx, budget);
 
+	if (work_done < budget) {
+		napi_complete_done(ptp->napi, work_done);
+		atl_intr_enable(&qvec->nic->hw, BIT(atl_qvec_intr(qvec)));
+		/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
+	}
+
 	return work_done;
 }
 
