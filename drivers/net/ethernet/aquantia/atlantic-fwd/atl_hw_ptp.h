@@ -26,7 +26,7 @@ int hw_atl_extts_gpio_enable(struct atl_hw *hw, u32 index, u32 enable);
 int hw_atl_get_sync_ts(struct atl_hw *hw, u64 *ts);
 u16 hw_atl_rx_extract_ts(struct atl_hw *hw, u8 *p, unsigned int len,
 			 u64 *timestamp);
-int hw_atl_extract_hwts(struct atl_hw *hw, struct atl_rx_desc_hwts_wb *hwts_wb,
-			u64 *timestamp);
+void hw_atl_extract_hwts(struct atl_hw *hw, struct atl_rx_desc_hwts_wb *hwts_wb,
+			 u64 *timestamp);
 
 #endif

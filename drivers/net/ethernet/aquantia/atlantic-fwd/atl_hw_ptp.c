@@ -168,9 +168,7 @@ int hw_atl_gpio_pulse(struct atl_hw *hw, u32 index, u64 start, u32 period)
 int hw_atl_extts_gpio_enable(struct atl_hw *hw, u32 index, u32 enable)
 {
 	/* Enable/disable Sync1588 GPIO Timestamping */
-	atl_mdio_write(hw, 0, MDIO_MMD_PCS, 0xc611, enable ? 0x71 : 0);
-
-	return 0;
+	return atl_mdio_write(hw, 0, MDIO_MMD_PCS, 0xc611, enable ? 0x71 : 0);
 }
 
 int hw_atl_get_sync_ts(struct atl_hw *hw, u64 *ts)
@@ -235,8 +233,8 @@ u16 hw_atl_rx_extract_ts(struct atl_hw *hw, u8 *p, unsigned int len,
 	return (eth->h_proto == htons(ETH_P_1588)) ? 12 : 14;
 }
 
-int hw_atl_extract_hwts(struct atl_hw *hw, struct atl_rx_desc_hwts_wb *hwts_wb,
-			u64 *timestamp)
+void hw_atl_extract_hwts(struct atl_hw *hw, struct atl_rx_desc_hwts_wb *hwts_wb,
+			 u64 *timestamp)
 {
 	u64 tmp, sec, ns;
 
@@ -252,5 +250,4 @@ int hw_atl_extract_hwts(struct atl_hw *hw, struct atl_rx_desc_hwts_wb *hwts_wb,
 	ns = sec * NSEC_PER_SEC + hwts_wb->ns;
 	if (timestamp)
 		*timestamp = ns + hw->ptp_clk_offset;
-	return 0;
 }

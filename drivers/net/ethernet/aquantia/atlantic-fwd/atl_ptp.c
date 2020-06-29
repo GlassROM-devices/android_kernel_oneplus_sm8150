@@ -188,7 +188,7 @@ static unsigned int atl_ptp_skb_buf_len(struct ptp_skb_ring *ring)
 
 static int atl_ptp_skb_ring_init(struct ptp_skb_ring *ring, unsigned int size)
 {
-	struct sk_buff **buff = kmalloc(sizeof(*buff) * size, GFP_KERNEL);
+	struct sk_buff **buff = kcalloc(size, sizeof(*buff), GFP_KERNEL);
 
 	if (!buff)
 		return -ENOMEM;
