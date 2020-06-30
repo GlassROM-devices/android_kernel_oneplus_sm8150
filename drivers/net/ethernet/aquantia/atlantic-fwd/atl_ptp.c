@@ -179,8 +179,8 @@ static unsigned int atl_ptp_skb_buf_len(struct ptp_skb_ring *ring)
 
 	spin_lock_irqsave(&ring->lock, flags);
 	len = (ring->head >= ring->tail) ?
-	ring->head - ring->tail :
-	ring->size - ring->tail + ring->head;
+		ring->head - ring->tail :
+		ring->size - ring->tail + ring->head;
 	spin_unlock_irqrestore(&ring->lock, flags);
 
 	return len;

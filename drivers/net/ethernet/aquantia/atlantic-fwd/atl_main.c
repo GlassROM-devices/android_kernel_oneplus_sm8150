@@ -256,6 +256,8 @@ static int atl_ndo_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 
+	pm_runtime_get_sync(&nic->hw.pdev->dev);
+
 	switch (cmd) {
 	case SIOCSHWTSTAMP:
 		return atl_hwtstamp_set(nic, ifr);
@@ -263,6 +265,8 @@ static int atl_ndo_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 	case SIOCGHWTSTAMP:
 		return atl_hwtstamp_get(nic, ifr);
 	}
+
+	pm_runtime_put(&nic->hw.pdev->dev);
 
 	return -EOPNOTSUPP;
 }
