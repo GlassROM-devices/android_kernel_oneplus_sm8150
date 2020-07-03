@@ -23,6 +23,7 @@ struct atl_queue_vec;
 
 /* Common functions */
 int atl_ptp_init(struct atl_nic *nic);
+int atl_ptp_register(struct atl_nic *nic);
 
 void atl_ptp_unregister(struct atl_nic *nic);
 void atl_ptp_free(struct atl_nic *nic);
@@ -66,6 +67,11 @@ int atl_ptp_link_change(struct atl_nic *nic);
 #else
 
 static inline int atl_ptp_init(struct atl_nic *nic)
+{
+	return 0;
+}
+
+static int atl_ptp_register(struct atl_nic *nic)
 {
 	return 0;
 }

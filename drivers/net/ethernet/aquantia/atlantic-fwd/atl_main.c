@@ -677,6 +677,10 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_register;
 
+	ret = atl_ptp_register(nic);
+	if (ret)
+		goto err_ptp_register;
+
 	pci_set_drvdata(pdev, nic);
 	netif_carrier_off(ndev);
 
@@ -708,6 +712,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 err_hwmon_init:
 	atl_stop(nic, true);
+err_ptp_register:
 	unregister_netdev(nic->ndev);
 err_register:
 	atl_clear_datapath(nic);
@@ -750,6 +755,7 @@ static void atl_remove(struct pci_dev *pdev)
 	del_timer_sync(&nic->work_timer);
 	cancel_work_sync(&nic->work);
 	atl_intr_disable_all(&nic->hw);
+	atl_ptp_unregister(nic);
 	unregister_netdev(nic->ndev);
 
 #if IS_ENABLED(CONFIG_ATLFWD_FWD)
@@ -758,7 +764,6 @@ static void atl_remove(struct pci_dev *pdev)
 
 	atl_clear_datapath(nic);
 
-	atl_ptp_unregister(nic);
 	atl_ptp_ring_free(nic);
 	atl_ptp_free(nic);
 

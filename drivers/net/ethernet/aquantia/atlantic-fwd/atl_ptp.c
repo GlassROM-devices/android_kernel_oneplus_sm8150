@@ -1020,10 +1020,7 @@ static void atl_ptp_poll_sync_work_cb(struct work_struct *w);
 
 int atl_ptp_init(struct atl_nic *nic)
 {
-	struct atl_ptp_offset_info ptp_offset_info;
-	enum atl_gpio_pin_function gpio_pin[3];
 	struct atl_mcp *mcp = &nic->hw.mcp;
-	struct ptp_clock *clock;
 	struct atl_ptp *ptp;
 	int err = 0;
 
@@ -1036,18 +1033,6 @@ int atl_ptp_init(struct atl_nic *nic)
 		nic->ptp = NULL;
 		return 0;
 	}
-
-	err = atl_read_mcp_mem(&nic->hw, mcp->fw_stat_addr + atl_fw2_stat_ptp_offset,
-		&ptp_offset_info, sizeof(ptp_offset_info));
-	if (err)
-		return err;
-
-	err = atl_read_mcp_mem(&nic->hw, mcp->fw_stat_addr + atl_fw2_stat_gpio_pin,
-		&gpio_pin, sizeof(gpio_pin));
-	if (err)
-		return err;
-
-	atl_ptp_offset_init(&ptp_offset_info);
 
 	ptp = kzalloc(sizeof(*ptp), GFP_KERNEL);
 	if (!ptp) {
@@ -1063,15 +1048,6 @@ int atl_ptp_init(struct atl_nic *nic)
 	spin_lock_init(&ptp->ptp_lock);
 	spin_lock_init(&ptp->ptp_ring_lock);
 
-	ptp->ptp_info = atl_ptp_clock;
-	atl_ptp_gpio_init(nic, &ptp->ptp_info, &gpio_pin[0]);
-	clock = ptp_clock_register(&ptp->ptp_info, &nic->ndev->dev);
-	if (IS_ERR_OR_NULL(clock)) {
-		netdev_err(nic->ndev, "ptp_clock_register failed\n");
-		err = PTR_ERR(clock);
-		goto err_exit;
-	}
-	ptp->ptp_clock = clock;
 	atl_ptp_tx_timeout_init(&ptp->ptp_tx_timeout);
 
 	atomic_set(&ptp->offset_egress, 0);
@@ -1099,6 +1075,44 @@ err_exit:
 		kfree(ptp->ptp_info.pin_config);
 	kfree(ptp);
 	nic->ptp = NULL;
+	return err;
+}
+
+int atl_ptp_register(struct atl_nic *nic)
+{
+	struct atl_ptp_offset_info ptp_offset_info;
+	enum atl_gpio_pin_function gpio_pin[3];
+	struct atl_mcp *mcp = &nic->hw.mcp;
+	struct atl_ptp *ptp = nic->ptp;
+	struct ptp_clock *clock;
+	int err;
+
+	if (!ptp)
+		return 0;
+
+	err = atl_read_mcp_mem(&nic->hw, mcp->fw_stat_addr + atl_fw2_stat_ptp_offset,
+		&ptp_offset_info, sizeof(ptp_offset_info));
+	if (err)
+		return err;
+
+	err = atl_read_mcp_mem(&nic->hw, mcp->fw_stat_addr + atl_fw2_stat_gpio_pin,
+		&gpio_pin, sizeof(gpio_pin));
+	if (err)
+		return err;
+
+	atl_ptp_offset_init(&ptp_offset_info);
+
+	ptp->ptp_info = atl_ptp_clock;
+	atl_ptp_gpio_init(nic, &ptp->ptp_info, &gpio_pin[0]);
+	clock = ptp_clock_register(&ptp->ptp_info, &nic->ndev->dev);
+	if (IS_ERR_OR_NULL(clock)) {
+		netdev_err(nic->ndev, "ptp_clock_register failed\n");
+		err = PTR_ERR(clock);
+		goto err_exit;
+	}
+	ptp->ptp_clock = clock;
+
+err_exit:
 	return err;
 }
 
