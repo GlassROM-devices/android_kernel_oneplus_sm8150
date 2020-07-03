@@ -618,11 +618,19 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ether_addr_copy(ndev->dev_addr, hw->mac_addr);
 	atl_dev_dbg("got MAC address: %pM\n", hw->mac_addr);
 
+	ret = atl_ptp_init(nic);
+	if (ret)
+		goto err_ptp_init;
+
 	nic->requested_nvecs = atl_max_queues;
 	nic->requested_tx_size = (atl_tx_ring_size & ~7);
 	nic->requested_rx_size = (atl_rx_ring_size & ~7);
 	nic->rx_intr_delay = atl_rx_mod;
 	nic->tx_intr_delay = atl_tx_mod;
+
+	ret = atl_ptp_ring_alloc(nic);
+	if (ret)
+		goto err_ptp_alloc;
 
 	ret = atl_setup_datapath(nic);
 	if (ret)
@@ -686,24 +694,6 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_hwmon_init;
 
-	ret = atl_ptp_init(nic);
-	if (ret)
-		goto err_ptp_init;
-
-	ret = atl_ptp_ring_alloc(nic);
-	if (ret)
-		goto err_ptp_init;
-
-	if (test_bit(ATL_ST_CONFIGURED, &nic->hw.state)) {
-		/* Very first setup_datapath() is invoked a bit too early,
-		 * way before ptp rings are ready to be started,
-		 * make sure rings are started as they should here.
-		 */
-		ret = atl_ptp_ring_start(nic);
-		if (ret)
-			goto err_ptp_init;
-	}
-
 	if (hw->mcp.caps_low & atl_fw2_wake_on_link_force)
 		pm_runtime_put_noidle(&pdev->dev);
 
@@ -716,13 +706,16 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	return 0;
 
-err_ptp_init:
 err_hwmon_init:
 	atl_stop(nic, true);
 	unregister_netdev(nic->ndev);
 err_register:
 	atl_clear_datapath(nic);
 err_datapath:
+	atl_ptp_ring_free(nic);
+err_ptp_alloc:
+	atl_ptp_free(nic);
+err_ptp_init:
 err_hwinit:
 	iounmap(hw->regs);
 err_ioremap:
@@ -751,16 +744,6 @@ static void atl_remove(struct pci_dev *pdev)
 	atlfwd_nl_on_remove(nic->ndev);
 #endif
 
-	if (test_bit(ATL_ST_CONFIGURED, &nic->hw.state))
-		/* Last clear_datapath() is invoked a bit too late,
-		 * after ptp rings are already freed.
-		 * Make sure rings are stopped as they should here.
-		 */
-		atl_ptp_ring_stop(nic);
-	atl_ptp_unregister(nic);
-	atl_ptp_ring_free(nic);
-	atl_ptp_free(nic);
-
 	atl_stop(nic, true);
 	disable_needed = test_and_clear_bit(ATL_ST_ENABLED, &nic->hw.state);
 	wol_force = !!(nic->hw.mcp.caps_low & atl_fw2_wake_on_link_force);
@@ -774,6 +757,11 @@ static void atl_remove(struct pci_dev *pdev)
 #endif
 
 	atl_clear_datapath(nic);
+
+	atl_ptp_unregister(nic);
+	atl_ptp_ring_free(nic);
+	atl_ptp_free(nic);
+
 	iounmap(nic->hw.regs);
 	free_netdev(nic->ndev);
 	pci_release_regions(pdev);
