@@ -838,6 +838,7 @@ int atl_ptp_ring_start(struct atl_nic *nic)
 			goto stop;
 	}
 
+	netif_napi_add(nic->ndev, ptp->napi, atl_ptp_poll, 64);
 	napi_enable(ptp->napi);
 
 	return 0;
@@ -858,6 +859,7 @@ void atl_ptp_ring_stop(struct atl_nic *nic)
 		return;
 
 	napi_disable(ptp->napi);
+	netif_napi_del(ptp->napi);
 
 	atl_for_each_ptp_qvec(ptp, qvec)
 		atl_stop_qvec(qvec);
@@ -1076,7 +1078,6 @@ int atl_ptp_init(struct atl_nic *nic)
 	atomic_set(&ptp->offset_ingress, 0);
 
 	ptp->napi = &ptp->qvec[ATL_PTPQ_PTP].napi;
-	netif_napi_add(nic->ndev, ptp->napi, atl_ptp_poll, 64);
 
 	ptp->idx_vector = ATL_IRQ_PTP;
 
@@ -1128,7 +1129,6 @@ void atl_ptp_free(struct atl_nic *nic)
 
 	kfree(ptp->ptp_info.pin_config);
 
-	netif_napi_del(ptp->napi);
 	kfree(ptp);
 	nic->ptp = NULL;
 }
