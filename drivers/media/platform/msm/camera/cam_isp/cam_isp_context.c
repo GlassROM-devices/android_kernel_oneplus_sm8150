@@ -583,8 +583,14 @@ static int __cam_isp_ctx_handle_buf_done_in_activated_state(
 	if (ctx_isp->frame_id == 1)
 		ctx_isp->irq_timestamps = done->irq_mono_boot_time;
 	else if (ctx_isp->fps && ((done->irq_mono_boot_time -
-		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps)))
+		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps))) {
 		ctx_isp->irq_delay_detect = true;
+		trace_cam_isp_irq_delay_detect("IRQ delay at buf_done",
+			ctx, req->request_id,
+			ctx_isp->substate_activated,
+			(done->irq_mono_boot_time -
+			ctx_isp->irq_timestamps));
+	}
 
 	ctx_isp->irq_timestamps = done->irq_mono_boot_time;
 
@@ -838,8 +844,14 @@ static int __cam_isp_ctx_reg_upd_in_epoch_state(
 	if (ctx_isp->frame_id == 1)
 		ctx_isp->irq_timestamps = rup_event_data->irq_mono_boot_time;
 	else if (ctx_isp->fps && ((rup_event_data->irq_mono_boot_time -
-			ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps)))
+		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps))) {
 		ctx_isp->irq_delay_detect = true;
+		trace_cam_isp_irq_delay_detect("IRQ delay at reg_upd",
+			ctx, req->request_id,
+			ctx_isp->substate_activated,
+			(rup_event_data->irq_mono_boot_time -
+			ctx_isp->irq_timestamps));
+	}
 
 	ctx_isp->irq_timestamps = rup_event_data->irq_mono_boot_time;
 	return 0;
@@ -893,8 +905,14 @@ static int __cam_isp_ctx_reg_upd_in_activated_state(
 	if (ctx_isp->frame_id == 1)
 		ctx_isp->irq_timestamps = rup_event_data->irq_mono_boot_time;
 	else if (ctx_isp->fps && ((rup_event_data->irq_mono_boot_time -
-			ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps)))
+		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps))) {
 		ctx_isp->irq_delay_detect = true;
+		trace_cam_isp_irq_delay_detect("IRQ delay at reg_upd",
+			ctx, req->request_id,
+			ctx_isp->substate_activated,
+			(rup_event_data->irq_mono_boot_time -
+			ctx_isp->irq_timestamps));
+	}
 
 	ctx_isp->irq_timestamps = rup_event_data->irq_mono_boot_time;
 end:
@@ -1077,8 +1095,14 @@ static int __cam_isp_ctx_sof_in_activated_state(
 	if (ctx_isp->frame_id == 1)
 		ctx_isp->irq_timestamps = sof_event_data->irq_mono_boot_time;
 	else if (ctx_isp->fps && ((sof_event_data->irq_mono_boot_time -
-			ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps)))
+		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps))) {
 		ctx_isp->irq_delay_detect = true;
+		trace_cam_isp_irq_delay_detect("IRQ delay at sof",
+			ctx, req->request_id,
+			ctx_isp->substate_activated,
+			(sof_event_data->irq_mono_boot_time -
+			ctx_isp->irq_timestamps));
+	}
 
 	ctx_isp->irq_timestamps = sof_event_data->irq_mono_boot_time;
 
@@ -1125,8 +1149,14 @@ static int __cam_isp_ctx_reg_upd_in_sof(struct cam_isp_context *ctx_isp,
 	if (ctx_isp->frame_id == 1)
 		ctx_isp->irq_timestamps = rup_event_data->irq_mono_boot_time;
 	else if (ctx_isp->fps && ((rup_event_data->irq_mono_boot_time -
-			ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps)))
+		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps))) {
 		ctx_isp->irq_delay_detect = true;
+		trace_cam_isp_irq_delay_detect("IRQ delay at reg_upd",
+			ctx, req->request_id,
+			ctx_isp->substate_activated,
+			(rup_event_data->irq_mono_boot_time -
+			ctx_isp->irq_timestamps));
+	}
 
 	ctx_isp->irq_timestamps = rup_event_data->irq_mono_boot_time;
 
@@ -1216,8 +1246,14 @@ end:
 		ctx_isp->irq_timestamps =
 			epoch_hw_event_data->irq_mono_boot_time;
 	else if (ctx_isp->fps && ((epoch_hw_event_data->irq_mono_boot_time -
-			ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps)))
+		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps))) {
 		ctx_isp->irq_delay_detect = true;
+		trace_cam_isp_irq_delay_detect("IRQ delay at epoch",
+			ctx, req->request_id,
+			ctx_isp->substate_activated,
+			(epoch_hw_event_data->irq_mono_boot_time -
+			ctx_isp->irq_timestamps));
+	}
 
 	ctx_isp->irq_timestamps = epoch_hw_event_data->irq_mono_boot_time;
 
@@ -1256,8 +1292,14 @@ static int __cam_isp_ctx_sof_in_epoch(struct cam_isp_context *ctx_isp,
 	if (ctx_isp->frame_id == 1)
 		ctx_isp->irq_timestamps = sof_event_data->irq_mono_boot_time;
 	else if (ctx_isp->fps && ((sof_event_data->irq_mono_boot_time -
-			ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps)))
+		ctx_isp->irq_timestamps) > ((1000*1000)/ctx_isp->fps))) {
 		ctx_isp->irq_delay_detect = true;
+		trace_cam_isp_irq_delay_detect("IRQ delay at sof",
+			ctx, 0,
+			ctx_isp->substate_activated,
+			(sof_event_data->irq_mono_boot_time -
+			ctx_isp->irq_timestamps));
+	}
 
 	ctx_isp->irq_timestamps = sof_event_data->irq_mono_boot_time;
 
@@ -2453,13 +2495,20 @@ static int __cam_isp_ctx_flush_req_in_top_state(
 		ctx->hw_mgr_intf->hw_stop(ctx->hw_mgr_intf->hw_mgr_priv,
 				&stop_args);
 
+		/*
+		 * As HW is stopped already No request will move from
+		 * one list to other good time to flush reqs.
+		 */
 		spin_lock_bh(&ctx->lock);
+		CAM_DBG(CAM_ISP, "try to flush pending list");
+		rc = __cam_isp_ctx_flush_req(ctx, &ctx->pending_req_list,
+			flush_req);
 		CAM_DBG(CAM_ISP, "try to flush wait list");
 		rc = __cam_isp_ctx_flush_req(ctx, &ctx->wait_req_list,
-		flush_req);
+			flush_req);
 		CAM_DBG(CAM_ISP, "try to flush active list");
 		rc = __cam_isp_ctx_flush_req(ctx, &ctx->active_req_list,
-		flush_req);
+			flush_req);
 		ctx_isp->active_req_cnt = 0;
 		spin_unlock_bh(&ctx->lock);
 
