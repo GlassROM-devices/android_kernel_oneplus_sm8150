@@ -932,6 +932,12 @@ static int atl_pm_runtime_idle(struct device *dev)
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct atl_nic *nic = pci_get_drvdata(pdev);
 
+	/* pm_runtime_idle may be called during probe */
+	if (!nic)
+		return -EBUSY;
+	if (nic->hw.pdev != pdev)
+		return -EBUSY;
+
 	if (!netif_carrier_ok(nic->ndev)) {
 		pm_schedule_suspend(&nic->hw.pdev->dev, atl_sleep_delay);
 	}
