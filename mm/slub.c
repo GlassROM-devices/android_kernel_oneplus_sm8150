@@ -1449,6 +1449,7 @@ static bool freelist_corrupted(struct kmem_cache *s, struct page *page,
 {
 	return false;
 }
+#endif
 #endif /* CONFIG_SLUB_DEBUG */
 
 /*
