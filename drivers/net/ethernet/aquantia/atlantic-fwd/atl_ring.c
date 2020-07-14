@@ -124,7 +124,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 		while (len > ATL_DATA_PER_TXD) {
 			desc->len = cpu_to_le16(ATL_DATA_PER_TXD);
 			trace_atl_tx_descr(ring->qvec->idx, idx, (u64 *)desc);
-			WRITE_ONCE(ring->hw.descs[idx].tx, *desc);
+			ring->hw.descs[idx].tx = *desc;
 			bump_ptr(idx, ring, 1);
 			daddr += ATL_DATA_PER_TXD;
 			len -= ATL_DATA_PER_TXD;
@@ -136,7 +136,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 			break;
 
 		trace_atl_tx_descr(ring->qvec->idx, idx, (u64 *)desc);
-		WRITE_ONCE(ring->hw.descs[idx].tx, *desc);
+		ring->hw.descs[idx].tx = *desc;
 		bump_ptr(idx, ring, 1);
 		txbuf = &ring->txbufs[idx];
 		len = skb_frag_size(frag);
@@ -154,7 +154,7 @@ static netdev_tx_t atl_map_xmit_skb(struct sk_buff *skb,
 	desc->cmd |= tx_desc_cmd_wb;
 #endif
 	trace_atl_tx_descr(ring->qvec->idx, idx, (u64 *)desc);
-	WRITE_ONCE(ring->hw.descs[idx].tx, *desc);
+	ring->hw.descs[idx].tx = *desc;
 	first_buf->last = idx;
 	bump_ptr(idx, ring, 1);
 	ring->txbufs[idx].last = -1;
@@ -410,7 +410,7 @@ static bool atl_clean_tx(struct atl_desc_ring *ring)
 		u64_stats_update_end(&ring->syncp);
 	}
 
-	WRITE_ONCE(ring->head, first);
+	ring->head = first;
 
 	if (likely(ring->qvec->type != ATL_QUEUE_PTP) &&
 	    ring_space(ring) > atl_tx_free_high) {
