@@ -113,10 +113,10 @@ static inline netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff
 
 static inline void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp) {}
 
-static inline void atl_ptp_hwtstamp_config_get(struct atl_ptp *ptp,
+static inline void atl_ptp_hwtstamp_config_get(struct atl_nic *nic,
 					       struct hwtstamp_config *config) {}
 
-static inline int atl_ptp_hwtstamp_config_set(struct atl_ptp *ptp,
+static inline int atl_ptp_hwtstamp_config_set(struct atl_nic *nic,
 					      struct hwtstamp_config *config)
 {
 	return 0;
