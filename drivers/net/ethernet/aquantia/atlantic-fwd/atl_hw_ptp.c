@@ -110,7 +110,8 @@ int hw_atl_adj_sys_clock(struct atl_hw *hw, s64 delta)
 {
 	hw->ptp_clk_offset += delta;
 
-	hw->mcp.ops->adjust_ptp(hw, hw->ptp_clk_offset);
+	atl_write(hw, ATL_RX_SPARE_CTRL0, lower_32_bits(hw->ptp_clk_offset));
+	atl_write(hw, ATL_RX_SPARE_CTRL1, upper_32_bits(hw->ptp_clk_offset));
 
 	return 0;
 }
