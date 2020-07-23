@@ -111,9 +111,11 @@ struct atl_ethtool_compat {
 static int atl_ethtool_get_settings(struct net_device *ndev,
 				 struct ethtool_cmd *cmd)
 {
-	struct atl_ethtool_compat cmd_compat = {0};
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_link_state *lstate = &nic->hw.link_state;
+	struct atl_ethtool_compat cmd_compat;
+
+	memset(&cmd_compat, 0, sizeof(cmd_compat));
 
 	atl_ethtool_get_common(cmd, &cmd_compat, lstate, true);
 	cmd->supported = cmd_compat.link_modes.supported;
@@ -1824,11 +1826,14 @@ static void atl2_rxf_set_ntuple(struct atl_nic *nic,
 				struct atl_rxf_ntuple *ntuple,
 				int idx)
 {
-	struct atl2_rxf_l3 l3 = {0};
-	struct atl2_rxf_l4 l4 = {0};
+	struct atl2_rxf_l3 l3;
+	struct atl2_rxf_l4 l4;
 	s8 l3_idx = -1;
 	s8 l4_idx = -1;
 	int i;
+
+	memset(&l3, 0, sizeof(l3));
+	memset(&l4, 0, sizeof(l4));
 
 	if (ntuple->cmd[idx] & ATL_NTC_PROTO)
 		l3.cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
