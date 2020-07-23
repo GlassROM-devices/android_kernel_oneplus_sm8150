@@ -115,13 +115,6 @@ int hw_atl_adj_sys_clock(struct atl_hw *hw, s64 delta)
 	return 0;
 }
 
-int hw_atl_set_sys_clock(struct atl_hw *hw, u64 time, u64 ts)
-{
-	s64 delta = time - (hw->ptp_clk_offset + ts);
-
-	return hw_atl_adj_sys_clock(hw, delta);
-}
-
 int hw_atl_ts_to_sys_clock(struct atl_hw *hw, u64 ts, u64 *time)
 {
 	*time = hw->ptp_clk_offset + ts;
