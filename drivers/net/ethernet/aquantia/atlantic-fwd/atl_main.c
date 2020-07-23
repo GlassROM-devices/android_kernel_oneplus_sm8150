@@ -544,7 +544,7 @@ static int atl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct net_device *ndev;
 	struct atl_nic *nic = NULL;
 	struct atl_hw *hw;
-	int disable_needed;
+	int disable_needed = 0;
 
 	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_forbid(&pdev->dev);
