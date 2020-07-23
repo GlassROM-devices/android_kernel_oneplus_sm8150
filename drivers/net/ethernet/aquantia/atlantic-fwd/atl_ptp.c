@@ -26,6 +26,10 @@
 
 #define MAX_PTP_GPIO_COUNT 4
 
+#define PTP_8TC_RING_IDX             8
+#define PTP_4TC_RING_IDX            16
+#define PTP_HWTS_RING_IDX           31
+
 enum ptp_speed_offsets {
 	ptp_offset_idx_10 = 0,
 	ptp_offset_idx_100,
@@ -98,29 +102,6 @@ struct ptp_tm_offset {
 };
 
 static struct ptp_tm_offset ptp_offset[6];
-
-void atl_ptp_tm_offset_set(struct atl_nic *nic, unsigned int mbps)
-{
-	struct atl_ptp *ptp = nic->ptp;
-	int i, egress, ingress;
-
-	if (!ptp)
-		return;
-
-	egress = 0;
-	ingress = 0;
-
-	for (i = 0; i < ARRAY_SIZE(ptp_offset); i++) {
-		if (mbps == ptp_offset[i].mbps) {
-			egress = ptp_offset[i].egress;
-			ingress = ptp_offset[i].ingress;
-			break;
-		}
-	}
-
-	atomic_set(&ptp->offset_egress, egress);
-	atomic_set(&ptp->offset_ingress, ingress);
-}
 
 static int __atl_ptp_skb_put(struct ptp_skb_ring *ring, struct sk_buff *skb)
 {
@@ -522,6 +503,312 @@ static int atl_ptp_verify(struct ptp_clock_info *ptp, unsigned int pin,
 	return 0;
 }
 
+/* atl_ptp_rx_hwtstamp - utility function which checks for RX time stamp
+ * @skb: particular skb to send timestamp with
+ *
+ * if the timestamp is valid, we convert it into the timecounter ns
+ * value, then store that result into the hwtstamps structure which
+ * is passed up the network stack
+ */
+static void atl_ptp_rx_hwtstamp(struct atl_ptp *ptp, struct sk_buff *skb,
+				u64 timestamp)
+{
+	timestamp -= atomic_read(&ptp->offset_ingress);
+	atl_ptp_convert_to_hwtstamp(skb_hwtstamps(skb), timestamp);
+}
+
+static int atl_ptp_ring_index(enum atl_ptp_queue ptp_queue)
+{
+	switch (ptp_queue) {
+	case ATL_PTPQ_PTP:
+		/* multi-TC is not supported in FWD driver, so tc mode is
+		 * always set to 4 TCs (each with 8 queues) for now
+		 */
+		return PTP_4TC_RING_IDX;
+	case ATL_PTPQ_HWTS:
+		return PTP_HWTS_RING_IDX;
+	default:
+		break;
+	}
+
+	WARN_ONCE(1, "Invalid ptp_queue");
+	return 0;
+}
+
+static int atl_ptp_poll(struct napi_struct *napi, int budget)
+{
+	struct atl_queue_vec *qvec = container_of(napi, struct atl_queue_vec, napi);
+	struct atl_ptp *ptp = qvec->nic->ptp;
+	int work_done = 0;
+
+	/* Processing PTP TX and RX traffic */
+	work_done = atl_poll_qvec(&ptp->qvec[ATL_PTPQ_PTP], budget);
+
+	/* Processing HW_TIMESTAMP RX traffic */
+	atl_clean_hwts_rx(&ptp->qvec[ATL_PTPQ_HWTS].rx, budget);
+
+	if (work_done < budget) {
+		napi_complete_done(ptp->napi, work_done);
+		atl_intr_enable(&qvec->nic->hw, BIT(atl_qvec_intr(qvec)));
+		/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
+	}
+
+	return work_done;
+}
+
+static irqreturn_t atl_ptp_irq(int irq, void *private)
+{
+	struct atl_ptp *ptp = private;
+	int err = 0;
+
+	if (!ptp) {
+		err = -EINVAL;
+		goto err_exit;
+	}
+	napi_schedule_irqoff(ptp->napi);
+
+err_exit:
+	return err >= 0 ? IRQ_HANDLED : IRQ_NONE;
+}
+
+static struct ptp_clock_info atl_ptp_clock = {
+	.owner		= THIS_MODULE,
+	.name		= "atlantic ptp",
+	.max_adj	= 999999999,
+	.n_ext_ts	= 0,
+	.pps		= 0,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+	.adjfine	= atl_ptp_adjfine,
+#endif
+	.adjtime	= atl_ptp_adjtime,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+	.gettime64	= atl_ptp_gettime,
+	.settime64	= atl_ptp_settime,
+#else
+	.gettime	= atl_ptp_gettime,
+	.settime	= atl_ptp_settime,
+#endif
+	.n_per_out	= 0,
+	.enable		= atl_ptp_gpio_feature_enable,
+	.n_pins		= 0,
+	.verify		= atl_ptp_verify,
+	.pin_config	= NULL,
+};
+
+#define ptp_offset_init(__idx, __mbps, __egress, __ingress)   do { \
+		ptp_offset[__idx].mbps = (__mbps); \
+		ptp_offset[__idx].egress = (__egress); \
+		ptp_offset[__idx].ingress = (__ingress); } \
+		while (0)
+
+static void atl_ptp_offset_init_from_fw(const struct atl_ptp_offset_info *offsets)
+{
+	int i;
+
+	/* Load offsets for PTP */
+	for (i = 0; i < ARRAY_SIZE(ptp_offset); i++) {
+		switch (i) {
+		/* 100M */
+		case ptp_offset_idx_100:
+			ptp_offset_init(i, 100,
+					offsets->egress_100,
+					offsets->ingress_100);
+			break;
+		/* 1G */
+		case ptp_offset_idx_1000:
+			ptp_offset_init(i, 1000,
+					offsets->egress_1000,
+					offsets->ingress_1000);
+			break;
+		/* 2.5G */
+		case ptp_offset_idx_2500:
+			ptp_offset_init(i, 2500,
+					offsets->egress_2500,
+					offsets->ingress_2500);
+			break;
+		/* 5G */
+		case ptp_offset_idx_5000:
+			ptp_offset_init(i, 5000,
+					offsets->egress_5000,
+					offsets->ingress_5000);
+			break;
+		/* 10G */
+		case ptp_offset_idx_10000:
+			ptp_offset_init(i, 10000,
+					offsets->egress_10000,
+					offsets->ingress_10000);
+			break;
+		}
+	}
+}
+
+static void atl_ptp_offset_init(const struct atl_ptp_offset_info *offsets)
+{
+	memset(ptp_offset, 0, sizeof(ptp_offset));
+
+	atl_ptp_offset_init_from_fw(offsets);
+}
+
+static void atl_ptp_gpio_init(struct atl_nic *nic,
+			      struct ptp_clock_info *info,
+			      enum atl_gpio_pin_function *gpio_pin)
+{
+	struct ptp_pin_desc pin_desc[MAX_PTP_GPIO_COUNT];
+	u32 extts_pin_cnt = 0;
+	u32 out_pin_cnt = 0;
+	u32 i;
+
+	memset(pin_desc, 0, sizeof(pin_desc));
+
+	for (i = 0; i < MAX_PTP_GPIO_COUNT - 1; i++) {
+		if (gpio_pin[i] ==
+		    (GPIO_PIN_FUNCTION_PTP0 + out_pin_cnt)) {
+			snprintf(pin_desc[out_pin_cnt].name,
+				 sizeof(pin_desc[out_pin_cnt].name),
+				 "AQ_GPIO%d", i);
+			pin_desc[out_pin_cnt].index = out_pin_cnt;
+			pin_desc[out_pin_cnt].chan = out_pin_cnt;
+			pin_desc[out_pin_cnt++].func = PTP_PF_PEROUT;
+		}
+	}
+
+	info->n_per_out = out_pin_cnt;
+
+	if (nic->hw.mcp.caps_ex & atl_fw2_ex_caps_phy_ctrl_ts_pin) {
+		extts_pin_cnt += 1;
+
+		snprintf(pin_desc[out_pin_cnt].name,
+			 sizeof(pin_desc[out_pin_cnt].name),
+			  "AQ_GPIO%d", out_pin_cnt);
+		pin_desc[out_pin_cnt].index = out_pin_cnt;
+		pin_desc[out_pin_cnt].chan = 0;
+		pin_desc[out_pin_cnt].func = PTP_PF_EXTTS;
+	}
+
+	info->n_pins = out_pin_cnt + extts_pin_cnt;
+	info->n_ext_ts = extts_pin_cnt;
+
+	if (!info->n_pins)
+		return;
+
+	info->pin_config = kcalloc(info->n_pins, sizeof(struct ptp_pin_desc),
+				   GFP_KERNEL);
+
+	if (!info->pin_config)
+		return;
+
+	memcpy(info->pin_config, &pin_desc,
+	       sizeof(struct ptp_pin_desc) * info->n_pins);
+}
+
+/* PTP external GPIO nanoseconds count */
+static uint64_t atl_ptp_get_sync1588_ts(struct atl_nic *nic)
+{
+	u64 ts = 0;
+
+	hw_atl_get_sync_ts(&nic->hw, &ts);
+
+	return ts;
+}
+
+static void atl_ptp_start_work(struct atl_ptp *ptp)
+{
+	if (ptp->extts_pin_enabled) {
+		ptp->poll_timeout_ms = POLL_SYNC_TIMER_MS;
+		ptp->last_sync1588_ts = atl_ptp_get_sync1588_ts(ptp->nic);
+		schedule_delayed_work(&ptp->poll_sync,
+				      msecs_to_jiffies(ptp->poll_timeout_ms));
+	}
+}
+
+static bool atl_ptp_sync_ts_updated(struct atl_ptp *ptp, u64 *new_ts)
+{
+	struct atl_nic *nic = ptp->nic;
+	u64 sync_ts2;
+	u64 sync_ts;
+
+	sync_ts = atl_ptp_get_sync1588_ts(nic);
+
+	if (sync_ts != ptp->last_sync1588_ts) {
+		sync_ts2 = atl_ptp_get_sync1588_ts(nic);
+		if (sync_ts != sync_ts2) {
+			sync_ts = sync_ts2;
+			sync_ts2 = atl_ptp_get_sync1588_ts(nic);
+			if (sync_ts != sync_ts2) {
+				atl_nic_err("%s: Unable to get correct GPIO TS",
+					    __func__);
+				sync_ts = 0;
+			}
+		}
+
+		*new_ts = sync_ts;
+		return true;
+	}
+	return false;
+}
+
+static int atl_ptp_check_sync1588(struct atl_ptp *ptp)
+{
+	struct atl_nic *nic = ptp->nic;
+	u64 sync_ts;
+
+	 /* Sync1588 pin was triggered */
+	if (atl_ptp_sync_ts_updated(ptp, &sync_ts)) {
+		if (ptp->extts_pin_enabled) {
+			struct ptp_clock_event ptp_event;
+			u64 time = 0;
+
+			hw_atl_ts_to_sys_clock(&nic->hw, sync_ts, &time);
+			ptp_event.index = ptp->ptp_info.n_pins - 1;
+			ptp_event.timestamp = time;
+
+			ptp_event.type = PTP_CLOCK_EXTTS;
+			ptp_clock_event(ptp->ptp_clock, &ptp_event);
+		}
+
+		ptp->last_sync1588_ts = sync_ts;
+	}
+
+	return 0;
+}
+
+static void atl_ptp_poll_sync_work_cb(struct work_struct *w)
+{
+	struct delayed_work *dw = to_delayed_work(w);
+	struct atl_ptp *ptp = container_of(dw, struct atl_ptp, poll_sync);
+
+	atl_ptp_check_sync1588(ptp);
+
+	if (ptp->extts_pin_enabled) {
+		unsigned long timeout = msecs_to_jiffies(ptp->poll_timeout_ms);
+
+		schedule_delayed_work(&ptp->poll_sync, timeout);
+	}
+}
+
+void atl_ptp_tm_offset_set(struct atl_nic *nic, unsigned int mbps)
+{
+	struct atl_ptp *ptp = nic->ptp;
+	int i, egress, ingress;
+
+	if (!ptp)
+		return;
+
+	egress = 0;
+	ingress = 0;
+
+	for (i = 0; i < ARRAY_SIZE(ptp_offset); i++) {
+		if (mbps == ptp_offset[i].mbps) {
+			egress = ptp_offset[i].egress;
+			ingress = ptp_offset[i].ingress;
+			break;
+		}
+	}
+
+	atomic_set(&ptp->offset_egress, egress);
+	atomic_set(&ptp->offset_ingress, ingress);
+}
+
 /* atl_ptp_tx_hwtstamp - utility function which checks for TX time stamp
  *
  * if the timestamp is valid, we convert it into the timecounter ns
@@ -548,20 +835,6 @@ void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp)
 	} while (skb);
 
 	atl_ptp_tx_timeout_update(ptp);
-}
-
-/* atl_ptp_rx_hwtstamp - utility function which checks for RX time stamp
- * @skb: particular skb to send timestamp with
- *
- * if the timestamp is valid, we convert it into the timecounter ns
- * value, then store that result into the hwtstamps structure which
- * is passed up the network stack
- */
-static void atl_ptp_rx_hwtstamp(struct atl_ptp *ptp, struct sk_buff *skb,
-				u64 timestamp)
-{
-	timestamp -= atomic_read(&ptp->offset_ingress);
-	atl_ptp_convert_to_hwtstamp(skb_hwtstamps(skb), timestamp);
 }
 
 void atl_ptp_hwtstamp_config_get(struct atl_nic *nic,
@@ -615,28 +888,6 @@ int atl_ptp_hwtstamp_config_set(struct atl_nic *nic,
 	return 0;
 }
 
-#define PTP_8TC_RING_IDX             8
-#define PTP_4TC_RING_IDX            16
-#define PTP_HWTS_RING_IDX           31
-
-int atl_ptp_ring_index(enum atl_ptp_queue ptp_queue)
-{
-	switch (ptp_queue) {
-	case ATL_PTPQ_PTP:
-		/* multi-TC is not supported in FWD driver, so tc mode is
-		 * always set to 4 TCs (each with 8 queues) for now
-		 */
-		return PTP_4TC_RING_IDX;
-	case ATL_PTPQ_HWTS:
-		return PTP_HWTS_RING_IDX;
-	default:
-		break;
-	}
-
-	WARN_ONCE(1, "Invalid ptp_queue");
-	return 0;
-}
-
 int atl_ptp_qvec_intr(struct atl_queue_vec *qvec)
 {
 	int i;
@@ -673,42 +924,6 @@ u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb, u8 *p,
 		atl_ptp_rx_hwtstamp(ptp, skb, timestamp);
 
 	return ret;
-}
-
-static int atl_ptp_poll(struct napi_struct *napi, int budget)
-{
-	struct atl_queue_vec *qvec = container_of(napi, struct atl_queue_vec, napi);
-	struct atl_ptp *ptp = qvec->nic->ptp;
-	int work_done = 0;
-
-	/* Processing PTP TX and RX traffic */
-	work_done = atl_poll_qvec(&ptp->qvec[ATL_PTPQ_PTP], budget);
-
-	/* Processing HW_TIMESTAMP RX traffic */
-	atl_clean_hwts_rx(&ptp->qvec[ATL_PTPQ_HWTS].rx, budget);
-
-	if (work_done < budget) {
-		napi_complete_done(ptp->napi, work_done);
-		atl_intr_enable(&qvec->nic->hw, BIT(atl_qvec_intr(qvec)));
-		/* atl_set_intr_throttle(&nic->hw, qvec->idx); */
-	}
-
-	return work_done;
-}
-
-static irqreturn_t atl_ptp_irq(int irq, void *private)
-{
-	struct atl_ptp *ptp = private;
-	int err = 0;
-
-	if (!ptp) {
-		err = -EINVAL;
-		goto err_exit;
-	}
-	napi_schedule_irqoff(ptp->napi);
-
-err_exit:
-	return err >= 0 ? IRQ_HANDLED : IRQ_NONE;
 }
 
 netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff *skb)
@@ -877,136 +1092,6 @@ void atl_ptp_ring_free(struct atl_nic *nic)
 	atl_ptp_skb_ring_release(&ptp->skb_ring);
 }
 
-static struct ptp_clock_info atl_ptp_clock = {
-	.owner		= THIS_MODULE,
-	.name		= "atlantic ptp",
-	.max_adj	= 999999999,
-	.n_ext_ts	= 0,
-	.pps		= 0,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
-	.adjfine	= atl_ptp_adjfine,
-#endif
-	.adjtime	= atl_ptp_adjtime,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
-	.gettime64	= atl_ptp_gettime,
-	.settime64	= atl_ptp_settime,
-#else
-	.gettime	= atl_ptp_gettime,
-	.settime	= atl_ptp_settime,
-#endif
-	.n_per_out	= 0,
-	.enable		= atl_ptp_gpio_feature_enable,
-	.n_pins		= 0,
-	.verify		= atl_ptp_verify,
-	.pin_config	= NULL,
-};
-
-#define ptp_offset_init(__idx, __mbps, __egress, __ingress)   do { \
-		ptp_offset[__idx].mbps = (__mbps); \
-		ptp_offset[__idx].egress = (__egress); \
-		ptp_offset[__idx].ingress = (__ingress); } \
-		while (0)
-
-static void atl_ptp_offset_init_from_fw(const struct atl_ptp_offset_info *offsets)
-{
-	int i;
-
-	/* Load offsets for PTP */
-	for (i = 0; i < ARRAY_SIZE(ptp_offset); i++) {
-		switch (i) {
-		/* 100M */
-		case ptp_offset_idx_100:
-			ptp_offset_init(i, 100,
-					offsets->egress_100,
-					offsets->ingress_100);
-			break;
-		/* 1G */
-		case ptp_offset_idx_1000:
-			ptp_offset_init(i, 1000,
-					offsets->egress_1000,
-					offsets->ingress_1000);
-			break;
-		/* 2.5G */
-		case ptp_offset_idx_2500:
-			ptp_offset_init(i, 2500,
-					offsets->egress_2500,
-					offsets->ingress_2500);
-			break;
-		/* 5G */
-		case ptp_offset_idx_5000:
-			ptp_offset_init(i, 5000,
-					offsets->egress_5000,
-					offsets->ingress_5000);
-			break;
-		/* 10G */
-		case ptp_offset_idx_10000:
-			ptp_offset_init(i, 10000,
-					offsets->egress_10000,
-					offsets->ingress_10000);
-			break;
-		}
-	}
-}
-
-static void atl_ptp_offset_init(const struct atl_ptp_offset_info *offsets)
-{
-	memset(ptp_offset, 0, sizeof(ptp_offset));
-
-	atl_ptp_offset_init_from_fw(offsets);
-}
-
-static void atl_ptp_gpio_init(struct atl_nic *nic,
-			      struct ptp_clock_info *info,
-			      enum atl_gpio_pin_function *gpio_pin)
-{
-	struct ptp_pin_desc pin_desc[MAX_PTP_GPIO_COUNT];
-	u32 extts_pin_cnt = 0;
-	u32 out_pin_cnt = 0;
-	u32 i;
-
-	memset(pin_desc, 0, sizeof(pin_desc));
-
-	for (i = 0; i < MAX_PTP_GPIO_COUNT - 1; i++) {
-		if (gpio_pin[i] ==
-		    (GPIO_PIN_FUNCTION_PTP0 + out_pin_cnt)) {
-			snprintf(pin_desc[out_pin_cnt].name,
-				 sizeof(pin_desc[out_pin_cnt].name),
-				 "AQ_GPIO%d", i);
-			pin_desc[out_pin_cnt].index = out_pin_cnt;
-			pin_desc[out_pin_cnt].chan = out_pin_cnt;
-			pin_desc[out_pin_cnt++].func = PTP_PF_PEROUT;
-		}
-	}
-
-	info->n_per_out = out_pin_cnt;
-
-	if (nic->hw.mcp.caps_ex & atl_fw2_ex_caps_phy_ctrl_ts_pin) {
-		extts_pin_cnt += 1;
-
-		snprintf(pin_desc[out_pin_cnt].name,
-			 sizeof(pin_desc[out_pin_cnt].name),
-			  "AQ_GPIO%d", out_pin_cnt);
-		pin_desc[out_pin_cnt].index = out_pin_cnt;
-		pin_desc[out_pin_cnt].chan = 0;
-		pin_desc[out_pin_cnt].func = PTP_PF_EXTTS;
-	}
-
-	info->n_pins = out_pin_cnt + extts_pin_cnt;
-	info->n_ext_ts = extts_pin_cnt;
-
-	if (!info->n_pins)
-		return;
-
-	info->pin_config = kcalloc(info->n_pins, sizeof(struct ptp_pin_desc),
-				   GFP_KERNEL);
-
-	if (!info->pin_config)
-		return;
-
-	memcpy(info->pin_config, &pin_desc,
-	       sizeof(struct ptp_pin_desc) * info->n_pins);
-}
-
 void atl_ptp_clock_init(struct atl_nic *nic)
 {
 	struct atl_ptp *ptp = nic->ptp;
@@ -1015,8 +1100,6 @@ void atl_ptp_clock_init(struct atl_nic *nic)
 	ktime_get_real_ts64(&ts);
 	atl_ptp_settime(&ptp->ptp_info, &ts);
 }
-
-static void atl_ptp_poll_sync_work_cb(struct work_struct *w);
 
 int atl_ptp_init(struct atl_nic *nic)
 {
@@ -1152,26 +1235,6 @@ struct ptp_clock *atl_ptp_get_ptp_clock(struct atl_nic *nic)
 	return nic->ptp->ptp_clock;
 }
 
-/* PTP external GPIO nanoseconds count */
-static uint64_t atl_ptp_get_sync1588_ts(struct atl_nic *nic)
-{
-	u64 ts = 0;
-
-	hw_atl_get_sync_ts(&nic->hw, &ts);
-
-	return ts;
-}
-
-static void atl_ptp_start_work(struct atl_ptp *ptp)
-{
-	if (ptp->extts_pin_enabled) {
-		ptp->poll_timeout_ms = POLL_SYNC_TIMER_MS;
-		ptp->last_sync1588_ts = atl_ptp_get_sync1588_ts(ptp->nic);
-		schedule_delayed_work(&ptp->poll_sync,
-				      msecs_to_jiffies(ptp->poll_timeout_ms));
-	}
-}
-
 int atl_ptp_link_change(struct atl_nic *nic)
 {
 	struct atl_ptp *ptp = nic->ptp;
@@ -1186,71 +1249,6 @@ int atl_ptp_link_change(struct atl_nic *nic)
 		cancel_delayed_work_sync(&ptp->poll_sync);
 
 	return 0;
-}
-
-static bool atl_ptp_sync_ts_updated(struct atl_ptp *ptp, u64 *new_ts)
-{
-	struct atl_nic *nic = ptp->nic;
-	u64 sync_ts2;
-	u64 sync_ts;
-
-	sync_ts = atl_ptp_get_sync1588_ts(nic);
-
-	if (sync_ts != ptp->last_sync1588_ts) {
-		sync_ts2 = atl_ptp_get_sync1588_ts(nic);
-		if (sync_ts != sync_ts2) {
-			sync_ts = sync_ts2;
-			sync_ts2 = atl_ptp_get_sync1588_ts(nic);
-			if (sync_ts != sync_ts2) {
-				atl_nic_err("%s: Unable to get correct GPIO TS",
-					    __func__);
-				sync_ts = 0;
-			}
-		}
-
-		*new_ts = sync_ts;
-		return true;
-	}
-	return false;
-}
-
-static int atl_ptp_check_sync1588(struct atl_ptp *ptp)
-{
-	struct atl_nic *nic = ptp->nic;
-	u64 sync_ts;
-
-	 /* Sync1588 pin was triggered */
-	if (atl_ptp_sync_ts_updated(ptp, &sync_ts)) {
-		if (ptp->extts_pin_enabled) {
-			struct ptp_clock_event ptp_event;
-			u64 time = 0;
-
-			hw_atl_ts_to_sys_clock(&nic->hw, sync_ts, &time);
-			ptp_event.index = ptp->ptp_info.n_pins - 1;
-			ptp_event.timestamp = time;
-
-			ptp_event.type = PTP_CLOCK_EXTTS;
-			ptp_clock_event(ptp->ptp_clock, &ptp_event);
-		}
-
-		ptp->last_sync1588_ts = sync_ts;
-	}
-
-	return 0;
-}
-
-void atl_ptp_poll_sync_work_cb(struct work_struct *w)
-{
-	struct delayed_work *dw = to_delayed_work(w);
-	struct atl_ptp *ptp = container_of(dw, struct atl_ptp, poll_sync);
-
-	atl_ptp_check_sync1588(ptp);
-
-	if (ptp->extts_pin_enabled) {
-		unsigned long timeout = msecs_to_jiffies(ptp->poll_timeout_ms);
-
-		schedule_delayed_work(&ptp->poll_sync, timeout);
-	}
 }
 
 #endif
