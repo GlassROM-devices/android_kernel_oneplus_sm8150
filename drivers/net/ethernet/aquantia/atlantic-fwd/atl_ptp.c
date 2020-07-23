@@ -9,15 +9,19 @@
  * published by the Free Software Foundation.
  */
 
+#include "atl_ptp.h"
+
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 #include <linux/ptp_clock_kernel.h>
 #include <linux/ptp_classify.h>
 #include <linux/clocksource.h>
+#endif
 
-#include "atl_ptp.h"
+#include "atl_ring.h"
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 #include "atl_common.h"
 #include "atl_ethtool.h"
 #include "atl_hw_ptp.h"
-#include "atl_ring.h"
 #include "atl_ring_desc.h"
 
 #define ATL_PTP_TX_TIMEOUT        (HZ *  10)
@@ -58,8 +62,6 @@ enum atl_ptp_queue {
 	ATL_PTPQ_HWTS = 1,
 	ATL_PTPQ_NUM,
 };
-
-#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 
 struct atl_ptp {
 	struct atl_nic *nic;
@@ -786,8 +788,11 @@ static void atl_ptp_poll_sync_work_cb(struct work_struct *w)
 	}
 }
 
+#endif /* IS_REACHABLE(CONFIG_PTP_1588_CLOCK) */
+
 void atl_ptp_tm_offset_set(struct atl_nic *nic, unsigned int mbps)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	int i, egress, ingress;
 
@@ -807,6 +812,7 @@ void atl_ptp_tm_offset_set(struct atl_nic *nic, unsigned int mbps)
 
 	atomic_set(&ptp->offset_egress, egress);
 	atomic_set(&ptp->offset_ingress, ingress);
+#endif
 }
 
 /* atl_ptp_tx_hwtstamp - utility function which checks for TX time stamp
@@ -817,6 +823,7 @@ void atl_ptp_tm_offset_set(struct atl_nic *nic, unsigned int mbps)
  */
 void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	struct sk_buff *skb = atl_ptp_skb_get(&ptp->skb_ring);
 	struct skb_shared_hwtstamps hwtstamp;
@@ -835,19 +842,23 @@ void atl_ptp_tx_hwtstamp(struct atl_nic *nic, u64 timestamp)
 	} while (skb);
 
 	atl_ptp_tx_timeout_update(ptp);
+#endif
 }
 
 void atl_ptp_hwtstamp_config_get(struct atl_nic *nic,
 				 struct hwtstamp_config *config)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 
 	*config = ptp->hwtstamp_config;
+#endif
 }
 
 int atl_ptp_hwtstamp_config_set(struct atl_nic *nic,
 				struct hwtstamp_config *config)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	static u32 ntuple_cmd =
 		ATL_NTC_PROTO |
@@ -884,18 +895,21 @@ int atl_ptp_hwtstamp_config_set(struct atl_nic *nic,
 	}
 
 	ptp->hwtstamp_config = *config;
+#endif
 
 	return 0;
 }
 
 int atl_ptp_qvec_intr(struct atl_queue_vec *qvec)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	int i;
 
 	for (i = 0; i != ATL_PTPQ_NUM; i++) {
 		if (qvec->idx == atl_ptp_ring_index(i))
 			return ATL_NUM_NON_RING_IRQS - 1;
 	}
+#endif
 
 	WARN_ONCE(1, "Not a PTP queue vector");
 	return ATL_NUM_NON_RING_IRQS;
@@ -903,6 +917,7 @@ int atl_ptp_qvec_intr(struct atl_queue_vec *qvec)
 
 bool atl_is_ptp_ring(struct atl_nic *nic, struct atl_desc_ring *ring)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 
 	if (!ptp)
@@ -911,25 +926,32 @@ bool atl_is_ptp_ring(struct atl_nic *nic, struct atl_desc_ring *ring)
 	return &ptp->qvec[ATL_PTPQ_PTP].tx == ring ||
 	       &ptp->qvec[ATL_PTPQ_PTP].rx == ring ||
 	       &ptp->qvec[ATL_PTPQ_HWTS].rx == ring;
+#else
+	return false;
+#endif
 }
 
 u16 atl_ptp_extract_ts(struct atl_nic *nic, struct sk_buff *skb, u8 *p,
 		       unsigned int len)
 {
+	u16 ret = 0;
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	u64 timestamp = 0;
-	u16 ret = hw_atl_rx_extract_ts(&nic->hw, p, len, &timestamp);
 
+	ret = hw_atl_rx_extract_ts(&nic->hw, p, len, &timestamp);
 	if (ret > 0)
 		atl_ptp_rx_hwtstamp(ptp, skb, timestamp);
+#endif
 
 	return ret;
 }
 
 netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff *skb)
 {
-	struct atl_ptp *ptp = nic->ptp;
 	netdev_tx_t err = NETDEV_TX_OK;
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
+	struct atl_ptp *ptp = nic->ptp;
 	struct atl_desc_ring *ring;
 	unsigned long irq_flags;
 
@@ -960,21 +982,25 @@ netdev_tx_t atl_ptp_start_xmit(struct atl_nic *nic, struct sk_buff *skb)
 	spin_unlock_irqrestore(&ptp->ptp_ring_lock, irq_flags);
 
 err_exit:
+#endif
 	return err;
 }
 
 void atl_ptp_work(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 
 	if (!ptp)
 		return;
 
 	atl_ptp_tx_timeout_check(ptp);
+#endif
 }
 
 int atl_ptp_irq_alloc(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct pci_dev *pdev = nic->hw.pdev;
 	struct atl_ptp *ptp = nic->ptp;
 
@@ -987,10 +1013,14 @@ int atl_ptp_irq_alloc(struct atl_nic *nic)
 	}
 
 	return -EINVAL;
+#else
+	return 0;
+#endif
 }
 
 void atl_ptp_irq_free(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_hw *hw = &nic->hw;
 	struct atl_ptp *ptp = nic->ptp;
 
@@ -999,13 +1029,15 @@ void atl_ptp_irq_free(struct atl_nic *nic)
 
 	atl_intr_disable(hw, BIT(ptp->idx_vector));
 	free_irq(pci_irq_vector(hw->pdev, ptp->idx_vector), ptp);
+#endif
 }
 
 int atl_ptp_ring_alloc(struct atl_nic *nic)
 {
+	int err = 0;
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	struct atl_queue_vec *qvec;
-	int err = 0;
 	int i;
 
 	if (!ptp)
@@ -1034,15 +1066,17 @@ int atl_ptp_ring_alloc(struct atl_nic *nic)
 free:
 	while (--qvec >= &ptp->qvec[0])
 		atl_free_qvec(qvec);
+#endif
 
 	return err;
 }
 
 int atl_ptp_ring_start(struct atl_nic *nic)
 {
+	int err = 0;
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	struct atl_queue_vec *qvec;
-	int err = 0;
 
 	if (!ptp)
 		return 0;
@@ -1061,12 +1095,14 @@ int atl_ptp_ring_start(struct atl_nic *nic)
 stop:
 	while (--qvec >= &ptp->qvec[0])
 		atl_stop_qvec(qvec);
+#endif
 
 	return err;
 }
 
 void atl_ptp_ring_stop(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	struct atl_queue_vec *qvec;
 
@@ -1078,10 +1114,12 @@ void atl_ptp_ring_stop(struct atl_nic *nic)
 
 	atl_for_each_ptp_qvec(ptp, qvec)
 		atl_stop_qvec(qvec);
+#endif
 }
 
 void atl_ptp_ring_free(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 
 	if (!ptp)
@@ -1090,22 +1128,26 @@ void atl_ptp_ring_free(struct atl_nic *nic)
 	atl_free_qvec(&ptp->qvec[ATL_PTPQ_PTP]);
 
 	atl_ptp_skb_ring_release(&ptp->skb_ring);
+#endif
 }
 
 void atl_ptp_clock_init(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	struct timespec64 ts;
 
 	ktime_get_real_ts64(&ts);
 	atl_ptp_settime(&ptp->ptp_info, &ts);
+#endif
 }
 
 int atl_ptp_init(struct atl_nic *nic)
 {
+	int err = 0;
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_mcp *mcp = &nic->hw.mcp;
 	struct atl_ptp *ptp;
-	int err = 0;
 
 	if (!mcp->ops->set_ptp) {
 		nic->ptp = NULL;
@@ -1158,17 +1200,21 @@ err_exit:
 		kfree(ptp->ptp_info.pin_config);
 	kfree(ptp);
 	nic->ptp = NULL;
+#endif
+
 	return err;
 }
 
 int atl_ptp_register(struct atl_nic *nic)
 {
+	int err = 0;
+
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp_offset_info ptp_offset_info;
 	enum atl_gpio_pin_function gpio_pin[3];
 	struct atl_mcp *mcp = &nic->hw.mcp;
 	struct atl_ptp *ptp = nic->ptp;
 	struct ptp_clock *clock;
-	int err;
 
 	if (!ptp)
 		return 0;
@@ -1196,21 +1242,26 @@ int atl_ptp_register(struct atl_nic *nic)
 	ptp->ptp_clock = clock;
 
 err_exit:
+#endif
+
 	return err;
 }
 
 void atl_ptp_unregister(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 
 	if (!ptp)
 		return;
 
 	ptp_clock_unregister(ptp->ptp_clock);
+#endif
 }
 
 void atl_ptp_free(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_mcp *mcp = &nic->hw.mcp;
 	struct atl_ptp *ptp = nic->ptp;
 
@@ -1228,15 +1279,21 @@ void atl_ptp_free(struct atl_nic *nic)
 
 	kfree(ptp);
 	nic->ptp = NULL;
+#endif
 }
 
 struct ptp_clock *atl_ptp_get_ptp_clock(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	return nic->ptp->ptp_clock;
+#else
+	return NULL;
+#endif
 }
 
 int atl_ptp_link_change(struct atl_nic *nic)
 {
+#if IS_REACHABLE(CONFIG_PTP_1588_CLOCK)
 	struct atl_ptp *ptp = nic->ptp;
 	struct atl_hw *hw = &nic->hw;
 
@@ -1247,8 +1304,7 @@ int atl_ptp_link_change(struct atl_nic *nic)
 		atl_ptp_start_work(ptp);
 	else
 		cancel_delayed_work_sync(&ptp->poll_sync);
+#endif
 
 	return 0;
 }
-
-#endif
