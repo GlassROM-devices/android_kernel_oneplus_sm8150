@@ -2489,12 +2489,15 @@ void atl_update_ntuple_flt(struct atl_nic *nic, int idx)
 
 static void atl_rxf_update_flex(struct atl_nic *nic, int idx)
 {
-	atl_write(&nic->hw, ATL_RX_FLEX_FLT_CTRL(idx), nic->rxf_flex.cmd[idx]);
+	atl_write(&nic->hw,
+		  ATL_RX_FLEX_FLT_CTRL(nic->rxf_flex.base_index + idx),
+		  nic->rxf_flex.cmd[idx]);
 
 	if (nic->hw.new_rpf) {
 		uint32_t action;
 
-		atl2_rpf_flex_flr_tag_set(&nic->hw, idx + 1, idx);
+		atl2_rpf_flex_flr_tag_set(&nic->hw, idx + 1,
+					  nic->rxf_flex.base_index + idx);
 
 		if (!(nic->rxf_flex.cmd[idx] & ATL_FLEX_EN)) {
 			action = ATL2_ACTION_DISABLE;
