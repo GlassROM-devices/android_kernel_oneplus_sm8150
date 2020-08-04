@@ -1318,6 +1318,16 @@ static int atl_rxf_get_ntuple(const struct atl_rxf_flt_desc *desc,
 	if (!(cmd & ATL_RXF_EN))
 		return -EINVAL;
 
+#ifdef ATL_HAVE_IPV6_NTUPLE
+	if (cmd & ATL_NTC_V6) {
+		fsp->flow_type = IPV6_USER_FLOW;
+	} else
+#endif
+	{
+		fsp->flow_type = IPV4_USER_FLOW;
+		fsp->h_u.usr_ip4_spec.ip_ver = ETH_RX_NFC_IP4;
+	}
+
 	if (cmd & ATL_NTC_PROTO) {
 		switch (cmd & ATL_NTC_L4_MASK) {
 		case ATL_NTC_L4_TCP:
@@ -1335,18 +1345,21 @@ static int atl_rxf_get_ntuple(const struct atl_rxf_flt_desc *desc,
 				SCTP_V6_FLOW : SCTP_V4_FLOW;
 			break;
 
+		case ATL_NTC_L4_ICMP:
+#ifdef ATL_HAVE_IPV6_NTUPLE
+			if (cmd & ATL_NTC_V6) {
+				fsp->h_u.usr_ip6_spec.l4_proto = IPPROTO_ICMPV6;
+				fsp->m_u.usr_ip6_spec.l4_proto = 0xff;
+			} else
+#endif
+			{
+				fsp->h_u.usr_ip4_spec.proto = IPPROTO_ICMP;
+				fsp->m_u.usr_ip4_spec.proto = 0xff;
+			}
+			break;
+
 		default:
 			return -EINVAL;
-		}
-	} else {
-#ifdef ATL_HAVE_IPV6_NTUPLE
-		if (cmd & ATL_NTC_V6) {
-			fsp->flow_type = IPV6_USER_FLOW;
-		} else
-#endif
-		{
-			fsp->flow_type = IPV4_USER_FLOW;
-			fsp->h_u.usr_ip4_spec.ip_ver = ETH_RX_NFC_IP4;
 		}
 	}
 
@@ -1910,6 +1923,17 @@ static void atl2_rxf_configure_l3l4(struct atl_rxf_ntuple *ntuple, int idx,
 			IPPROTO_SCTP << ATL2_NTC_L3_IPV6_PROTO_SHIFT :
 			IPPROTO_SCTP << ATL2_NTC_L3_IPV4_PROTO_SHIFT;
 		break;
+
+	case ATL_NTC_L4_ICMP:
+#ifdef ATL_HAVE_IPV6_NTUPLE
+		l3->cmd |= ntuple->cmd[idx] & ATL_NTC_V6 ?
+			IPPROTO_ICMPV6 << ATL2_NTC_L3_IPV6_PROTO_SHIFT :
+			IPPROTO_ICMP << ATL2_NTC_L3_IPV4_PROTO_SHIFT;
+#else
+		l3->cmd |= IPPROTO_ICMP << ATL2_NTC_L3_IPV4_PROTO_SHIFT;
+#endif
+		break;
+
 	}
 
 	if (ntuple->cmd[idx] & ATL_NTC_SA) {
@@ -2095,11 +2119,18 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 
 	case IPV6_USER_FLOW:
 		if (fsp->m_u.usr_ip6_spec.l4_4_bytes != 0 ||
-			fsp->m_u.usr_ip6_spec.tclass != 0 ||
-			fsp->m_u.usr_ip6_spec.l4_proto != 0) {
+		    fsp->m_u.usr_ip6_spec.tclass != 0) {
 			atl_nic_err("Unsupported match field\n");
 			return -EINVAL;
 		}
+
+		if (fsp->h_u.usr_ip6_spec.l4_proto == IPPROTO_ICMPV6) {
+			cmd |= ATL_NTC_L4_ICMP | ATL_NTC_PROTO;
+		} else if (fsp->m_u.usr_ip6_spec.l4_proto != 0) {
+			atl_nic_err("Unsupported match field\n");
+			return -EINVAL;
+		}
+
 		cmd |= ATL_NTC_V6;
 		break;
 #endif
@@ -2116,9 +2147,15 @@ static int atl_rxf_set_ntuple(const struct atl_rxf_flt_desc *desc,
 
 	case IPV4_USER_FLOW:
 		if (fsp->m_u.usr_ip4_spec.l4_4_bytes != 0 ||
-			fsp->m_u.usr_ip4_spec.tos != 0 ||
-			fsp->h_u.usr_ip4_spec.ip_ver != ETH_RX_NFC_IP4 ||
-			fsp->h_u.usr_ip4_spec.proto != 0) {
+		    fsp->m_u.usr_ip4_spec.tos != 0 ||
+		    fsp->h_u.usr_ip4_spec.ip_ver != ETH_RX_NFC_IP4) {
+			atl_nic_err("Unsupported match field\n");
+			return -EINVAL;
+		}
+
+		if (fsp->h_u.usr_ip4_spec.proto == IPPROTO_ICMP) {
+			cmd |= ATL_NTC_L4_ICMP | ATL_NTC_PROTO;
+		} else if (fsp->m_u.usr_ip4_spec.proto != 0) {
 			atl_nic_err("Unsupported match field\n");
 			return -EINVAL;
 		}
