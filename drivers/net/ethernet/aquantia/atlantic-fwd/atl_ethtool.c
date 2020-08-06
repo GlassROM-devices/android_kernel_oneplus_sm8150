@@ -2001,12 +2001,14 @@ static int atl2_rxf_set_ntuple(struct atl_nic *nic,
 				struct atl_rxf_ntuple *ntuple,
 				int idx)
 {
-	struct atl2_rxf_l3 l3 = {0};
-	struct atl2_rxf_l4 l4 = {0};
+	struct atl2_rxf_l3 l3;
+	struct atl2_rxf_l4 l4;
 	struct atl2_rxf_l3 *l3_filters;
 	s8 l3_idx = -1;
 	s8 l4_idx = -1;
 
+	memset(&l3, 0, sizeof(l3));
+	memset(&l4, 0, sizeof(l4));
 	atl2_rxf_configure_l3l4(ntuple, idx, &l3, &l4);
 
 	/* find L3 and L4 filters */
