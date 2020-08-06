@@ -84,14 +84,19 @@ static inline void atl_glb_soft_reset_full(struct atl_hw *hw)
 }
 
 static void atl2_hw_new_rx_filter_vlan_promisc(struct atl_hw *hw, bool promisc);
-static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc);
+static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc,
+					  bool allmulti);
 static void atl2_hw_init_new_rx_filters(struct atl_hw *hw);
 
-static void atl_set_promisc(struct atl_hw *hw, bool enabled)
+static void atl_set_promisc(struct atl_hw *hw, bool enabled, bool allmulti)
 {
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, enabled);
 	if (hw->new_rpf)
-		atl2_hw_new_rx_filter_promisc(hw, enabled);
+		atl2_hw_new_rx_filter_promisc(hw, enabled, allmulti);
+	else {
+		atl_write_bit(hw, ATL_RX_MC_FLT_MSK, 14, allmulti);
+		atl_write(hw, ATL_RX_MC_FLT(0), allmulti ? 0x80010FFF : 0x00010FFF);
+	}
 }
 
 void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
@@ -106,7 +111,7 @@ static inline void atl_enable_dma_net_lpb_mode(struct atl_nic *nic)
 	struct atl_hw *hw = &nic->hw;
 
 	atl_set_vlan_promisc(hw, 1);
-	atl_set_promisc(hw, 1);
+	atl_set_promisc(hw, 1, 0);
 	atl_write_bit(hw, ATL_TX_PBUF_CTRL1, 4, 0);
 	atl_write_bit(hw, ATL_TX_CTRL1, 4, 1);
 	atl_write_bit(hw, ATL_RX_CTRL1, 4, 1);
@@ -853,12 +858,6 @@ void atl_start_hw_global(struct atl_nic *nic)
 
 #define atl_vlan_flt_val(vid) ((uint32_t)(vid) | 1 << 16 | 1 << 31)
 
-static void atl_set_all_multi(struct atl_hw *hw, bool all_multi)
-{
-	atl_write_bit(hw, ATL_RX_MC_FLT_MSK, 14, all_multi);
-	atl_write(hw, ATL_RX_MC_FLT(0), all_multi ? 0x80010FFF : 0x00010FFF);
-}
-
 void atl_set_rx_mode(struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
@@ -889,7 +888,8 @@ void atl_set_rx_mode(struct net_device *ndev)
 		ndev->flags & IFF_PROMISC || nic->rxf_vlan.promisc_count ||
 		!nic->rxf_vlan.vlans_active);
 
-	atl_set_promisc(hw, promisc_needed);
+	atl_set_promisc(hw, promisc_needed,
+			is_multicast_enabled && all_multi_needed);
 	if (hw->new_rpf)
 		atl2_fw_set_filter_policy(hw, promisc_needed,
 				  is_multicast_enabled && all_multi_needed);
@@ -899,8 +899,6 @@ void atl_set_rx_mode(struct net_device *ndev)
 
 	netdev_for_each_uc_addr(hwaddr, ndev)
 		atl_set_uc_flt(hw, i++, hwaddr->addr);
-
-	atl_set_all_multi(hw, is_multicast_enabled && all_multi_needed);
 
 	if (is_multicast_enabled && !all_multi_needed)
 		netdev_for_each_mc_addr(hwaddr, ndev)
@@ -1477,7 +1475,8 @@ static void atl2_hw_init_new_rx_filters(struct atl_hw *hw)
 		       22, 6, ATL2_RPF_TAG_BASE_UC);
 	atl_write_bits(hw, ATL2_RX_FLT_L2_BC_TAG, 0, 6, ATL2_RPF_TAG_BASE_BC);
 	atl_set_bits(hw, ATL2_RPF_L3_FLT(0), BIT(0x17));
-	
+	atl_write_bit(hw, ATL_RX_MC_FLT_MSK, 14, 1);
+
 	art_last_sec = hw->art_base_index / 8 + hw->art_available / 8;
 	art_first_sec = hw->art_base_index / 8;
 	art_mask = (BIT(art_last_sec) - 1) - (BIT(art_first_sec) - 1);
@@ -1517,15 +1516,18 @@ static void atl2_hw_new_rx_filter_vlan_promisc(struct atl_hw *hw, bool promisc)
 				 off_action);
 }
 
-static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc)
+static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc,
+					  bool allmulti)
 {
 	u16 off_action = promisc ? ATL2_ACTION_DISABLE : ATL2_ACTION_DROP;
+	u32 mask = allmulti ? (ATL2_RPF_TAG_UC_MASK | ATL2_RPF_TAG_ALLMC_MASK) :
+			      ATL2_RPF_TAG_UC_MASK;
 	int index = hw->art_base_index + ATL2_RPF_L2_PROMISC_OFF_INDEX;
 
 	atl2_act_rslvr_table_set(hw,
 				 index,
 				 0,
-				 ATL2_RPF_TAG_UC_MASK | ATL2_RPF_TAG_ALLMC_MASK,
+				 mask,
 				 off_action);
 
 }
