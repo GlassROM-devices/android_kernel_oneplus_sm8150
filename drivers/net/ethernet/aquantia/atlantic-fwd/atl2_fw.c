@@ -169,7 +169,7 @@ static int atl2_fw_get_filter_caps(struct atl_hw *hw)
 	if (hw->art_available == 0)
 		hw->art_available = 128;
 	nic->rxf_flex.available = 1;
-	nic->rxf_flex.base_index = filter_caps.flexible_filter_mask >> 1;	
+	nic->rxf_flex.base_index = filter_caps.flexible_filter_mask >> 1;
 	nic->rxf_mac.base_index = filter_caps.l2_filters_base_index;
 	nic->rxf_mac.available = filter_caps.l2_filter_count;
 	nic->rxf_etype.base_index = filter_caps.ethertype_filter_base_index;

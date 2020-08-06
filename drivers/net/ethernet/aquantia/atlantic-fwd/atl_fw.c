@@ -263,7 +263,7 @@ static int __atl_fw2_get_link_caps(struct atl_hw *hw)
 	hw->link_state.supported = supported;
 	hw->link_state.lp_lowest = fls(supported) - 1;
 
-	nic->rxf_flex.base_index = 0;	
+	nic->rxf_flex.base_index = 0;
 	nic->rxf_flex.available = ATL_FLEX_FLT_NUM;
 	nic->rxf_mac.base_index = 0;
 	nic->rxf_mac.available = ATL_UC_FLT_NUM;

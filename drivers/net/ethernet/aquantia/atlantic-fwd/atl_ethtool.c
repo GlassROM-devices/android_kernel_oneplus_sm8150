@@ -1834,7 +1834,7 @@ static void atl2_rxf_write_l3_cmd(struct atl_hw *hw, int l3_idx, bool is_ipv6,
 {
 	uint32_t mask = is_ipv6 ? 0xFF7F0000 : 0x0000FFFF;
 	uint32_t value = (atl_read(hw, ATL2_RPF_L3_FLT(l3_idx)) & ~mask) | cmd;
-	 
+
 	atl_write(hw, ATL2_RPF_L3_FLT(l3_idx), value);
 }
 
@@ -1949,7 +1949,7 @@ static int atl2_rxf_fl3l4_find_l3(struct atl_rxf_ntuple *ntuple,
 			ntuple->l3_v4_base_index :
 			ntuple->l3_v6_base_index;
 	int last = first + (l3->cmd & ATL2_NTC_L3_IPV4_EN) ?
-				ntuple->l3_v4_available:
+				ntuple->l3_v4_available :
 				ntuple->l3_v6_available;
 	int l3_idx = -1;
 	int i;
@@ -2059,7 +2059,7 @@ static int atl2_rxf_set_ntuple(struct atl_nic *nic,
 					ntuple->l4_idx[idx]);
 		}
 	ntuple->l4_idx[idx] = l4_idx;
-	
+
 	ntuple->is_ipv6[idx] = (l3.cmd & ATL2_NTC_L3_IPV4_EN) ? false : true;
 
 	return 0;
