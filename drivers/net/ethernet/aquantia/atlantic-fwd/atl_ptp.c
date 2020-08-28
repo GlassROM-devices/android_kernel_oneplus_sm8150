@@ -270,11 +270,30 @@ static int atl_ptp_adjfine(struct ptp_clock_info *ptp_info, long scaled_ppm)
 	struct atl_ptp *ptp = container_of(ptp_info, struct atl_ptp, ptp_info);
 	struct atl_nic *nic = ptp->nic;
 
+pr_info("atl_ptp_adjfine %d (%d)\n", scaled_ppm,  scaled_ppm_to_ppb(scaled_ppm));
 	hw_atl_adj_clock_freq(&nic->hw, scaled_ppm_to_ppb(scaled_ppm));
 
 	return 0;
 }
 #endif
+
+/* atl_ptp_adjfreq
+ * @ptp_info: the ptp clock structure
+ * @ppb: parts per billion adjustment from base
+ *
+ * adjust the frequency of the ptp cycle counter by the
+ * indicated ppb from the base frequency.
+ */
+static int atl_ptp_adjfreq(struct ptp_clock_info *ptp_info, s32 ppb)
+{
+	struct atl_ptp *ptp = container_of(ptp_info, struct atl_ptp, ptp_info);
+	struct atl_nic *nic = ptp->nic;
+
+pr_info("atl_ptp_adjfreq %d \n", ppb);
+	hw_atl_adj_clock_freq(&nic->hw, ppb);
+
+	return 0;
+}
 
 /* atl_ptp_adjtime
  * @ptp_info: the ptp clock structure
@@ -288,6 +307,7 @@ static int atl_ptp_adjtime(struct ptp_clock_info *ptp_info, s64 delta)
 	struct atl_nic *nic = ptp->nic;
 	unsigned long flags;
 
+pr_info("atl_ptp_adjtime %lld \n", delta);
 	spin_lock_irqsave(&ptp->ptp_lock, flags);
 	hw_atl_adj_sys_clock(&nic->hw, delta);
 	spin_unlock_irqrestore(&ptp->ptp_lock, flags);
@@ -312,6 +332,7 @@ static int atl_ptp_gettime(struct ptp_clock_info *ptp_info, struct timespec64 *t
 	spin_lock_irqsave(&ptp->ptp_lock, flags);
 	hw_atl_get_ptp_ts(&nic->hw, &ns);
 	spin_unlock_irqrestore(&ptp->ptp_lock, flags);
+pr_info("atl_ptp_gettime %lld \n", ns);
 
 	*ts = ns_to_timespec64(ns);
 
@@ -581,6 +602,8 @@ static struct ptp_clock_info atl_ptp_clock = {
 	.pps		= 0,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
 	.adjfine	= atl_ptp_adjfine,
+#else
+	.adjfreq	= atl_ptp_adjfreq,
 #endif
 	.adjtime	= atl_ptp_adjtime,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
