@@ -60,6 +60,8 @@ source "net/xfrm/Kconfig"
 source "net/iucv/Kconfig"
 source "net/smc/Kconfig"
 
+source "net/sch_cake/Kconfig"
+
 config INET
 	bool "TCP/IP networking"
 	select CRYPTO

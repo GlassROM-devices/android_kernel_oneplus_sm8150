@@ -2024,7 +2024,8 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 
 		if (roam_req->reason == REASON_ROAM_STOP_ALL ||
 		    roam_req->reason == REASON_DISCONNECTED ||
-		    roam_req->reason == REASON_ROAM_SYNCH_FAILED) {
+		    roam_req->reason == REASON_ROAM_SYNCH_FAILED ||
+		    roam_req->reason == REASON_SUPPLICANT_DISABLED_ROAMING) {
 			mode = WMI_ROAM_SCAN_MODE_NONE;
 		} else {
 			if (csr_is_roam_offload_enabled(mac))
@@ -2542,10 +2543,14 @@ static int wma_fill_roam_synch_buffer(tp_wma_handle wma,
 	} else {
 		wma_fill_data_synch_event(wma, roam_synch_ind_ptr, param_buf);
 	}
-
 	chan = param_buf->chan;
-	if (chan)
+	if (chan) {
 		roam_synch_ind_ptr->chan_freq = chan->mhz;
+		roam_synch_ind_ptr->phy_mode =
+			wma_fw_to_host_phymode(WMI_GET_CHANNEL_MODE(chan));
+	} else {
+		roam_synch_ind_ptr->phy_mode = WLAN_PHYMODE_AUTO;
+	}
 
 	key = param_buf->key;
 	key_ft = param_buf->key_ext;
@@ -2872,6 +2877,7 @@ int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
 	A_UINT32 bcn_probe_rsp_len;
 	A_UINT32 reassoc_rsp_len;
 	A_UINT32 reassoc_req_len;
+	WMI_HOST_WLAN_PHY_MODE phymode;
 
 	WMA_LOGD("LFR3:%s", __func__);
 	if (!event) {
@@ -3065,15 +3071,17 @@ int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
 	 */
 	channel = wlan_freq_to_chan(wma->interfaces[synch_event->vdev_id].mhz);
 	if (param_buf->chan) {
-		wma->interfaces[synch_event->vdev_id].chanmode =
-			WMI_GET_CHANNEL_MODE(param_buf->chan);
+		phymode = WMI_GET_CHANNEL_MODE(param_buf->chan);
 	} else {
 		wma_get_phy_mode_cb(channel,
-				    wma->interfaces[synch_event->vdev_id].
-				    chan_width,
-				    &wma->interfaces[synch_event->vdev_id].
-				    chanmode);
+			wma->interfaces[synch_event->vdev_id].chan_width,
+			&phymode);
 	}
+	wma->interfaces[synch_event->vdev_id].chanmode = phymode;
+	/* Update new peer phymode after roaming */
+	wma_objmgr_set_peer_mlme_phymode(wma, roam_synch_ind_ptr->bssid.bytes,
+					 phymode);
+	wma_debug("LFR3: new phymode %d", phymode);
 
 	wma->csr_roam_synch_cb(wma->mac_context, roam_synch_ind_ptr,
 			       bss_desc_ptr, SIR_ROAM_SYNCH_COMPLETE);

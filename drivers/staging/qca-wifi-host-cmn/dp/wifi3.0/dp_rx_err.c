@@ -1090,8 +1090,7 @@ dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	 */
 	if (!hal_rx_attn_msdu_done_get(rx_tlv_hdr)) {
 
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("MSDU DONE failure"));
+		dp_err_rl("MSDU DONE failure");
 
 		hal_rx_dump_pkt_tlvs(soc->hal_soc, rx_tlv_hdr,
 				     QDF_TRACE_LEVEL_INFO);
@@ -1292,6 +1291,46 @@ fail:
 	return;
 }
 
+#ifdef DP_RX_DESC_COOKIE_INVALIDATE
+/**
+ * dp_rx_link_cookie_check() - Validate link desc cookie
+ * @ring_desc: ring descriptor
+ *
+ * Return: qdf status
+ */
+static inline QDF_STATUS
+dp_rx_link_cookie_check(void *ring_desc)
+{
+	if (qdf_unlikely(HAL_RX_REO_BUF_LINK_COOKIE_INVALID_GET(ring_desc)))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_rx_link_cookie_invalidate() - Invalidate link desc cookie
+ * @ring_desc: ring descriptor
+ *
+ * Return: None
+ */
+static inline void
+dp_rx_link_cookie_invalidate(void *ring_desc)
+{
+	HAL_RX_REO_BUF_LINK_COOKIE_INVALID_SET(ring_desc);
+}
+#else
+static inline QDF_STATUS
+dp_rx_link_cookie_check(void *ring_desc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+dp_rx_link_cookie_invalidate(void *ring_desc)
+{
+}
+#endif
+
 uint32_t
 dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		  void *hal_ring, uint32_t quota)
@@ -1314,6 +1353,7 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 	struct hal_rx_msdu_list msdu_list; /* MSDU's per MPDU */
 	uint16_t num_msdus;
 	struct dp_rx_desc *rx_desc = NULL;
+	QDF_STATUS status;
 
 	/* Debug -- Remove later */
 	qdf_assert(soc && hal_ring);
@@ -1337,8 +1377,8 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 	}
 
 	while (qdf_likely(quota-- && (ring_desc =
-				hal_srng_dst_get_next(hal_soc, hal_ring)))) {
-
+				hal_srng_dst_peek(hal_soc,
+						  hal_ring)))) {
 		DP_STATS_INC(soc, rx.err_ring_pkts, 1);
 
 		error = HAL_RX_ERROR_STATUS_GET(ring_desc);
@@ -1357,6 +1397,12 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		 */
 		qdf_assert_always((cookie >> LINK_DESC_ID_SHIFT) &
 							LINK_DESC_ID_START);
+
+		status = dp_rx_link_cookie_check(ring_desc);
+		if (qdf_unlikely(QDF_IS_STATUS_ERROR(status))) {
+			DP_STATS_INC(soc, rx.err.invalid_link_cookie, 1);
+			break;
+		}
 
 		/*
 		 * Check if the buffer is to be processed on this processor
@@ -1385,7 +1431,7 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 			/* Return link descriptor through WBM ring (SW2WBM)*/
 			dp_rx_link_desc_return(soc, ring_desc,
 					HAL_BM_ACTION_RELEASE_MSDU_LIST);
-			continue;
+			goto next_entry;
 		}
 
 		rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc,
@@ -1408,7 +1454,7 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 							 &mpdu_desc_info,
 							 &mac_id, quota);
 				rx_bufs_reaped[mac_id] += count;
-				continue;
+				goto next_entry;
 			}
 
 			count = dp_rx_frag_handle(soc,
@@ -1417,7 +1463,7 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 
 			rx_bufs_reaped[mac_id] += count;
 			DP_STATS_INC(soc, rx.rx_frags, 1);
-			continue;
+			goto next_entry;
 		}
 
 		if (hal_rx_reo_is_pn_error(ring_desc)) {
@@ -1432,7 +1478,7 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 						      quota);
 
 			rx_bufs_reaped[mac_id] += count;
-			continue;
+			goto next_entry;
 		}
 
 		if (hal_rx_reo_is_2k_jump(ring_desc)) {
@@ -1450,7 +1496,7 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					HAL_REO_ERR_REGULAR_FRAME_2K_JUMP);
 
 			rx_bufs_reaped[mac_id] += count;
-			continue;
+			goto next_entry;
 		}
 
 		if (hal_rx_reo_is_oor_error(ring_desc)) {
@@ -1468,8 +1514,11 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					HAL_REO_ERR_REGULAR_FRAME_OOR);
 
 			rx_bufs_reaped[mac_id] += count;
-			continue;
+			goto next_entry;
 		}
+next_entry:
+		dp_rx_link_cookie_invalidate(ring_desc);
+		hal_srng_dst_get_next(hal_soc, hal_ring);
 	}
 
 done:
