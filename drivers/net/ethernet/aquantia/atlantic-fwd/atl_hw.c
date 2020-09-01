@@ -65,7 +65,7 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 			busy_wait(100, udelay(10), next,
 				  atl_read(hw, ATL_GLOBAL_MBOX_CTRL),
 				  next & BIT(8));
-			
+
 		*addr = atl_read(hw, ATL_GLOBAL_MBOX_DATA);
 		mcp_addr += 4;
 		addr++;
@@ -1391,7 +1391,7 @@ int atl_write_mcp_mem_b0(struct atl_hw *hw, uint32_t offt, void *host_addr,
 	while (size) {
 		uint32_t stat;
 
-		atl_write(hw,ATL_GLOBAL_MBOX_DATA, *addr++);
+		atl_write(hw, ATL_GLOBAL_MBOX_DATA, *addr++);
 		atl_write(hw, ATL_GLOBAL_MBOX_CTRL, 0xc000);
 
 		busy_wait(100, udelay(10), stat,

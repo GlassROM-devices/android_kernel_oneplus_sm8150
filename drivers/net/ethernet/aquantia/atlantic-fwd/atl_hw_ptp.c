@@ -133,15 +133,12 @@ int hw_atl_adj_clock_freq(struct atl_hw *hw, s32 ppb)
 	hw_atl_adj_params_get(ATL_HW_MAC_COUNTER_HZ, ppb,
 				 &fwreq.adj_freq.ns_mac,
 				 &fwreq.adj_freq.fns_mac);
-pr_info("ns_mac %u.%u\n", fwreq.adj_freq.ns_mac,fwreq.adj_freq.fns_mac );
 	hw_atl_adj_params_get(ATL_HW_PHY_COUNTER_HZ, ppb,
 				 &fwreq.adj_freq.ns_phy,
 				 &fwreq.adj_freq.fns_phy);
-pr_info("ns_phy %u.%u\n", fwreq.adj_freq.ns_phy,fwreq.adj_freq.fns_phy );
 	hw_atl_mac_adj_param_calc(&fwreq.adj_freq,
 				     ATL_HW_PHY_COUNTER_HZ,
 				     ATL_HW_MAC_COUNTER_HZ);
-pr_info("adj_freq %u.%u\n", fwreq.adj_freq.mac_ns_adj,fwreq.adj_freq.mac_fns_adj );
 	return mcp->ops->send_ptp_req(hw, &fwreq);
 }
 
