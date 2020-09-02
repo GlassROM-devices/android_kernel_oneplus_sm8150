@@ -44,6 +44,11 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 		      unsigned int size)
 {
 	uint32_t *addr = (uint32_t *)host_addr;
+	int ret;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MEM);
+	if (ret)
+		return ret;
 
 	size = (size + 3) & ~3u;
 	atl_write(hw, ATL_GLOBAL_MBOX_ADDR, mcp_addr);
@@ -59,7 +64,8 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 			if (next == mcp_addr) {
 				atl_dev_err("mcp mem read timed out (%d remaining)\n",
 					    size);
-				return -EIO;
+				ret = -EIO;
+				goto err_exit;
 			}
 		} else
 			busy_wait(100, udelay(10), next,
@@ -71,7 +77,9 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 		addr++;
 		size -= 4;
 	}
-	return 0;
+err_exit:
+	atl_hwsem_put(hw, ATL_MCP_SEM_MEM);
+	return ret;
 }
 
 
@@ -1409,10 +1417,19 @@ int atl_write_mcp_mem_b0(struct atl_hw *hw, uint32_t offt, void *host_addr,
 int atl_write_mcp_mem(struct atl_hw *hw, uint32_t offt, void *host_addr,
 	size_t size, enum mcp_area area)
 {
+	int ret;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MEM);
+	if (ret)
+		return ret;
+
 	if (hw->chip_rev == 0xb1)
-		return atl_write_mcp_mem_b1(hw, offt, host_addr, size, area);
+		ret = atl_write_mcp_mem_b1(hw, offt, host_addr, size, area);
 	else
-		return atl_write_mcp_mem_b0(hw, offt, host_addr, size, area);
+		ret = atl_write_mcp_mem_b0(hw, offt, host_addr, size, area);
+
+	atl_hwsem_put(hw, ATL_MCP_SEM_MEM);
+	return ret;
 }
 
 void atl_thermal_check(struct atl_hw *hw, bool alarm)

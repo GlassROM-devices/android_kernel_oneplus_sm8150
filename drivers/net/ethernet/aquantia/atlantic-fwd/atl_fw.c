@@ -941,8 +941,8 @@ static int atl_fw2_send_ptp_request(struct atl_hw *hw,
 		((high_req ^ high_status) & atl_fw2_fw_request) != 0);
 	if (((high_req ^ high_status) & atl_fw2_fw_request) != 0) {
 		atl_dev_err("Timeout waiting for fw request\n");
-		atl_unlock_fw(hw);
-		return -EIO;
+		ret = -EIO;
+		goto err_exit;
 	}
 
 	/* Toggle statistics bit for FW to update */
