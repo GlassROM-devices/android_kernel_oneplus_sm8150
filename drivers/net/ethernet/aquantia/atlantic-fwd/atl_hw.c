@@ -1397,6 +1397,8 @@ int atl_write_mcp_mem_b0(struct atl_hw *hw, uint32_t offt, void *host_addr,
 		busy_wait(100, udelay(10), stat,
 			atl_read(hw, ATL_GLOBAL_MBOX_CTRL),
 			stat & BIT(8));
+		if (stat & BIT(8))
+			return -ETIME;
 
 		size -= 4;
 	}
