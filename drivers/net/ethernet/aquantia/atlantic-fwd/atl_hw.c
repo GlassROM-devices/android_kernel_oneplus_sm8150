@@ -450,7 +450,8 @@ int atl_hwinit(struct atl_hw *hw, enum atl_chip chip_id)
 	int ret;
 
 	hw->chip_id = chip_id;
-	hw->chip_rev = (atl_read(hw, ATL_GLOBAL_MIF_ID) == 0xa) ? 0xb1 : 0xb0;
+	hw->chip_rev = ((atl_read(hw, ATL_GLOBAL_MIF_ID) & 0xf) == 0xa) ?
+			0xb1 : 0xb0;
 
 	if (chip_id == ATL_ANTIGUA && atl_newrpf)
 		hw->new_rpf = 1;
