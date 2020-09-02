@@ -139,6 +139,7 @@ int hw_atl_adj_clock_freq(struct atl_hw *hw, s32 ppb)
 	hw_atl_mac_adj_param_calc(&fwreq.adj_freq,
 				     ATL_HW_PHY_COUNTER_HZ,
 				     ATL_HW_MAC_COUNTER_HZ);
+
 	return mcp->ops->send_ptp_req(hw, &fwreq);
 }
 

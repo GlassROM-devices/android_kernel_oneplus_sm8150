@@ -442,7 +442,7 @@ int atl_hwinit(struct atl_hw *hw, enum atl_chip chip_id)
 	int ret;
 
 	hw->chip_id = chip_id;
-	hw->chip_rev = atl_read(hw, ATL_GLOBAL_CHIP_REV) & 0xffff;
+	hw->chip_rev = (atl_read(hw, ATL_GLOBAL_MIF_ID) == 0xa) ? 0xb1 : 0xb0;
 
 	if (chip_id == ATL_ANTIGUA && atl_newrpf)
 		hw->new_rpf = 1;
@@ -1398,7 +1398,6 @@ int atl_write_mcp_mem_b0(struct atl_hw *hw, uint32_t offt, void *host_addr,
 			atl_read(hw, ATL_GLOBAL_MBOX_CTRL),
 			stat & BIT(8));
 
-		offt += 4;
 		size -= 4;
 	}
 
