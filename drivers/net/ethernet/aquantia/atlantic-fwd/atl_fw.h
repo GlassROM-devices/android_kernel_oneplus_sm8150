@@ -31,6 +31,7 @@ struct atl_mcp {
 	uint32_t caps_low;
 	uint32_t caps_high;
 	uint32_t caps_ex;
+	uint32_t interface_ver;
 	struct mutex lock;
 	unsigned long next_wdog;
 	bool wdog_disabled;
