@@ -86,6 +86,7 @@ enum atl_fw2_opts {
 	atl_define_bit(atl_fw2_wake_on_link, 16)
 	atl_define_bit(atl_fw2_wake_on_link_force, 17)
 	atl_define_bit(atl_fw2_phy_temp, 18)
+	atl_define_bit(atl_fw2_downshift, 19)
 	atl_define_bit(atl_fw2_set_thermal, 21)
 	atl_define_bit(atl_fw2_link_drop, 22)
 	atl_define_bit(atl_fw2_nic_proxy, 0x17)
@@ -287,6 +288,7 @@ struct atl_fw_ops {
 	int (*restore_cfg)(struct atl_hw *hw);
 	int (*set_phy_loopback)(struct atl_nic *nic, u32 mode);
 	int (*set_mediadetect)(struct atl_hw *hw, bool on);
+	int (*set_downshift)(struct atl_hw *hw, bool on);
 	int (*set_pad_stripping)(struct atl_hw *hw, bool on);
 	int (*send_macsec_req)(struct atl_hw *hw,
 			       struct macsec_msg_fw_request *msg,

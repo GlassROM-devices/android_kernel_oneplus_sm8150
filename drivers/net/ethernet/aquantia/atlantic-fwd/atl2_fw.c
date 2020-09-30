@@ -901,6 +901,19 @@ static int atl2_fw_set_mediadetect(struct atl_hw *hw, bool on)
 	return  atl2_shared_buffer_finish_ack(hw);
 }
 
+static int atl2_fw_set_downshift(struct atl_hw *hw, bool on)
+{
+	struct link_options_s link_options;
+
+	atl2_shared_buffer_get(hw, link_options, link_options);
+
+	link_options.downshift = on;
+
+	atl2_shared_buffer_write(hw, link_options, link_options);
+
+	return  atl2_shared_buffer_finish_ack(hw);
+}
+
 static int atl2_fw_unsupported(struct atl_hw *hw)
 {
 	return -EOPNOTSUPP;
@@ -927,6 +940,7 @@ static struct atl_fw_ops atl2_fw_ops = {
 		.set_default_link = atl2_fw_set_default_link,
 		.get_phy_temperature = atl2_fw_get_phy_temperature,
 		.set_mediadetect = atl2_fw_set_mediadetect,
+		.set_downshift = atl2_fw_set_downshift,
 		.send_macsec_req = (void *)atl2_fw_unsupported,
 		.set_pad_stripping = atl2_fw_set_pad_stripping,
 		.get_mac_addr = atl2_fw_get_mac_addr,
