@@ -482,7 +482,7 @@ struct statistics_b0_s {
 	uint64_t rx_good_octets;
 	uint64_t rx_pause_frames;
 	uint64_t rx_good_frames;
-	uint64_t rx_rrrors;
+	uint64_t rx_errors;
 	uint64_t rx_unicast_frames;
 	uint64_t rx_multicast_frames;
 	uint64_t rx_broadcast_frames;
