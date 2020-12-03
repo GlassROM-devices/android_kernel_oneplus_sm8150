@@ -613,7 +613,7 @@ static int atl_ptp_poll(struct napi_struct *napi, int budget)
 	return work_done;
 }
 
-static irqreturn_t atl_ptp_irq(int irq, void *private)
+irqreturn_t atl_ptp_irq(int irq, void *private)
 {
 	struct atl_ptp *ptp = private;
 	int err = 0;
@@ -1068,7 +1068,7 @@ int atl_ptp_irq_alloc(struct atl_nic *nic)
 				  atl_ptp_irq, 0, nic->ndev->name, ptp);
 	}
 
-	return -EINVAL;
+	return 0;
 #else
 	return 0;
 #endif
@@ -1084,7 +1084,8 @@ void atl_ptp_irq_free(struct atl_nic *nic)
 		return;
 
 	atl_intr_disable(hw, BIT(ptp->idx_vector));
-	free_irq(pci_irq_vector(hw->pdev, ptp->idx_vector), ptp);
+	if (nic->flags & ATL_FL_MULTIPLE_VECTORS)
+		free_irq(pci_irq_vector(hw->pdev, ptp->idx_vector), ptp);
 #endif
 }
 
