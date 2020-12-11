@@ -1711,7 +1711,7 @@ static struct dentry *ext4_lookup(struct inode *dir, struct dentry *dentry, unsi
 				     "Inconsistent encryption contexts: %lu/%lu",
 				     dir->i_ino, inode->i_ino);
 			iput(inode);
-			return ERR_PTR(-EPERM);
+			return ERR_PTR(-EXDEV);
 		}
 	}
 
