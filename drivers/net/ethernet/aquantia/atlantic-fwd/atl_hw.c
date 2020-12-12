@@ -44,6 +44,11 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 		      unsigned int size)
 {
 	uint32_t *addr = (uint32_t *)host_addr;
+	int ret;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MEM);
+	if (ret)
+		return ret;
 
 	size = (size + 3) & ~3u;
 	atl_write(hw, ATL_GLOBAL_MBOX_ADDR, mcp_addr);
@@ -52,19 +57,29 @@ int atl_read_mcp_mem(struct atl_hw *hw, uint32_t mcp_addr, void *host_addr,
 
 		atl_write(hw, ATL_GLOBAL_MBOX_CTRL, 0x8000);
 
-		busy_wait(100, udelay(10), next,
-			  atl_read(hw, ATL_GLOBAL_MBOX_ADDR), next == mcp_addr);
-		if (next == mcp_addr) {
-			atl_dev_err("mcp mem read timed out (%d remaining)\n",
-				    size);
-			return -EIO;
-		}
+		if (hw->chip_rev == 0xb1) {
+			busy_wait(100, udelay(10), next,
+				  atl_read(hw, ATL_GLOBAL_MBOX_ADDR),
+				  next == mcp_addr);
+			if (next == mcp_addr) {
+				atl_dev_err("mcp mem read timed out (%d remaining)\n",
+					    size);
+				ret = -EIO;
+				goto err_exit;
+			}
+		} else
+			busy_wait(100, udelay(10), next,
+				  atl_read(hw, ATL_GLOBAL_MBOX_CTRL),
+				  next & BIT(8));
+
 		*addr = atl_read(hw, ATL_GLOBAL_MBOX_DATA);
 		mcp_addr += 4;
 		addr++;
 		size -= 4;
 	}
-	return 0;
+err_exit:
+	atl_hwsem_put(hw, ATL_MCP_SEM_MEM);
+	return ret;
 }
 
 
@@ -84,14 +99,19 @@ static inline void atl_glb_soft_reset_full(struct atl_hw *hw)
 }
 
 static void atl2_hw_new_rx_filter_vlan_promisc(struct atl_hw *hw, bool promisc);
-static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc);
+static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc,
+					  bool allmulti);
 static void atl2_hw_init_new_rx_filters(struct atl_hw *hw);
 
-static void atl_set_promisc(struct atl_hw *hw, bool enabled)
+static void atl_set_promisc(struct atl_hw *hw, bool enabled, bool allmulti)
 {
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 3, enabled);
 	if (hw->new_rpf)
-		atl2_hw_new_rx_filter_promisc(hw, enabled);
+		atl2_hw_new_rx_filter_promisc(hw, enabled, allmulti);
+	else {
+		atl_write_bit(hw, ATL_RX_MC_FLT_MSK, 14, allmulti);
+		atl_write(hw, ATL_RX_MC_FLT(0), allmulti ? 0x80010FFF : 0x00010FFF);
+	}
 }
 
 void atl_set_vlan_promisc(struct atl_hw *hw, int promisc)
@@ -106,7 +126,7 @@ static inline void atl_enable_dma_net_lpb_mode(struct atl_nic *nic)
 	struct atl_hw *hw = &nic->hw;
 
 	atl_set_vlan_promisc(hw, 1);
-	atl_set_promisc(hw, 1);
+	atl_set_promisc(hw, 1, 0);
 	atl_write_bit(hw, ATL_TX_PBUF_CTRL1, 4, 0);
 	atl_write_bit(hw, ATL_TX_CTRL1, 4, 1);
 	atl_write_bit(hw, ATL_RX_CTRL1, 4, 1);
@@ -429,6 +449,9 @@ int atl_hwinit(struct atl_hw *hw, enum atl_chip chip_id)
 	int ret;
 
 	hw->chip_id = chip_id;
+	hw->chip_rev = ((atl_read(hw, ATL_GLOBAL_MIF_ID) & 0xf) == 0xa) ?
+			0xb1 : 0xb0;
+
 	if (chip_id == ATL_ANTIGUA && atl_newrpf)
 		hw->new_rpf = 1;
 
@@ -552,8 +575,10 @@ static irqreturn_t atl_legacy_irq(int irq, void *priv)
 		}
 	}
 
-	if (unlikely(stat & hw->non_ring_intr_mask))
+	if (unlikely(stat & BIT(ATL_IRQ_LINK)))
 		atl_link_irq(irq, nic);
+	if (unlikely(stat & BIT(ATL_IRQ_PTP)))
+		atl_ptp_irq(irq, nic->ptp);
 	return IRQ_HANDLED;
 }
 
@@ -764,9 +789,9 @@ void atl_start_hw_global(struct atl_nic *nic)
 	/* RPF */
 	/* Default RPF2 parser options */
 	atl_write(hw, ATL_RX_FLT_CTRL2, 0x0);
-	atl_set_uc_flt(hw, 0, hw->mac_addr);
+	atl_set_uc_flt(hw, nic->rxf_mac.base_index, hw->mac_addr);
 	/* BC action host */
-	atl_write_bits(hw, ATL_RX_FLT_CTRL1, 12, 3, 1);
+	atl_write_bits(hw, ATL_RX_FLT_CTRL1, 12, 1, 1);
 	/* Enable BC */
 	atl_write_bit(hw, ATL_RX_FLT_CTRL1, 0, 1);
 	/* BC thresh */
@@ -852,22 +877,16 @@ void atl_start_hw_global(struct atl_nic *nic)
 
 #define atl_vlan_flt_val(vid) ((uint32_t)(vid) | 1 << 16 | 1 << 31)
 
-static void atl_set_all_multi(struct atl_hw *hw, bool all_multi)
-{
-	atl_write_bit(hw, ATL_RX_MC_FLT_MSK, 14, all_multi);
-	atl_write(hw, ATL_RX_MC_FLT(0), all_multi ? 0x80010FFF : 0x00010FFF);
-}
-
 void atl_set_rx_mode(struct net_device *ndev)
 {
 	struct atl_nic *nic = netdev_priv(ndev);
 	struct atl_hw *hw = &nic->hw;
 	bool is_multicast_enabled = !!(ndev->flags & IFF_MULTICAST);
-	int all_multi_needed = !!(ndev->flags & IFF_ALLMULTI);
-	int promisc_needed = !!(ndev->flags & IFF_PROMISC);
+	bool all_multi_needed = !!(ndev->flags & IFF_ALLMULTI);
+	bool promisc_needed = !!(ndev->flags & IFF_PROMISC);
+	int i = nic->rxf_mac.base_index + 1; /* 1 reserved for MAC address */
 	int uc_count = netdev_uc_count(ndev);
 	int mc_count = 0;
-	int i = 1; /* UC filter 0 reserved for MAC address */
 	struct netdev_hw_addr *hwaddr;
 
 	if (!pm_runtime_active(&nic->hw.pdev->dev))
@@ -876,11 +895,13 @@ void atl_set_rx_mode(struct net_device *ndev)
 	if (is_multicast_enabled)
 		mc_count = netdev_mc_count(ndev);
 
-	if (uc_count > ATL_UC_FLT_NUM - 1)
-		promisc_needed |= 1;
-	else if (uc_count + mc_count > ATL_UC_FLT_NUM - 1)
-		all_multi_needed |= 1;
+	if (uc_count > nic->rxf_mac.available - 1)
+		promisc_needed = true;
+	else if (uc_count + mc_count > nic->rxf_mac.available - 1)
+		all_multi_needed = true;
 
+	if (nic->priv_flags & ATL_PF_BIT(LPB_NET_DMA))
+		promisc_needed = true;
 
 	/* Enable promisc VLAN mode if IFF_PROMISC explicitly
 	 * requested or too many VIDs registered
@@ -889,14 +910,17 @@ void atl_set_rx_mode(struct net_device *ndev)
 		ndev->flags & IFF_PROMISC || nic->rxf_vlan.promisc_count ||
 		!nic->rxf_vlan.vlans_active);
 
-	atl_set_promisc(hw, promisc_needed);
+	atl_set_promisc(hw, promisc_needed,
+			is_multicast_enabled && all_multi_needed);
+	if (hw->new_rpf)
+		atl2_fw_set_filter_policy(hw, promisc_needed,
+				  is_multicast_enabled && all_multi_needed);
+
 	if (promisc_needed)
 		return;
 
 	netdev_for_each_uc_addr(hwaddr, ndev)
 		atl_set_uc_flt(hw, i++, hwaddr->addr);
-
-	atl_set_all_multi(hw, is_multicast_enabled && all_multi_needed);
 
 	if (is_multicast_enabled && !all_multi_needed)
 		netdev_for_each_mc_addr(hwaddr, ndev)
@@ -1223,6 +1247,106 @@ void atl_adjust_eth_stats(struct atl_ether_stats *stats,
 		_stats[i] += add ? _base[i] : - _base[i];
 }
 
+static int __atl_fetch_msm1_stats(struct atl_hw *hw,
+				  struct atl_ether_stats *stats)
+{
+	u32 reg, reg2;
+	int ret;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
+	if (ret)
+		return ret;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_TX_PAUSE, &reg, hwsem_put);
+	stats->tx_pause = reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_TX_PKTS_GOOD, &reg, hwsem_put);
+	stats->tx_ether_pkts = reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_TX_OCTETS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_TX_OCTETS_HI, &reg2, hwsem_put);
+	stats->tx_ether_octets = ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_PAUSE, &reg, hwsem_put);
+	stats->rx_pause = reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_OCTETS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_OCTETS_HI, &reg2, hwsem_put);
+	stats->rx_ether_octets = ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_PKTS_GOOD, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_ERRS, &reg2, hwsem_put);
+	stats->rx_ether_pkts = reg + reg2;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_BROADCAST, &reg, hwsem_put);
+	stats->rx_ether_broacasts = reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_MULTICAST, &reg, hwsem_put);
+	stats->rx_ether_multicasts = reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_FCS_ERRS, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_ALIGN_ERRS, &reg2, hwsem_put);
+	stats->rx_ether_crc_align_errs = reg + reg2;
+
+hwsem_put:
+	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);
+	return ret;
+}
+
+static int __atl_fetch_msm2_stats(struct atl_hw *hw,
+				  struct atl_ether_stats *stats)
+{
+	u32 reg, reg2;
+	int ret;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
+	if (ret)
+		return ret;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_TX_PAUSE_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_TX_PAUSE_HI, &reg2, hwsem_put);
+	stats->tx_pause =  ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_TX_PKTS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_TX_PKTS_HI, &reg2, hwsem_put);
+	stats->tx_ether_pkts = ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_TX_OCTETS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_TX_OCTETS_HI, &reg2, hwsem_put);
+	stats->tx_ether_octets = ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_PAUSE_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_PAUSE_HI, &reg2, hwsem_put);
+	stats->rx_pause =  ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_OCTETS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_OCTETS_HI, &reg2, hwsem_put);
+	stats->rx_ether_octets = ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_PKTS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_PKTS_HI, &reg2, hwsem_put);
+	stats->rx_ether_pkts =  ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_BROADCAST_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_BROADCAST_HI, &reg2, hwsem_put);
+	stats->rx_ether_broacasts =  ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_MULTICAST_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_MULTICAST_HI, &reg2, hwsem_put);
+	stats->rx_ether_multicasts =  ((uint64_t)reg2 << 32) | reg;
+
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_FCS_ERRS_LO, &reg, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_FCS_ERRS_LO, &reg, hwsem_put);
+	stats->rx_ether_crc_align_errs = ((uint64_t)reg2 << 32) | reg;
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_ALIGN_ERRS_LO, &reg2, hwsem_put);
+	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM2_CTR_RX_ALIGN_ERRS_HI, &reg2, hwsem_put);
+	stats->rx_ether_crc_align_errs += ((uint64_t)reg2 << 32) | reg;
+
+hwsem_put:
+	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);
+	return ret;
+}
+
 int atl_update_eth_stats(struct atl_nic *nic)
 {
 	struct atl_hw *hw = &nic->hw;
@@ -1238,33 +1362,12 @@ int atl_update_eth_stats(struct atl_nic *nic)
 
 	atl_lock_fw(hw);
 
-	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MSM);
+	if (hw->mcp.interface_ver != ATL2_FW_INTERFACE_B0)
+		ret = __atl_fetch_msm1_stats(hw, &stats);
+	else
+		ret = __atl_fetch_msm2_stats(hw, &stats);
 	if (ret)
 		goto unlock_fw;
-
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_TX_PAUSE, &reg, hwsem_put);
-	stats.tx_pause = reg;
-
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_PAUSE, &reg, hwsem_put);
-	stats.rx_pause = reg;
-
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_OCTETS_LO, &reg, hwsem_put);
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_OCTETS_HI, &reg2, hwsem_put);
-	stats.rx_ether_octets = ((uint64_t)reg2 << 32) | reg;
-
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_PKTS_GOOD, &reg, hwsem_put);
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_ERRS, &reg2, hwsem_put);
-	stats.rx_ether_pkts = reg + reg2;;
-
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_BROADCAST, &reg, hwsem_put);
-	stats.rx_ether_broacasts = reg;
-
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_MULTICAST, &reg, hwsem_put);
-	stats.rx_ether_multicasts = reg;
-
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_FCS_ERRS, &reg, hwsem_put);
-	__READ_MSM_OR_GOTO(ret, hw, ATL_MSM_CTR_RX_ALIGN_ERRS, &reg2, hwsem_put);
-	stats.rx_ether_crc_align_errs = reg + reg2;
 
 	stats.rx_ether_drops = atl_read(hw, ATL_RX_DMA_STATS_CNT7);
 
@@ -1288,8 +1391,6 @@ int atl_update_eth_stats(struct atl_nic *nic)
 
 	ret = 0;
 
-hwsem_put:
-	atl_hwsem_put(hw, ATL_MCP_SEM_MSM);
 unlock_fw:
 	atl_unlock_fw(hw);
 	return ret;
@@ -1322,7 +1423,7 @@ static uint32_t atl_mcp_mbox_wait(struct atl_hw *hw, enum mcp_area area, int loo
 	return stat;
 }
 
-int atl_write_mcp_mem(struct atl_hw *hw, uint32_t offt, void *host_addr,
+int atl_write_mcp_mem_b1(struct atl_hw *hw, uint32_t offt, void *host_addr,
 	size_t size, enum mcp_area area)
 {
 	uint32_t *addr = (uint32_t *)host_addr;
@@ -1360,6 +1461,57 @@ int atl_write_mcp_mem(struct atl_hw *hw, uint32_t offt, void *host_addr,
 	}
 
 	return 0;
+}
+
+int atl_write_mcp_mem_b0(struct atl_hw *hw, uint32_t offt, void *host_addr,
+	size_t size, enum mcp_area area)
+{
+	uint32_t *addr = (uint32_t *)host_addr;
+
+	if (offt > 0xffff)
+		return -EINVAL;
+
+	if (area == MCP_AREA_CONFIG)
+		offt += hw->mcp.rpc_addr;
+	else
+		offt += hw->mcp.fw_settings_addr;
+
+	atl_write(hw, ATL_GLOBAL_MBOX_ADDR, offt);
+
+	while (size) {
+		uint32_t stat;
+
+		atl_write(hw, ATL_GLOBAL_MBOX_DATA, *addr++);
+		atl_write(hw, ATL_GLOBAL_MBOX_CTRL, 0xc000);
+
+		busy_wait(100, udelay(10), stat,
+			atl_read(hw, ATL_GLOBAL_MBOX_CTRL),
+			stat & BIT(8));
+		if (stat & BIT(8))
+			return -ETIME;
+
+		size -= 4;
+	}
+
+	return 0;
+}
+
+int atl_write_mcp_mem(struct atl_hw *hw, uint32_t offt, void *host_addr,
+	size_t size, enum mcp_area area)
+{
+	int ret;
+
+	ret = atl_hwsem_get(hw, ATL_MCP_SEM_MEM);
+	if (ret)
+		return ret;
+
+	if (hw->chip_rev == 0xb1)
+		ret = atl_write_mcp_mem_b1(hw, offt, host_addr, size, area);
+	else
+		ret = atl_write_mcp_mem_b0(hw, offt, host_addr, size, area);
+
+	atl_hwsem_put(hw, ATL_MCP_SEM_MEM);
+	return ret;
 }
 
 void atl_thermal_check(struct atl_hw *hw, bool alarm)
@@ -1460,105 +1612,73 @@ int atl2_act_rslvr_table_set(struct atl_hw *hw, u8 location,
 /** Initialise new rx filters
  * L2 promisc OFF
  * VLAN promisc OFF
- *
- * VLAN
- * MAC
- * ALLMULTI
- * UT
- * VLAN promisc ON
- * L2 promisc ON
+ * user custom filtlers
+ * RSS TC0
  */
 static void atl2_hw_init_new_rx_filters(struct atl_hw *hw)
 {
-	atl_write(hw, ATL2_RPF_REC_TAB_EN, 0xFFFF);
-	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(0), 22, 6, ATL2_RPF_TAG_BASE_UC);
-	atl_write_bits(hw, ATL2_RX_FLT_L2_BC_TAG, 0, 6, ATL2_RPF_TAG_BASE_UC);
-	atl_set_bits(hw, ATL2_RPF_L3_FLT(0), BIT(0x17));
+	struct atl_nic *nic = container_of(hw, struct atl_nic, hw);
+	uint32_t art_last_sec, art_first_sec, art_mask;
+	int index;
 
+	atl_write_bits(hw, ATL_RX_UC_FLT_REG2(nic->rxf_mac.base_index),
+		       22, 6, ATL2_RPF_TAG_BASE_UC);
+	atl_write_bits(hw, ATL2_RX_FLT_L2_BC_TAG, 0, 6, ATL2_RPF_TAG_BASE_BC);
+	atl_set_bits(hw, ATL2_RPF_L3_FLT(0), BIT(0x17));
+	atl_write_bit(hw, ATL_RX_MC_FLT_MSK, 14, 1);
+
+	art_last_sec = hw->art_base_index / 8 + hw->art_available / 8;
+	art_first_sec = hw->art_base_index / 8;
+	art_mask = (BIT(art_last_sec) - 1) - (BIT(art_first_sec) - 1);
+	atl_set_bits(hw, ATL2_RPF_REC_TAB_EN, art_mask);
+
+	index = hw->art_base_index + ATL2_RPF_L2_PROMISC_OFF_INDEX;
 	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_L2_PROMISC_OFF_INDEX,
+				 index,
 				 0,
 				 ATL2_RPF_TAG_UC_MASK | ATL2_RPF_TAG_ALLMC_MASK,
 				 ATL2_ACTION_DROP);
 
+	index = hw->art_base_index + ATL2_RPF_VLAN_PROMISC_OFF_INDEX;
 	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_VLAN_PROMISC_OFF_INDEX,
+				 index,
 				 0,
 				 ATL2_RPF_TAG_VLAN_MASK | ATL2_RPF_TAG_UNTAG_MASK,
 				 ATL2_ACTION_DROP);
 
-
+	index = hw->art_base_index + ATL2_RPF_DEFAULT_RULE_INDEX;
 	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_VLAN_INDEX,
-				 ATL2_RPF_TAG_BASE_VLAN,
-				 ATL2_RPF_TAG_VLAN_MASK,
-				 ATL2_ACTION_ASSIGN_TC(0));
-
-	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_MAC_INDEX,
-				 ATL2_RPF_TAG_BASE_UC,
-				 ATL2_RPF_TAG_UC_MASK,
-				 ATL2_ACTION_ASSIGN_TC(0));
-
-	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_ALLMC_INDEX,
-				 ATL2_RPF_TAG_BASE_ALLMC,
-				 ATL2_RPF_TAG_ALLMC_MASK,
-				 ATL2_ACTION_ASSIGN_TC(0));
-
-	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_UNTAG_INDEX,
-				 ATL2_RPF_TAG_UNTAG_MASK,
-				 ATL2_RPF_TAG_UNTAG_MASK,
-				 ATL2_ACTION_ASSIGN_TC(0));
-
-	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_VLAN_PROMISC_ON_INDEX,
+				 index,
 				 0,
-				 ATL2_RPF_TAG_VLAN_MASK,
-				 ATL2_ACTION_DISABLE);
-
-	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_L2_PROMISC_ON_INDEX,
 				 0,
-				 ATL2_RPF_TAG_UC_MASK,
-				 ATL2_ACTION_DISABLE);
+				 ATL2_ACTION_ASSIGN_TC(0));
 }
-
 
 static void atl2_hw_new_rx_filter_vlan_promisc(struct atl_hw *hw, bool promisc)
 {
-	u16 on_action = promisc ? ATL2_ACTION_ASSIGN_TC(0) : ATL2_ACTION_DISABLE;
 	u16 off_action = !promisc ? ATL2_ACTION_DROP : ATL2_ACTION_DISABLE;
+	int index = hw->art_base_index + ATL2_RPF_VLAN_PROMISC_OFF_INDEX;
 
 	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_VLAN_PROMISC_ON_INDEX,
-				 0,
-				 ATL2_RPF_TAG_VLAN_MASK,
-				 on_action);
-
-	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_VLAN_PROMISC_OFF_INDEX,
+				 index,
 				 0,
 				 ATL2_RPF_TAG_VLAN_MASK | ATL2_RPF_TAG_UNTAG_MASK,
 				 off_action);
 }
 
-static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc)
+static void atl2_hw_new_rx_filter_promisc(struct atl_hw *hw, bool promisc,
+					  bool allmulti)
 {
-	u16 on_action = promisc ? ATL2_ACTION_ASSIGN_TC(0) : ATL2_ACTION_DISABLE;
 	u16 off_action = promisc ? ATL2_ACTION_DISABLE : ATL2_ACTION_DROP;
+	u32 mask = allmulti ? (ATL2_RPF_TAG_UC_MASK | ATL2_RPF_TAG_ALLMC_MASK) :
+			      ATL2_RPF_TAG_UC_MASK;
+	int index = hw->art_base_index + ATL2_RPF_L2_PROMISC_OFF_INDEX;
 
 	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_L2_PROMISC_OFF_INDEX,
+				 index,
 				 0,
-				 ATL2_RPF_TAG_UC_MASK | ATL2_RPF_TAG_ALLMC_MASK,
+				 mask,
 				 off_action);
 
-	atl2_act_rslvr_table_set(hw,
-				 ATL2_RPF_L2_PROMISC_ON_INDEX,
-				 0,
-				 ATL2_RPF_TAG_UC_MASK,
-				 on_action);
 }
 

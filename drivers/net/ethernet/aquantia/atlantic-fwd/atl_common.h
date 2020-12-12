@@ -20,7 +20,7 @@
 #include <linux/netdevice.h>
 #include <linux/moduleparam.h>
 
-#define ATL_VERSION "1.1.9"
+#define ATL_VERSION "1.1.15"
 
 struct atl_nic;
 
@@ -41,8 +41,8 @@ enum {
 	ATL_RXF_VLAN_MAX = ATL_VLAN_FLT_NUM,
 	ATL_RXF_ETYPE_BASE = ATL_RXF_VLAN_BASE + ATL_RXF_VLAN_MAX,
 	ATL_RXF_ETYPE_MAX = ATL_ETYPE_FLT_NUM,
-	/* + 1 is for backward compatibility */
-	ATL_RXF_NTUPLE_BASE = ATL_RXF_ETYPE_BASE + ATL_RXF_ETYPE_MAX + 1,
+	ATL2_RPF_ETYPE_TAGS = 7,
+	ATL_RXF_NTUPLE_BASE = ATL_RXF_ETYPE_BASE + ATL_RXF_ETYPE_MAX,
 	ATL_RXF_NTUPLE_MAX = ATL_NTUPLE_FLT_NUM,
 	ATL_RXF_FLEX_BASE = ATL_RXF_NTUPLE_BASE + ATL_RXF_NTUPLE_MAX,
 	ATL_RXF_FLEX_MAX = 1,
@@ -134,12 +134,20 @@ struct atl_rxf_ntuple {
 	__be16 dst_port[ATL_RXF_NTUPLE_MAX];
 	__be16 src_port[ATL_RXF_NTUPLE_MAX];
 
-	struct atl2_rxf_l3 l3[ATL_RXF_NTUPLE_MAX];
+	struct atl2_rxf_l3 l3v4[ATL_RXF_NTUPLE_MAX];
+	struct atl2_rxf_l3 l3v6[ATL_RXF_NTUPLE_MAX];
 	struct atl2_rxf_l4 l4[ATL_RXF_NTUPLE_MAX];
 	s8 l3_idx[ATL_RXF_NTUPLE_MAX];
+	bool is_ipv6[ATL_RXF_NTUPLE_MAX];
 	s8 l4_idx[ATL_RXF_NTUPLE_MAX];
 	uint32_t cmd[ATL_RXF_NTUPLE_MAX];
 	int count;
+	int l3_v4_base_index;
+	int l3_v4_available;
+	int l3_v6_base_index;
+	int l3_v6_available;
+	int l4_base_index;
+	int l4_available;
 };
 
 enum atl_vlan_cmd {
@@ -159,6 +167,8 @@ struct atl_rxf_vlan {
 	unsigned long map[ATL_VID_MAP_LEN];
 	int vlans_active;
 	int promisc_count;
+	int base_index;
+	int available;
 };
 
 enum atl_etype_cmd {
@@ -170,9 +180,24 @@ enum atl_etype_cmd {
 	ATL_ETYPE_VAL_MASK = BIT(16) - 1,
 };
 
+struct atl2_tag_policy {
+	u16 action;
+	u16 usage;
+};
+
 struct atl_rxf_etype {
 	uint32_t cmd[ATL_RXF_ETYPE_MAX];
 	int count;
+	struct atl2_tag_policy tags_policy[ATL_RXF_ETYPE_MAX];
+	int tag[ATL_RXF_ETYPE_MAX];
+	int base_index;
+	int available;
+	int tag_top;
+};
+
+struct atl_rxf_mac {
+	int base_index;
+	int available;
 };
 
 enum atl_flex_cmd {
@@ -186,6 +211,8 @@ enum atl_flex_cmd {
 struct atl_rxf_flex {
 	uint32_t cmd[ATL_RXF_FLEX_MAX];
 	int count;
+	int base_index;
+	int available;
 };
 
 struct atl_queue_vec;
@@ -258,6 +285,7 @@ struct atl_nic {
 	struct atl_rxf_ntuple rxf_ntuple;
 	struct atl_rxf_vlan rxf_vlan;
 	struct atl_rxf_etype rxf_etype;
+	struct atl_rxf_mac rxf_mac;
 	struct atl_rxf_flex rxf_flex;
 
 	/* PTP support */
@@ -287,6 +315,7 @@ enum atl_priv_flags {
 	ATL_PF_STATS_RESET,
 	ATL_PF_STRIP_PAD,
 	ATL_PF_MEDIA_DETECT,
+	ATL_PF_DOWNSHIFT,
 };
 
 enum atl_priv_flag_bits {
@@ -311,9 +340,11 @@ enum atl_priv_flag_bits {
 
 	ATL_DEF_PF_BIT(STRIP_PAD),
 	ATL_DEF_PF_BIT(MEDIA_DETECT),
+	ATL_DEF_PF_BIT(DOWNSHIFT),
 
 	ATL_PF_RW_MASK = ATL_PF_LPB_MASK | ATL_PF_BIT(STATS_RESET) |
-		ATL_PF_BIT(STRIP_PAD) | ATL_PF_BIT(MEDIA_DETECT),
+		ATL_PF_BIT(STRIP_PAD) | ATL_PF_BIT(MEDIA_DETECT) |
+		ATL_PF_BIT(DOWNSHIFT),
 	ATL_PF_RO_MASK = ATL_PF_LPI_MASK,
 };
 
@@ -369,6 +400,7 @@ void atl_clear_tdm_cache(struct atl_nic *nic);
 int atl_alloc_rings(struct atl_nic *nic);
 void atl_free_rings(struct atl_nic *nic);
 irqreturn_t atl_ring_irq(int irq, void *priv);
+irqreturn_t atl_ptp_irq(int irq, void *private);
 void atl_ring_work(struct work_struct *work);
 void atl_start_hw_global(struct atl_nic *nic);
 int atl_intr_init(struct atl_nic *nic);
